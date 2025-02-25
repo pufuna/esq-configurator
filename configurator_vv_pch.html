@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Конфигуратор ВВ ПЧ ESQ-ME800</title>
+    <title>Конфигуратор преобразователя частоты ESQ F ME 800</title>
     <style>
         body {
             margin: 0;
@@ -13,7 +13,7 @@
             flex-direction: column;
             align-items: center;
             background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), 
-                        url('background1.jpg') center/cover fixed;
+                        url('background.jpg') center/cover fixed;
             position: relative;
         }
 
@@ -60,10 +60,11 @@
             background: #f8f9fa;
             border-radius: 10px;
             font-family: monospace;
-            font-size: 16px;
+            font-size: 24px;
             color: #2c3e50;
             border: 1px solid #eee;
             text-align: center;
+            font-weight: bold;
         }
 
         .footer {
@@ -96,15 +97,52 @@
         h1 {
             color: #2c3e50;
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 15px;
             font-size: 2.2em;
             text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .title-sub {
+            display: block;
+            font-size: 1.8em;
+            margin-top: 10px;
+            color: #2c3e50;
+        }
+
+        .result-title {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .home-button {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 20px 0;
+            background: #2c3e50;
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            transition: background 0.3s;
+            font-weight: 500;
+            width: 100%;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .home-button:hover {
+            background: #34495e;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
     </style>
 </head>
 <body>
     <div class="configurator">
-        <h1>Конфигуратор преобразователя частоты ESQ F ME800</h1>
+        <h1>Конфигуратор преобразователя частоты<br>
+            <span class="title-sub">ESQ F ME 800</span></h1>
         
         <div class="param">
             <label>1. Напряжение:</label>
@@ -226,7 +264,10 @@
             </select>
         </div>
 
+        <div class="result-title">Итог</div>
         <div id="result">ESQ F ME800-</div>
+
+        <a href="index.html" class="home-button">Вернуться на главную</a>
     </div>
 
     <div class="footer">
@@ -315,7 +356,7 @@
             const powerSelect = document.getElementById('power');
             powerSelect.innerHTML = '';
             
-            const powers = Object.keys(modelData[voltage])
+            Object.keys(modelData[voltage])
                 .sort((a, b) => a - b)
                 .forEach(power => {
                     const option = document.createElement('option');
