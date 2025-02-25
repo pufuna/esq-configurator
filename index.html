@@ -5,44 +5,102 @@
     <title>Конфигураторы оборудования</title>
     <style>
         body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
             margin: 0;
+            padding: 0;
+            min-height: 100vh;
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            position: relative;
+            overflow: hidden;
         }
-        
+
+        #video-bg {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            z-index: -1;
+            filter: brightness(0.6);
+        }
+
         .container {
             text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            margin: 100px auto;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            position: relative;
+            max-width: 800px;
         }
-        
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+        }
+
         .btn {
             display: inline-block;
             padding: 20px 40px;
             margin: 15px;
             font-size: 18px;
             cursor: pointer;
-            background-color: #4CAF50;
+            background-color: #3498db;
             color: white;
             border: none;
             border-radius: 8px;
             text-decoration: none;
-            transition: background-color 0.3s;
+            transition: all 0.3s;
+            width: 300px;
         }
-        
+
         .btn:hover {
-            background-color: #45a049;
+            background-color: #2980b9;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: rgba(44, 62, 80, 0.9);
+            color: white;
+            position: relative;
+        }
+
+        /* Мобильная адаптация */
+        @media (max-width: 768px) {
+            .container {
+                width: 90%;
+                margin: 50px auto;
+                padding: 20px;
+            }
+            .btn {
+                width: 100%;
+                margin: 10px 0;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Видео-фон -->
+    <video autoplay muted loop id="video-bg">
+        <source src="background.mp4" type="video/mp4">
+        Ваш браузер не поддерживает видео-фон.
+    </video>
+
     <div class="container">
         <h1>Выберите конфигуратор:</h1>
         <a href="configurator_vv_pch.html" class="btn">Конфигуратор ВВ ПЧ</a>
         <a href="vv_upp.html" class="btn">Конфигуратор ВВ УПП</a>
+    </div>
+
+    <div class="footer">
+        <p>© 2023 ESQ Конфигураторы. Все права защищены</p>
     </div>
 </body>
 </html>
