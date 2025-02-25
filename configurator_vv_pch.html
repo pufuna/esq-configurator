@@ -4,13 +4,42 @@
     <meta charset="UTF-8">
     <title>Конфигуратор ВВ ПЧ ESQ-ME800</title>
     <style>
-        .configurator { margin: 20px; padding: 20px; border: 1px solid #ccc; max-width: 800px; }
+        .configurator { 
+            margin: 20px; 
+            padding: 20px; 
+            border: 1px solid #ccc; 
+            max-width: 800px; 
+            min-height: calc(100vh - 160px);
+        }
         .param { margin-bottom: 15px; display: flex; align-items: center; }
         label { display: inline-block; width: 250px; margin-right: 15px; }
         #result { margin-top: 25px; padding: 15px; background: #f0f0f0; font-family: monospace; font-size: 16px; }
         select, input { width: 200px; padding: 5px; }
         select:disabled, input[readonly] { background: #f8f8f8; }
         .disabled { opacity: 0.7; }
+        
+        /* Стили для футера и кнопки */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background: #2c3e50;
+            margin-top: auto;
+        }
+        .back-btn {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .back-btn:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body>
@@ -142,6 +171,11 @@
         <div id="result">ESQ F ME800-</div>
     </div>
 
+    <!-- Добавленный блок с кнопкой -->
+    <div class="footer">
+        <a href="index.html" class="back-btn">Вернуться на главную</a>
+    </div>
+
     <script>
         // Полные данные из таблицы
         const modelData = {
@@ -242,19 +276,14 @@
             const power = document.getElementById('power').value;
             const data = modelData[voltage][power];
             
-            // Обновление тока
             document.getElementById('current').value = data.current;
-            
-            // Обновление размера ячеек
             const cellSize = document.getElementById('cellSize');
             cellSize.value = data.size;
             
-            // Управление пусковым шкафом
             const starter = document.getElementById('starter');
             starter.disabled = data.starter;
             starter.value = data.starter ? 'S' : 'X';
             
-            // Обновление пульсности
             const pulsation = document.getElementById('pulsation');
             pulsation.innerHTML = voltage === 'T060' 
                 ? '<option value="30">30</option><option value="36">36</option>'
@@ -285,7 +314,6 @@
             document.getElementById('result').textContent = `ESQ F ME800-${params.join('')}`;
         }
 
-        // Инициализация
         document.addEventListener('DOMContentLoaded', () => {
             updatePowerOptions();
             document.querySelectorAll('select').forEach(el => 
