@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Конфигуратор ВВ ПЧ ESQ-ME800</title>
+    <style>
+        .configurator { margin: 20px; padding: 20px; border: 1px solid #ccc; max-width: 800px; }
+        .param { margin-bottom: 15px; display: flex; align-items: center; }
+        label { display: inline-block; width: 250px; margin-right: 15px; }
+        #result { margin-top: 25px; padding: 15px; background: #f0f0f0; font-family: monospace; font-size: 16px; }
+        select, input { width: 200px; padding: 5px; }
+        select:disabled, input[readonly] { background: #f8f8f8; }
+        .disabled { opacity: 0.7; }
+    </style>
+</head>
+<body>
+    <div class="configurator">
+        <h2>Конфигуратор преобразователей частоты ESQ-ME800</h2>
+        
+        <!-- Основные параметры -->
+        <div class="param">
+            <label>1. Напряжение:</label>
+            <select id="voltage" onchange="updatePowerOptions()">
+                <option value="T060">6 кВ</option>
+                <option value="T100">10 кВ</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>2. Мощность ПЧ (кВт):</label>
+            <select id="power" onchange="updateDependencies()"></select>
+        </div>
+
+        <div class="param">
+            <label>3. Номинальный ток (А):</label>
+            <input type="text" id="current" readonly>
+        </div>
+
+        <div class="param">
+            <label>4. Материал обмоток:</label>
+            <select id="material" onchange="updateNomenclature()">
+                <option value="AL">Алюминий</option>
+                <option value="CU">Медь</option>
+            </select>
+        </div>
+
+        <!-- Остальные параметры -->
+        <div class="param">
+            <label>5. Пульсность:</label>
+            <select id="pulsation" onchange="updateNomenclature()"></select>
+        </div>
+
+        <div class="param">
+            <label>6. Пусковой шкаф:</label>
+            <select id="starter" onchange="updateNomenclature()">
+                <option value="X">Отсутствует</option>
+                <option value="S">Включен</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>7. Шкаф байпаса:</label>
+            <select id="bypass" onchange="updateNomenclature()">
+                <option value="A">Автоматический</option>
+                <option value="M">Ручной</option>
+                <option value="X">Отсутствует</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>8. Шкаф реактора:</label>
+            <select id="reactor" onchange="updateNomenclature()">
+                <option value="R">Включен</option>
+                <option value="X">Отсутствует</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>9. Степень защиты:</label>
+            <select id="ip" onchange="updateNomenclature()">
+                <option value="31">IP31</option>
+                <option value="42">IP42</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>10. Плата расширения:</label>
+            <select id="expansion" onchange="updateNomenclature()">
+                <option value="E">+8DI/DO</option>
+                <option value="2E">+16DI/DO</option>
+                <option value="X">Стандарт</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>11. ИБП:</label>
+            <select id="ups" onchange="updateNomenclature()">
+                <option value="U">Присутствует</option>
+                <option value="X">Отсутствует</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>12. Вводы/выводы:</label>
+            <select id="cable" onchange="updateNomenclature()">
+                <option value="D">Снизу</option>
+                <option value="T">Сверху</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>13. Протокол связи:</label>
+            <select id="protocol" onchange="updateNomenclature()">
+                <option value="MR">Modbus RTU</option>
+                <option value="MT">Modbus TCP</option>
+                <option value="PB">ProfibusDP</option>
+                <option value="PN">ProfiNet</option>
+                <option value="CO">CanOpen</option>
+                <option value="EI">Ethernet/IP</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>14. Размер ячеек:</label>
+            <select id="cellSize" onchange="updateNomenclature()" disabled>
+                <option value="PE">PE</option>
+                <option value="PA">PA</option>
+                <option value="PB">PB</option>
+                <option value="PC">PC</option>
+                <option value="PD">PD</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>15. Байпас ячейки:</label>
+            <select id="cellBypass" onchange="updateNomenclature()">
+                <option value="N">Отсутствует</option>
+                <option value="B">Включен</option>
+            </select>
+        </div>
+
+        <div id="result">ESQ F ME800-</div>
+    </div>
+
+    <script>
+        // Полные данные из таблицы
+        const modelData = {
+            'T060': {
+                '280':  {current: '34',  size: 'PE', starter: false},
+                '315':  {current: '38',  size: 'PE', starter: false},
+                '355':  {current: '43',  size: 'PE', starter: false},
+                '400':  {current: '48',  size: 'PE', starter: false},
+                '450':  {current: '54',  size: 'PE', starter: false},
+                '500':  {current: '61',  size: 'PE', starter: false},
+                '560':  {current: '67',  size: 'PE', starter: false},
+                '630':  {current: '77',  size: 'PE', starter: false},
+                '710':  {current: '87',  size: 'PE', starter: false},
+                '800':  {current: '96',  size: 'PA', starter: false},
+                '900':  {current: '108', size: 'PA', starter: false},
+                '1000': {current: '120', size: 'PA', starter: false},
+                '1120': {current: '135', size: 'PA', starter: false},
+                '1250': {current: '154', size: 'PA', starter: false},
+                '1400': {current: '173', size: 'PA', starter: false},
+                '1500': {current: '183', size: 'PB', starter: false},
+                '1600': {current: '192', size: 'PB', starter: false},
+                '1800': {current: '217', size: 'PA', starter: true},
+                '2000': {current: '241', size: 'PA', starter: true},
+                '2240': {current: '269', size: 'PB', starter: true},
+                '2500': {current: '303', size: 'PB', starter: true},
+                '2600': {current: '318', size: 'PB', starter: true},
+                '2800': {current: '337', size: 'PB', starter: true},
+                '3150': {current: '385', size: 'PC', starter: true},
+                '3550': {current: '433', size: 'PC', starter: true},
+                '4000': {current: '481', size: 'PC', starter: true},
+                '4500': {current: '558', size: 'PC', starter: true},
+                '5000': {current: '600', size: 'PC', starter: true},
+                '5600': {current: '673', size: 'PD', starter: true},
+                '6300': {current: '770', size: 'PD', starter: true},
+                '7100': {current: '870', size: 'PD', starter: true},
+                '8000': {current: '962', size: 'PD', starter: true}
+            },
+            'T100': {
+                '280':  {current: '20',  size: 'PE', starter: false},
+                '315':  {current: '23',  size: 'PE', starter: false},
+                '355':  {current: '26',  size: 'PE', starter: false},
+                '400':  {current: '29',  size: 'PE', starter: false},
+                '450':  {current: '32',  size: 'PE', starter: false},
+                '500':  {current: '36',  size: 'PE', starter: false},
+                '560':  {current: '40',  size: 'PE', starter: false},
+                '630':  {current: '46',  size: 'PE', starter: false},
+                '710':  {current: '52',  size: 'PE', starter: false},
+                '800':  {current: '58',  size: 'PA', starter: false},
+                '900':  {current: '65',  size: 'PA', starter: false},
+                '1000': {current: '72',  size: 'PA', starter: false},
+                '1120': {current: '81',  size: 'PA', starter: false},
+                '1250': {current: '92',  size: 'PA', starter: false},
+                '1400': {current: '104', size: 'PA', starter: false},
+                '1500': {current: '110', size: 'PA', starter: false},
+                '1600': {current: '115', size: 'PA', starter: false},
+                '1800': {current: '130', size: 'PA', starter: false},
+                '2000': {current: '144', size: 'PA', starter: false},
+                '2240': {current: '162', size: 'PB', starter: false},
+                '2500': {current: '182', size: 'PB', starter: false},
+                '2650': {current: '191', size: 'PB', starter: false},
+                '2800': {current: '202', size: 'PA', starter: true},
+                '3150': {current: '231', size: 'PA', starter: true},
+                '3400': {current: '245', size: 'PB', starter: true},
+                '3600': {current: '260', size: 'PB', starter: true},
+                '4000': {current: '289', size: 'PB', starter: true},
+                '4500': {current: '335', size: 'PC', starter: true},
+                '5000': {current: '364', size: 'PC', starter: true},
+                '5600': {current: '404', size: 'PC', starter: true},
+                '6300': {current: '462', size: 'PC', starter: true},
+                '7100': {current: '520', size: 'PD', starter: true},
+                '8000': {current: '577', size: 'PD', starter: true},
+                '9000': {current: '650', size: 'PD', starter: true},
+                '10000':{current: '720', size: 'PD', starter: true},
+                '11200':{current: '810', size: 'PD', starter: true},
+                '12500':{current: '920', size: 'PD', starter: true}
+            }
+        };
+
+        function updatePowerOptions() {
+            const voltage = document.getElementById('voltage').value;
+            const powerSelect = document.getElementById('power');
+            powerSelect.innerHTML = '';
+            
+            const powers = Object.keys(modelData[voltage])
+                .sort((a, b) => a - b)
+                .forEach(power => {
+                    const option = document.createElement('option');
+                    option.value = power;
+                    option.textContent = `${power} кВт`;
+                    powerSelect.appendChild(option);
+                });
+            
+            updateDependencies();
+        }
+
+        function updateDependencies() {
+            const voltage = document.getElementById('voltage').value;
+            const power = document.getElementById('power').value;
+            const data = modelData[voltage][power];
+            
+            // Обновление тока
+            document.getElementById('current').value = data.current;
+            
+            // Обновление размера ячеек
+            const cellSize = document.getElementById('cellSize');
+            cellSize.value = data.size;
+            
+            // Управление пусковым шкафом
+            const starter = document.getElementById('starter');
+            starter.disabled = data.starter;
+            starter.value = data.starter ? 'S' : 'X';
+            
+            // Обновление пульсности
+            const pulsation = document.getElementById('pulsation');
+            pulsation.innerHTML = voltage === 'T060' 
+                ? '<option value="30">30</option><option value="36">36</option>'
+                : '<option value="48">48</option><option value="54">54</option>';
+            
+            updateNomenclature();
+        }
+
+        function updateNomenclature() {
+            const params = [
+                document.getElementById('power').value + 'P',
+                document.getElementById('current').value + 'А',
+                document.getElementById('voltage').value,
+                document.getElementById('material').value,
+                document.getElementById('pulsation').value,
+                document.getElementById('starter').value,
+                document.getElementById('bypass').value,
+                document.getElementById('reactor').value,
+                document.getElementById('ip').value,
+                document.getElementById('expansion').value,
+                document.getElementById('ups').value,
+                document.getElementById('cable').value,
+                document.getElementById('protocol').value,
+                '-' + document.getElementById('cellSize').value,
+                document.getElementById('cellBypass').value
+            ];
+            
+            document.getElementById('result').textContent = `ESQ F ME800-${params.join('')}`;
+        }
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
+            updatePowerOptions();
+            document.querySelectorAll('select').forEach(el => 
+                el.addEventListener('change', updateNomenclature)
+            );
+        });
+    </script>
+</body>
+</html>
