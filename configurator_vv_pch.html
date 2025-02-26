@@ -493,6 +493,16 @@
             document.getElementById('old-result').textContent = buildOldNomenclatureText();
         }
 
+         function getOldNomenclatureCode() {
+            const newCode = document.getElementById('result').textContent;
+            const codeParts = newCode.split('-');
+            const lastPart = codeParts[codeParts.length - 1];
+            const lastThree = lastPart.slice(-3);
+            
+            const voltage = document.getElementById('voltage').value;
+            const power = document.getElementById('power').value;
+            return ESQ-ME800-${power}-${voltage}-${lastThree};
+        }
         document.addEventListener('DOMContentLoaded', () => {
             updatePowerOptions();
             document.querySelectorAll('select').forEach(el => 
