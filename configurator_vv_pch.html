@@ -408,6 +408,16 @@
             return `ESQ-ME800-${power}-${voltage}-${pulsationCode}${materialCode}${cellBypass}`;
         }
 
+           function getCellCount() {
+            const pulsation = document.getElementById('pulsation').value;
+            return {
+                '30': '5 ячеек на фазу',
+                '36': '6 ячеек на фазу', 
+                '48': '8 ячеек на фазу',
+                '54': '9 ячеек на фазу'
+            }[pulsation] || '';
+        }
+        
         function buildOldNomenclatureText() {
             const voltage = document.getElementById('voltage');
             const power = document.getElementById('power');
@@ -442,6 +452,7 @@
                 `IP${ip.value}`,
                 bypass.value === 'X' ? 'без байпаса силовых ячеек' : 
                     `${bypass.options[bypass.selectedIndex].textContent.toLowerCase()} байпас`
+                getCellCount() // Добавляем ячейки
             ];
 
             const additions = [];
