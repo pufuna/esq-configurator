@@ -408,30 +408,30 @@
             }[pulsation] || '';
         }
 
-        function getOldNomenclatureCode() {
+       function getOldNomenclatureCode() {
+            const power = document.getElementById('power').value;
+            const voltage = document.getElementById('voltage').value;
             const newCode = document.getElementById('result').textContent;
-             const codeParts = newCode.split('-');
-            const lastPart = codeParts[codeParts.length - 1];
-            const lastThree = lastPart.slice(-3);
-            
-            return `ESQ-ME800-${power}-${voltage}-${lastThree}`;
+            const lastPart = newCode.split('-').pop();
+            return `ESQ-ME800-${power}-${voltage}-${lastPart.slice(-3)}`;
         }
 
-        function buildOldNomenclatureText() {
-            const voltage = document.getElementById('voltage');
-            const power = document.getElementById('power');
-            const current = document.getElementById('current');
-            const material = document.getElementById('material');
-            const ip = document.getElementById('ip');
-            const bypass = document.getElementById('bypass');
-            const starter = document.getElementById('starter');
-            const reactor = document.getElementById('reactor');
-            const expansion = document.getElementById('expansion');
-            const ups = document.getElementById('ups');
-            const cable = document.getElementById('cable');
-            const protocol = document.getElementById('protocol');
-            const cellBypass = document.getElementById('cellBypass');
-
+       function buildOldNomenclatureText() {
+            const voltageText = document.getElementById('voltage').options[document.getElementById('voltage').selectedIndex].text;
+            const powerValue = document.getElementById('power').value;
+            const current = document.getElementById('current').value;
+            const material = document.getElementById('material').value;
+            const ip = document.getElementById('ip').value;
+            const bypass = document.getElementById('bypass').value;
+            const starter = document.getElementById('starter').value;
+            const reactor = document.getElementById('reactor').value;
+            const expansion = document.getElementById('expansion').value;
+            const ups = document.getElementById('ups').value;
+            const cable = document.getElementById('cable').value;
+            const protocol = document.getElementById('protocol').value;
+            const cellBypass = document.getElementById('cellBypass').value;
+return parts.concat(additions).join(', ');
+        }
             const protocolMap = {
                 'MR': 'Modbus RTU',
                 'MT': 'Modbus TCP',
