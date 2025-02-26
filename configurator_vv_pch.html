@@ -354,7 +354,45 @@
             }
         };
 
-        function getOldNomenclatureCode() {
+        function updatePowerOptions() {
+            const voltage = document.getElementById('voltage').value;
+            const powerSelect = document.getElementById('power');
+            powerSelect.innerHTML = '';
+            
+            Object.keys(modelData[voltage])
+                .sort((a, b) => a - b)
+                .forEach(power => {
+                    const option = document.createElement('option');
+                    option.value = power;
+                    option.textContent = `${power} кВт`;
+                    powerSelect.appendChild(option);
+                });
+            
+            updateDependencies();
+        }
+
+        function updateDependencies() {
+            const voltage = document.getElementById('voltage').value;
+            const power = document.getElementById('power').value;
+            const data = modelData[voltage][power];
+            
+            document.getElementById('current').value = data.current;
+            const cellSize = document.getElementById('cellSize');
+            cellSize.value = data.size;
+            
+            const starter = document.getElementById('starter');
+            starter.disabled = data.starter;
+            starter.value = data.starter ? 'S' : 'X';
+            
+            const pulsation = document.getElementById('pulsation');
+            pulsation.innerHTML = voltage === 'T060' 
+                ? '<option value="30">30</option><option value="36">36</option>'
+                : '<option value="48">48</option><option value="54">54</option>';
+            
+            updateNomenclature();
+        }
+
+         function getOldNomenclatureCode() {
             const voltage = document.getElementById('voltage').value;
             const power = document.getElementById('power').value;
             const pulsation = document.getElementById('pulsation').value;
