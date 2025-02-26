@@ -186,17 +186,17 @@
         <div class="param">
             <label>7. Шкаф байпаса:</label>
             <select id="bypass" onchange="updateNomenclature()">
+                <option value="X">Отсутствует</option>
                 <option value="A">Автоматический</option>
                 <option value="M">Ручной</option>
-                <option value="X">Отсутствует</option>
             </select>
         </div>
 
         <div class="param">
             <label>8. Шкаф реактора:</label>
             <select id="reactor" onchange="updateNomenclature()">
-                <option value="R">Включен</option>
                 <option value="X">Отсутствует</option>
+                <option value="R">Включен</option>
             </select>
         </div>
 
@@ -211,17 +211,17 @@
         <div class="param">
             <label>10. Плата расширения:</label>
             <select id="expansion" onchange="updateNomenclature()">
+                <option value="X">Нет</option>
                 <option value="E">+8DI/DO</option>
                 <option value="2E">+16DI/DO</option>
-                <option value="X">Стандарт</option>
             </select>
         </div>
 
         <div class="param">
             <label>11. ИБП:</label>
             <select id="ups" onchange="updateNomenclature()">
+               <option value="X">Отсутствует</option>
                 <option value="U">Присутствует</option>
-                <option value="X">Отсутствует</option>
             </select>
         </div>
 
@@ -260,7 +260,7 @@
             <label>15. Байпас ячейки:</label>
             <select id="cellBypass" onchange="updateNomenclature()">
                 <option value="N">Отсутствует</option>
-                <option value="B">Включен</option>
+                <option value="B">Присутствует</option>
             </select>
         </div>
 
@@ -454,7 +454,6 @@
                 `${current} А`,
                 `${material === 'AL' ? 'алюминиевый' : 'медный'} трансформатор`,
                 `IP${ip}`,
-                bypassSelect.value === 'X' ? 'без байпаса силовых ячеек' : `${bypassText} байпас`,
                 getCellCount()
             ];
 
@@ -465,7 +464,7 @@
             if (expansionSelect.value !== 'X') additions.push(expansionText);
             additions.push(protocolText);
             additions.push(cable === 'T' ? 'вводы сверху' : 'вводы снизу');
-            if (cellBypass === 'B') additions.push('байпас ячеек включен');
+            if (cellBypass === 'B') additions.push('байпас силовой ячейки');
 
             return parts.concat(additions).filter(Boolean).join(', ');
         }
