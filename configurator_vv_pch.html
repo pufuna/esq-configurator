@@ -54,7 +54,7 @@
             background: white;
         }
 
-        #result {
+        #result, #old-result {
             margin: 30px 0;
             padding: 20px;
             background: #f8f9fa;
@@ -267,6 +267,9 @@
         <div class="result-title">Итог</div>
         <div id="result">ESQ F ME800-</div>
 
+        <div class="result-title">Ответ по старой номенклатуре</div>
+        <div id="old-result"></div>
+
         <a href="index.html" class="home-button">Вернуться на главную</a>
     </div>
 
@@ -375,18 +378,96 @@
             
             document.getElementById('current').value = data.current;
             const cellSize = document.getElementById('cellSize');
-            cellSize.value = data.size;
+            const pulsation = document.getElementById('pulsation').value;
+            
+            if(voltage === 'T060') {
+                cellSize.value = pulsation === '30' ? 'PE' : 'PA';
+            } else {
+                cellSize.value = pulsation === '48' ? 'PB' : 'PC';
+            }
             
             const starter = document.getElementById('starter');
             starter.disabled = data.starter;
             starter.value = data.starter ? 'S' : 'X';
             
-            const pulsation = document.getElementById('pulsation');
-            pulsation.innerHTML = voltage === 'T060' 
+            const pulsationSelect = document.getElementById('pulsation');
+            pulsationSelect.innerHTML = voltage === 'T060' 
                 ? '<option value="30">30</option><option value="36">36</option>'
                 : '<option value="48">48</option><option value="54">54</option>';
             
             updateNomenclature();
+        }
+
+        function getCellCount() {
+            const pulsation = document.getElementById('pulsation').value;
+            return {
+                '30': '5 ячеек на фазу',
+                '36': '6 ячеек на фазу',
+                '48': '8 ячеек на фазу',
+                '54': '9 ячеек на фазу'
+            }[pulsation] || '';
+        }
+
+        function getOldNomenclatureCode() {
+            const newCode = document.getElementById('result').textContent;
+            const codeParts = newCode.split('-');
+            const lastPart = codeParts[codeParts.length - 1];
+            const lastThree = lastPart.slice(-3);
+            
+            const voltage = document.getElementById('voltage').value;
+            const power = document.getElementById('power').value;
+            return `ESQ-ME800-${power}-${voltage}-${lastThree}`;
+        }
+
+        function buildOldNomenclatureText() {
+            const voltageSelect = document.getElementById('voltage');
+            const voltageText = voltageSelect.options[voltageSelect.selectedIndex].text;
+            const power = document.getElementById('power').value;
+            const current = document.getElementById('current').value;
+            const material = document.getElementById('material').value;
+            const ip = document.getElementById('ip').value;
+            const bypassSelect = document.getElementById('bypass');
+            const bypassText = bypassSelect.options[bypassSelect.selectedIndex].text.toLowerCase();
+            const starter = document.getElementById('starter').value;
+            const reactor = document.getElementById('reactor').value;
+            const expansionSelect = document.getElementById('expansion');
+            const expansionText = expansionSelect.value !== 'X' 
+                ? expansionSelect.options[expansionSelect.selectedIndex].text.toLowerCase() 
+                : '';
+            const ups = document.getElementById('ups').value;
+            const cable = document.getElementById('cable').value;
+            const protocolSelect = document.getElementById('protocol');
+            const protocolText = {
+                'MR': 'Modbus RTU',
+                'MT': 'Modbus TCP',
+                'PB': 'ProfibusDP',
+                'PN': 'ProfiNet',
+                'CO': 'CanOpen',
+                'EI': 'Ethernet/IP'
+            }[protocolSelect.value];
+            const cellBypass = document.getElementById('cellBypass').value;
+
+            const parts = [
+                getOldNomenclatureCode(),
+                voltageText,
+                `${power} кВт`,
+                `${current} А`,
+                `${material === 'AL' ? 'алюминиевый' : 'медный'} трансформатор`,
+                `IP${ip}`,
+                bypassSelect.value === 'X' ? 'без байпаса силовых ячеек' : `${bypassText} байпас`,
+                getCellCount()
+            ];
+
+            const additions = [];
+            if (starter === 'S') additions.push('пусковой шкаф');
+            if (reactor === 'R') additions.push('шкаф реактора');
+            if (ups === 'U') additions.push('ИБП');
+            if (expansionSelect.value !== 'X') additions.push(expansionText);
+            additions.push(protocolText);
+            additions.push(cable === 'T' ? 'вводы сверху' : 'вводы снизу');
+            if (cellBypass === 'B') additions.push('байпас ячеек включен');
+
+            return parts.concat(additions).filter(Boolean).join(', ');
         }
 
         function updateNomenclature() {
@@ -409,6 +490,7 @@
             ];
             
             document.getElementById('result').textContent = `ESQ F ME800-${params.join('')}`;
+            document.getElementById('old-result').textContent = buildOldNomenclatureText();
         }
 
         document.addEventListener('DOMContentLoaded', () => {
