@@ -54,7 +54,7 @@
             background: white;
         }
 
-        #result {
+        #result, #old-nomenclature {
             margin: 30px 0;
             padding: 20px;
             background: #f8f9fa;
@@ -77,36 +77,12 @@
             backdrop-filter: blur(5px);
         }
 
-        @media (max-width: 768px) {
-            .configurator {
-                width: 95%;
-                padding: 20px;
-                margin: 20px auto;
-            }
-            
-            .param {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            label, select, input {
-                flex: 1 1 100%;
-            }
-        }
-
         h1 {
             color: #2c3e50;
             text-align: center;
             margin-bottom: 15px;
             font-size: 2.2em;
             text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .title-sub {
-            display: block;
-            font-size: 1.8em;
-            margin-top: 10px;
-            color: #2c3e50;
         }
 
         .result-title {
@@ -117,26 +93,6 @@
             text-align: center;
         }
 
-        .home-button {
-            display: inline-block;
-            padding: 12px 30px;
-            margin: 20px 0;
-            background: #2c3e50;
-            color: white;
-            text-decoration: none;
-            border-radius: 25px;
-            transition: background 0.3s;
-            font-weight: 500;
-            width: 100%;
-            text-align: center;
-            box-sizing: border-box;
-        }
-
-        .home-button:hover {
-            background: #34495e;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
     </style>
 </head>
 <body>
@@ -264,16 +220,42 @@
             </select>
         </div>
 
-        <div class="result-title">Итог</div>
-        <div id="result">ESQ F ME800-</div>
+           <div class="result-title">Ответ по старой номенклатуре</div>
+        <div id="old-nomenclature">ESQ-ME800-1600-T060-PEN, 6 кВ, 1600 кВт, 192 А, алюминиевый трансформатор, IP31, без байпаса силовых ячеек</div>
 
         <a href="index.html" class="home-button">Вернуться на главную</a>
     </div>
 
     <div class="footer">
-        <p>© 2025 ESQ </p>
+        <p>©️ 2025 ESQ </p>
     </div>
 
+    <script>
+        function updateNomenclature() {
+            const power = document.getElementById('power').value;
+            const voltage = document.getElementById('voltage').value;
+            const current = document.getElementById('current').value;
+            const material = document.getElementById('material').value === 'AL' ? 'алюминиевый' : 'медный';
+            const ip = document.getElementById('ip').value;
+            const bypass = document.getElementById('bypass').value === 'X' ? 'без байпаса силовых ячеек' : 'с байпасом';
+            
+            // Основная номенклатура
+            document.getElementById('result').textContent = ESQ F ME800-${power}P;
+
+            // Ответ по старой номенклатуре
+            let oldNomenclature = ESQ-ME800-${power}-${voltage}-PEN, ${voltage === 'T060' ? '6 кВ' : '10 кВ'}, ${power} кВт, ${current} А, ${material} трансформатор, IP${ip}, ${bypass};
+            document.getElementById('old-nomenclature').textContent = oldNomenclature;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('select, input').forEach(el => 
+                el.addEventListener('change', updateNomenclature)
+            );
+            updateNomenclature();
+        });
+    </script>
+</body>
+</html>
     <script>
         const modelData = {
             'T060': {
