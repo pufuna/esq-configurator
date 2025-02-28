@@ -258,7 +258,7 @@
 
         <div class="param">
             <label>15. Байпас ячейки:</label>
-            <select id="cellBypass" onchange="updateNomenclature()">
+            <select id="cell" onchange="updateNomenclature()">
                 <option value="N">Отсутствует</option>
                 <option value="B">Присутствует</option>
             </select>
@@ -426,7 +426,7 @@
             const current = document.getElementById('current').value;
             const ip = document.getElementById('ip').value;
             const material = document.getElementById('material').value;
-            const bypassSelect = document.getElementById('bypass').value
+            const bypass = document.getElementById('bypass').value
             const bypassText = bypassSelect.options[bypassSelect.selectedIndex].text.toLowerCase();
             const starter = document.getElementById('starter').value;
             const reactor = document.getElementById('reactor').value;
