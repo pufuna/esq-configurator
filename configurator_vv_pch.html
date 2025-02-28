@@ -458,13 +458,14 @@
             ];
 
             const additions = [];
+             if (cellBypass === 'B') additions.push('с байпас силовой ячейки');
+            if (cellBypass === 'N') additions.push('без байпас силовой ячейки');
             if (starter === 'S') additions.push('пусковой шкаф');
             if (reactor === 'R') additions.push('шкаф реактора');
             if (ups === 'U') additions.push('ИБП');
             if (expansionSelect.value !== 'X') additions.push(expansionText);
             additions.push(protocolText);
             additions.push(cable === 'T' ? 'вводы сверху' : 'вводы снизу');
-            if (cellBypass === 'B') additions.push('байпас силовой ячейки');
 
             return parts.concat(additions).filter(Boolean).join(', ');
         }
