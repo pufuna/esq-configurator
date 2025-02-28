@@ -185,7 +185,7 @@
 
         <div class="param">
             <label>7. Шкаф байпаса:</label>
-            <select id="bypass" onchange="updateNomenclature()">
+            <select id="bypassSelect" onchange="updateNomenclature()">
                 <option value="X">Отсутствует</option>
                 <option value="A">Автоматический</option>
                 <option value="M">Ручной</option>
@@ -460,8 +460,8 @@
             const additions = [];
              if (cellBypass === 'B') additions.push('с байпас силовой ячейки');
             if (cellBypass === 'N') additions.push('без байпас силовой ячейки');
-            if (bypass === 'A') additions.push('шкаф автоматического байпаса');
-            if (bypass === 'M') additions.push('шкаф ручного байпаса');
+            if (bypassSelect === 'A') additions.push('шкаф автоматического байпаса');
+            if (bypassSelect === 'M') additions.push('шкаф ручного байпаса');
             if (starter === 'S') additions.push('пусковой шкаф');
             if (reactor === 'R') additions.push('шкаф реактора');
             if (ups === 'U') additions.push('ИБП');
