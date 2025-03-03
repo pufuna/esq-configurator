@@ -458,10 +458,11 @@
             ];
 
             const additions = [];
-             if (cellBypass === 'B') additions.push('с байпас силовой ячейки');
+            if (cellBypass === 'B') additions.push('с байпас силовой ячейки');
             if (cellBypass === 'N') additions.push('без байпас силовой ячейки');
             if (starter === 'S') additions.push('пусковой шкаф');
             if (reactor === 'R') additions.push('шкаф реактора');
+            if (bypassSelect.value !== 'X') additions.push(`${bypassText} шкаф байпаса`);
             if (ups === 'U') additions.push('ИБП');
             if (expansionSelect.value !== 'X') additions.push(expansionText);
             additions.push(protocolText);
