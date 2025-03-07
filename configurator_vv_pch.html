@@ -380,11 +380,7 @@
             const cellSize = document.getElementById('cellSize');
             const pulsation = document.getElementById('pulsation').value;
             
-            if(voltage === 'T060') {
-                cellSize.value = pulsation === '30' ? 'PE' : 'PA';
-            } else {
-                cellSize.value = pulsation === '48' ? 'PB' : 'PC';
-            }
+        
             
             const starter = document.getElementById('starter');
             starter.disabled = data.starter;
