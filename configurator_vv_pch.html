@@ -377,10 +377,13 @@
             const data = modelData[voltage][power];
             
             document.getElementById('current').value = data.current;
+
+            // ▼ Новое: автоматический выбор размера ячеек по таблице
             const cellSize = document.getElementById('cellSize');
+            cellSize.value = data.size; // <- устанавливаем PE/PB/PC/PA/PD автоматически
+            // ▲ Новое
+
             const pulsation = document.getElementById('pulsation').value;
-            
-        
             
             const starter = document.getElementById('starter');
             starter.disabled = data.starter;
