@@ -11,6 +11,8 @@
     label{min-width:280px;color:#25364a}
     select,input{flex:1;min-width:260px;padding:10px 12px;border:1px solid #dfe6ef;border-radius:8px;background:#fff}
     .result{margin-top:22px;padding:16px;border:1px dashed #d6deeb;border-radius:10px;background:#f9fbff;font:600 20px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;color:#1f3147}
+    .back-btn{margin-top:24px;display:inline-block;padding:12px 22px;background:#1f3147;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;transition:.2s}
+    .back-btn:hover{background:#2d4665}
     @media (max-width:720px){label{min-width:100%}}
   </style>
 </head>
@@ -82,6 +84,7 @@
     </div>
 
     <div class="result" id="resultLine"></div>
+    <a href="index.html" class="back-btn">Вернуться на главную</a>
   </div>
 
   <script>
@@ -150,7 +153,6 @@
       const protoMap = {MR:'Modbus RTU', MT:'Modbus TCP', PB:'ProfibusDP', PN:'ProfiNet', CO:'CanOpen', EI:'Ethernet/IP'};
       const protoText = protoMap[els.proto.value];
 
-      // Комплектация не добавляется в описание
       els.result.textContent = `${sku} — ${vText}, ${pText}, ${els.current.value} А, ${ipText}, питание ${ctlText}, ${cableText}, протокол ${protoText}`;
     }
 
