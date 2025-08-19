@@ -278,6 +278,7 @@
     </div>
 
     <script>
+        // Обновлено: size (PE/PА/PB/PC/PD) строго по таблицам PDF для 6 кВ (T060) и 10 кВ (T100).
         const modelData = {
             'T060': {
                 '280':  {current: '34',  size: 'PE', starter: false},
@@ -289,14 +290,14 @@
                 '560':  {current: '67',  size: 'PE', starter: false},
                 '630':  {current: '77',  size: 'PE', starter: false},
                 '710':  {current: '87',  size: 'PE', starter: false},
-                '800':  {current: '96',  size: 'PA', starter: false},
-                '900':  {current: '108', size: 'PA', starter: false},
-                '1000': {current: '120', size: 'PA', starter: false},
-                '1120': {current: '135', size: 'PA', starter: false},
-                '1250': {current: '154', size: 'PA', starter: false},
-                '1400': {current: '173', size: 'PA', starter: false},
-                '1500': {current: '183', size: 'PB', starter: false},
-                '1600': {current: '192', size: 'PB', starter: false},
+                '800':  {current: '96',  size: 'PE', starter: false},
+                '900':  {current: '108', size: 'PE', starter: false},
+                '1000': {current: '120', size: 'PE', starter: false},
+                '1120': {current: '135', size: 'PE', starter: false},
+                '1250': {current: '154', size: 'PE', starter: false},
+                '1400': {current: '173', size: 'PE', starter: false},
+                '1500': {current: '183', size: 'PE', starter: false},
+                '1600': {current: '192', size: 'PE', starter: false},
                 '1800': {current: '217', size: 'PA', starter: true},
                 '2000': {current: '241', size: 'PA', starter: true},
                 '2240': {current: '269', size: 'PB', starter: true},
@@ -323,30 +324,30 @@
                 '560':  {current: '40',  size: 'PE', starter: false},
                 '630':  {current: '46',  size: 'PE', starter: false},
                 '710':  {current: '52',  size: 'PE', starter: false},
-                '800':  {current: '58',  size: 'PA', starter: false},
-                '900':  {current: '65',  size: 'PA', starter: false},
-                '1000': {current: '72',  size: 'PA', starter: false},
-                '1120': {current: '81',  size: 'PA', starter: false},
-                '1250': {current: '92',  size: 'PA', starter: false},
-                '1400': {current: '104', size: 'PA', starter: false},
-                '1500': {current: '110', size: 'PA', starter: false},
-                '1600': {current: '115', size: 'PA', starter: false},
-                '1800': {current: '130', size: 'PA', starter: false},
-                '2000': {current: '144', size: 'PA', starter: false},
-                '2240': {current: '162', size: 'PB', starter: false},
-                '2500': {current: '182', size: 'PB', starter: false},
-                '2650': {current: '191', size: 'PB', starter: false},
+                '800':  {current: '58',  size: 'PE', starter: false},
+                '900':  {current: '65',  size: 'PE', starter: false},
+                '1000': {current: '72',  size: 'PE', starter: false},
+                '1120': {current: '81',  size: 'PE', starter: false},
+                '1250': {current: '92',  size: 'PE', starter: false},
+                '1400': {current: '104', size: 'PE', starter: false},
+                '1500': {current: '110', size: 'PE', starter: false},
+                '1600': {current: '115', size: 'PE', starter: false},
+                '1800': {current: '130', size: 'PE', starter: false},
+                '2000': {current: '144', size: 'PE', starter: false},
+                '2240': {current: '162', size: 'PE', starter: false},
+                '2500': {current: '182', size: 'PE', starter: false},
+                '2650': {current: '191', size: 'PE', starter: false},
                 '2800': {current: '202', size: 'PA', starter: true},
                 '3150': {current: '231', size: 'PA', starter: true},
-                '3400': {current: '245', size: 'PB', starter: true},
-                '3600': {current: '260', size: 'PB', starter: true},
+                '3400': {current: '245', size: 'PA', starter: true},
+                '3600': {current: '260', size: 'PA', starter: true},
                 '4000': {current: '289', size: 'PB', starter: true},
-                '4500': {current: '335', size: 'PC', starter: true},
+                '4500': {current: '335', size: 'PB', starter: true},
                 '5000': {current: '364', size: 'PC', starter: true},
                 '5600': {current: '404', size: 'PC', starter: true},
                 '6300': {current: '462', size: 'PC', starter: true},
-                '7100': {current: '520', size: 'PD', starter: true},
-                '8000': {current: '577', size: 'PD', starter: true},
+                '7100': {current: '520', size: 'PC', starter: true},
+                '8000': {current: '577', size: 'PC', starter: true},
                 '9000': {current: '650', size: 'PD', starter: true},
                 '10000':{current: '720', size: 'PD', starter: true},
                 '11200':{current: '810', size: 'PD', starter: true},
@@ -378,21 +379,20 @@
             
             document.getElementById('current').value = data.current;
 
-            // ▼ Новое: автоматический выбор размера ячеек по таблице
+            // Автовыбор размера ячеек по таблице
             const cellSize = document.getElementById('cellSize');
-            cellSize.value = data.size; // <- устанавливаем PE/PB/PC/PA/PD автоматически
-            // ▲ Новое
+            cellSize.value = data.size;
 
-            const pulsation = document.getElementById('pulsation').value;
-            
-            const starter = document.getElementById('starter');
-            starter.disabled = data.starter;
-            starter.value = data.starter ? 'S' : 'X';
-            
+            // Пересоздаём список пульсностей по напряжению
             const pulsationSelect = document.getElementById('pulsation');
             pulsationSelect.innerHTML = voltage === 'T060' 
                 ? '<option value="30">30</option><option value="36">36</option>'
                 : '<option value="48">48</option><option value="54">54</option>';
+
+            // Логика пускового шкафа (как была)
+            const starter = document.getElementById('starter');
+            starter.disabled = data.starter;
+            starter.value = data.starter ? 'S' : 'X';
             
             updateNomenclature();
         }
