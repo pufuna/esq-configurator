@@ -88,6 +88,7 @@
   </div>
 
   <script>
+    // Мощность (кВт) → номинальный ток (А)
     const data = {
       "06": {
         220: 25, 280: 35, 315: 40, 400: 45, 450: 55, 560: 65, 630: 75, 710: 90,
@@ -123,7 +124,7 @@
         opt.textContent = `${p} кВт`;
         els.power.appendChild(opt);
       }
-      updateFromPower();
+      updateFromPower(); // сразу выставляем ток по первой мощности
     }
 
     function updateFromPower() {
@@ -135,9 +136,9 @@
     }
 
     function buildSku() {
-      const v = els.voltage.value;
-      const I = els.current.value || '000';
-      const pkg = els.pkg.value;
+      const v = els.voltage.value;           // '06' | '10'
+      const I = els.current.value || '000';  // ток
+      const pkg = els.pkg.value;             // 'STD' | 'E' | 'S'
       const suffix = (pkg === 'E' || pkg === 'S') ? `-${pkg}` : '';
       return `ESQ-HVS${v}-${I}${suffix}`;
     }
@@ -157,19 +158,22 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      // Значения по умолчанию
       els.voltage.value = '06';
-      updatePowerOptions();
       els.ip.value = 'IP41';
       els.pkg.value = 'STD';
       els.ctl.value = 'AC';
       els.cable.value = 'BOT';   // по умолчанию "Снизу"
       els.proto.value = 'MR';
-      render();
 
-      ['change','input'].forEach(ev=>{
-        [els.voltage, els.power, els.ip, els.pkg, els.ctl, els.cable, els.proto].forEach(el=>{
-          el.addEventListener(ev, ()=> (el.id==='voltage'?updatePowerOptions():render()));
-        });
+      // Инициализация
+      updatePowerOptions();
+
+      // Обработчики: важно — для мощности вызываем updateFromPower()
+      els.voltage.addEventListener('change', updatePowerOptions);
+      els.power.addEventListener('change', updateFromPower);
+      [els.ip, els.pkg, els.ctl, els.cable, els.proto].forEach(el => {
+        el.addEventListener('change', render);
       });
     });
   </script>
