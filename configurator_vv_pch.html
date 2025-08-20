@@ -1,579 +1,625 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>Конфигуратор преобразователя частоты ESQ F ME 800</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), 
-                        url('background2.jpg') center/cover fixed;
-            position: relative;
-        }
-
-        .configurator {
-            width: 90%;
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 30px;
-            background: rgba(255, 255, 255, 0.9);
-            border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-            backdrop-filter: blur(5px);
-        }
-
-        .param {
-            margin-bottom: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            align-items: center;
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-        }
-
-        label {
-            flex: 1 1 250px;
-            font-weight: 500;
-            color: #2c3e50;
-            min-width: 250px;
-        }
-
-        select, input {
-            flex: 2 1 300px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 14px;
-            background: white;
-        }
-
-        #result, #old-result {
-            margin: 30px 0;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-            font-family: monospace;
-            font-size: 24px;
-            color: #2c3e50;
-            border: 1px solid #eee;
-            text-align: center;
-            font-weight: bold;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 20px;
-            background: rgba(44, 62, 80, 0.9);
-            color: white;
-            width: 100%;
-            margin-top: auto;
-            backdrop-filter: blur(5px);
-        }
-
-        @media (max-width: 768px) {
-            .configurator {
-                width: 95%;
-                padding: 20px;
-                margin: 20px auto;
-            }
-            
-            .param {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            label, select, input {
-                flex: 1 1 100%;
-            }
-        }
-
-        h1 {
-            color: #2c3e50;
-            text-align: center;
-            margin-bottom: 15px;
-            font-size: 2.2em;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .title-sub {
-            display: block;
-            font-size: 1.8em;
-            margin-top: 10px;
-            color: #2c3e50;
-        }
-
-        .result-title {
-            font-size: 1.5em;
-            margin-bottom: 15px;
-            color: #2c3e50;
-            font-weight: bold;
-            text-align: center;
-        }
-
-        .home-button {
-            display: inline-block;
-            padding: 12px 30px;
-            margin: 20px 0;
-            background: #2c3e50;
-            color: white;
-            text-decoration: none;
-            border-radius: 25px;
-            transition: background 0.3s;
-            font-weight: 500;
-            width: 100%;
-            text-align: center;
-            box-sizing: border-box;
-        }
-
-        .home-button:hover {
-            background: #34495e;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Конфигуратор преобразователя частоты ESQ F ME 800</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- PDF генератор -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-YcsIPmQY2pQFm2y+m5gK1Ewq3MZ8w5JjW2Vq2h1r3yV2Xo1r0tD0r5jQ7r+0J8G4JYkC1XbEwB0Y3O1QKz3a7Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    body{
+      margin:0;padding:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;
+      display:flex;flex-direction:column;align-items:center;
+      background:linear-gradient(rgba(0,0,0,0.4),rgba(0,0,0,0.4)), url('background2.jpg') center/cover fixed;
+      position:relative
+    }
+    .configurator{
+      width:90%;max-width:800px;margin:40px auto;padding:30px;background:rgba(255,255,255,.9);
+      border-radius:15px;box-shadow:0 8px 32px rgba(0,0,0,.1);backdrop-filter:blur(5px)
+    }
+    .param{margin-bottom:20px;display:flex;flex-wrap:wrap;gap:15px;align-items:center;padding:15px;border-bottom:1px solid #eee}
+    label{flex:1 1 250px;font-weight:500;color:#2c3e50;min-width:250px}
+    select,input{flex:2 1 300px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff}
+    .note{flex:1 1 100%;margin-top:6px;color:#666;font-size:12px}
+    #result,#old-result{
+      margin:30px 0;padding:20px;background:#f8f9fa;border-radius:10px;font-family:monospace;
+      font-size:24px;color:#2c3e50;border:1px solid #eee;text-align:center;font-weight:bold
+    }
+    .result-title{font-size:1.5em;margin-bottom:15px;color:#2c3e50;font-weight:700;text-align:center}
+    .home-button,.download-btn{
+      display:inline-block;padding:12px 30px;background:#2c3e50;color:#fff;text-decoration:none;border-radius:25px;
+      transition:background .3s;font-weight:600;width:100%;text-align:center;box-sizing:border-box
+    }
+    .home-button{margin:20px 0 10px}
+    .home-button:hover{background:#34495e;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    .download-btn{margin:10px 0 20px;background:#0f6b3f}
+    .download-btn:hover{background:#11824c;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    @media (max-width:768px){
+      .configurator{width:95%;padding:20px;margin:20px auto}
+      .param{flex-direction:column;align-items:stretch}
+      label,select,input{flex:1 1 100%}
+    }
+    h1{color:#2c3e50;text-align:center;margin-bottom:15px;font-size:2.2em;text-shadow:0 2px 4px rgba(0,0,0,.1)}
+    .title-sub{display:block;font-size:1.8em;margin-top:10px;color:#2c3e50}
+    .footer{text-align:center;padding:20px;background:rgba(44,62,80,.9);color:#fff;width:100%;margin-top:auto;backdrop-filter:blur(5px)}
+  </style>
 </head>
 <body>
-    <div class="configurator">
-        <h1>Конфигуратор преобразователя частоты<br>
-            <span class="title-sub">ESQ F ME 800</span></h1>
-        
-        <div class="param">
-            <label>1. Напряжение:</label>
-            <select id="voltage" onchange="updatePowerOptions()">
-                <option value="T060">6 кВ</option>
-                <option value="T100">10 кВ</option>
-            </select>
-        </div>
+  <div class="configurator">
+    <h1>Конфигуратор преобразователя частоты<br><span class="title-sub">ESQ F ME 800</span></h1>
 
-        <div class="param">
-            <label>2. Мощность ПЧ (кВт):</label>
-            <select id="power" onchange="updateDependencies()"></select>
-        </div>
-
-        <div class="param">
-            <label>3. Номинальный ток (А):</label>
-            <input type="text" id="current" readonly>
-        </div>
-
-        <div class="param">
-            <label>4. Материал обмоток:</label>
-            <select id="material" onchange="updateNomenclature()">
-                <option value="AL">Алюминий</option>
-                <option value="CU">Медь</option>
-            </select>
-        </div>
-
-        <div class="param">
-            <label>5. Пульсность:</label>
-            <select id="pulsation" onchange="updateNomenclature()"></select>
-        </div>
-
-<div class="param">
-    <label>6. Тип конденсаторов:</label>
-    <div style="flex:2 1 300px; display:flex; flex-direction:column;">
-        <select id="capacitorType" onchange="onCapacitorTypeChange()">
-            <option value="EL">Электролитические</option>
-            <option value="PF">Пленочные</option>
-        </select>
-        <small style="color:#666; font-size:12px; margin-top:4px;">
-            Пленочные доступны: 6 кВ до 710 кВт, 10 кВ до 1250 кВт
-        </small>
-    </div>
-</div>
-
-        <div class="param">
-            <label>7. Пусковой шкаф:</label>
-            <select id="starter" onchange="updateNomenclature()">
-                <option value="X">Отсутствует</option>
-                <option value="S">Включен</option>
-            </select>
-        </div>
-
-        <div class="param">
-            <label>8. Шкаф байпаса:</label>
-            <select id="bypass" onchange="updateNomenclature()">
-                <option value="X">Отсутствует</option>
-                <option value="A">Автоматический</option>
-                <option value="M">Ручной</option>
-            </select>
-        </div>
-
-        <div class="param">
-            <label>9. Шкаф реактора:</label>
-            <select id="reactor" onchange="updateNomenclature()">
-                <option value="X">Отсутствует</option>
-                <option value="R">Включен</option>
-            </select>
-        </div>
-
-        <div class="param">
-            <label>10. Степень защиты:</label>
-            <select id="ip" onchange="updateNomenclature()">
-                <option value="31">IP31</option>
-                <option value="42">IP42</option>
-            </select>
-        </div>
-
-        <div class="param">
-            <label>11. Плата расширения:</label>
-            <select id="expansion" onchange="updateNomenclature()">
-                <option value="X">Нет</option>
-                <option value="E">+8DI/DO</option>
-                <option value="2E">+16DI/DO</option>
-            </select>
-        </div>
-
-        <div class="param">
-            <label>12. ИБП:</label>
-            <select id="ups" onchange="updateNomenclature()">
-               <option value="X">Отсутствует</option>
-                <option value="U">Присутствует</option>
-            </select>
-        </div>
-
-        <div class="param">
-            <label>13. Вводы/выводы:</label>
-            <select id="cable" onchange="updateNomenclature()">
-                <option value="D">Снизу</option>
-                <option value="T">Сверху</option>
-            </select>
-        </div>
-
-        <div class="param">
-            <label>14. Протокол связи:</label>
-            <select id="protocol" onchange="updateNomenclature()">
-                <option value="MR">Modbus RTU</option>
-                <option value="MT">Modbus TCP</option>
-                <option value="PB">ProfibusDP</option>
-                <option value="PN">ProfiNet</option>
-                <option value="CO">CanOpen</option>
-                <option value="EI">Ethernet/IP</option>
-            </select>
-        </div>
-
-        <div class="param">
-            <label>15. Тип ячеек:</label>
-            <select id="cellSize" onchange="updateNomenclature()" disabled>
-                <option value="PE">PE</option>
-                <option value="PA">PA</option>
-                <option value="PB">PB</option>
-                <option value="PC">PC</option>
-                <option value="PD">PD</option>
-                <option value="PF">PF</option><!-- добавлен PF -->
-            </select>
-        </div>
-
-        <div class="param">
-            <label>16. Байпас ячейки:</label>
-            <select id="cellBypass" onchange="updateNomenclature()">
-                <option value="N">Отсутствует</option>
-                <option value="B">Присутствует</option>
-            </select>
-        </div>
-
-        <div class="result-title">Итог</div>
-        <div id="result">ESQ F ME800-</div>
-
-        <div class="result-title">Ответ по старой номенклатуре</div>
-        <div id="old-result"></div>
-
-        <a href="index.html" class="home-button">Вернуться на главную</a>
+    <div class="param">
+      <label>1. Напряжение:</label>
+      <select id="voltage" onchange="updatePowerOptions()">
+        <option value="T060">6 кВ</option>
+        <option value="T100">10 кВ</option>
+      </select>
     </div>
 
-    <div class="footer">
-        <p>© 2025 ESQ </p>
+    <div class="param">
+      <label>2. Мощность ПЧ (кВт):</label>
+      <select id="power" onchange="updateDependencies()"></select>
     </div>
 
-    <script>
-        const modelData = {
-            'T060': {
-                '280':  {current: '34',  size: 'PE', starter: false},
-                '315':  {current: '38',  size: 'PE', starter: false},
-                '355':  {current: '43',  size: 'PE', starter: false},
-                '400':  {current: '48',  size: 'PE', starter: false},
-                '450':  {current: '54',  size: 'PE', starter: false},
-                '500':  {current: '61',  size: 'PE', starter: false},
-                '560':  {current: '67',  size: 'PE', starter: false},
-                '630':  {current: '77',  size: 'PE', starter: false},
-                '710':  {current: '87',  size: 'PE', starter: false},
-                '800':  {current: '96',  size: 'PE', starter: false},
-                '900':  {current: '108', size: 'PE', starter: false},
-                '1000': {current: '120', size: 'PE', starter: false},
-                '1120': {current: '135', size: 'PE', starter: false},
-                '1250': {current: '154', size: 'PE', starter: false},
-                '1400': {current: '173', size: 'PE', starter: false}, // исправлено ранее
-                '1500': {current: '183', size: 'PE', starter: false},
-                '1600': {current: '192', size: 'PE', starter: false},
-                '1800': {current: '217', size: 'PA', starter: true},
-                '2000': {current: '241', size: 'PA', starter: true},
-                '2240': {current: '269', size: 'PB', starter: true},
-                '2500': {current: '303', size: 'PB', starter: true},
-                '2600': {current: '318', size: 'PB', starter: true},
-                '2800': {current: '337', size: 'PB', starter: true},
-                '3150': {current: '385', size: 'PC', starter: true},
-                '3550': {current: '433', size: 'PC', starter: true},
-                '4000': {current: '481', size: 'PC', starter: true},
-                '4500': {current: '558', size: 'PC', starter: true},
-                '5000': {current: '600', size: 'PC', starter: true},
-                '5600': {current: '673', size: 'PD', starter: true},
-                '6300': {current: '770', size: 'PD', starter: true},
-                '7100': {current: '870', size: 'PD', starter: true},
-                '8000': {current: '962', size: 'PD', starter: true}
-            },
-            'T100': {
-                '280':  {current: '20',  size: 'PE', starter: false},
-                '315':  {current: '23',  size: 'PE', starter: false},
-                '355':  {current: '26',  size: 'PE', starter: false},
-                '400':  {current: '29',  size: 'PE', starter: false},
-                '450':  {current: '32',  size: 'PE', starter: false},
-                '500':  {current: '36',  size: 'PE', starter: false},
-                '560':  {current: '40',  size: 'PE', starter: false},
-                '630':  {current: '46',  size: 'PE', starter: false},
-                '710':  {current: '52',  size: 'PE', starter: false},
-                '800':  {current: '58',  size: 'PE', starter: false},
-                '900':  {current: '65',  size: 'PE', starter: false},
-                '1000': {current: '72',  size: 'PE', starter: false},
-                '1120': {current: '81',  size: 'PE', starter: false},
-                '1250': {current: '92',  size: 'PE', starter: false},
-                '1400': {current: '104', size: 'PE', starter: false},
-                '1500': {current: '110', size: 'PE', starter: false},
-                '1600': {current: '115', size: 'PE', starter: false},
-                '1800': {current: '130', size: 'PE', starter: false},
-                '2000': {current: '144', size: 'PE', starter: false},
-                '2240': {current: '162', size: 'PE', starter: false},
-                '2500': {current: '182', size: 'PE', starter: false},
-                '2650': {current: '191', size: 'PE', starter: false},
-                '2800': {current: '202', size: 'PA', starter: true},
-                '3150': {current: '231', size: 'PA', starter: true},
-                '3400': {current: '245', size: 'PA', starter: true},
-                '3600': {current: '260', size: 'PA', starter: true},
-                '4000': {current: '289', size: 'PB', starter: true},
-                '4500': {current: '335', size: 'PB', starter: true},
-                '5000': {current: '364', size: 'PC', starter: true},
-                '5600': {current: '404', size: 'PC', starter: true},
-                '6300': {current: '462', size: 'PC', starter: true},
-                '7100': {current: '520', size: 'PC', starter: true},
-                '8000': {current: '577', size: 'PC', starter: true},
-                '9000': {current: '650', size: 'PD', starter: true},
-                '10000':{current: '720', size: 'PD', starter: true},
-                '11200':{current: '810', size: 'PD', starter: true},
-                '12500':{current: '920', size: 'PD', starter: true}
-            }
-        };
+    <div class="param">
+      <label>3. Номинальный ток (А):</label>
+      <input type="text" id="current" readonly>
+    </div>
 
-        function isFilmAllowed(voltage, power) {
-            const p = Number(power);
-            if (voltage === 'T060') return p <= 710;    // 6 кВ: до 710 кВт включительно
-            if (voltage === 'T100') return p <= 1250;   // 10 кВ: до 1250 кВт включительно
-            return false;
-        }
+    <div class="param">
+      <label>4. Материал обмоток:</label>
+      <select id="material" onchange="updateNomenclature()">
+        <option value="AL">Алюминий</option>
+        <option value="CU">Медь</option>
+      </select>
+    </div>
 
-        function updatePowerOptions() {
-            const voltage = document.getElementById('voltage').value;
-            const powerSelect = document.getElementById('power');
-            powerSelect.innerHTML = '';
-            
-            Object.keys(modelData[voltage])
-                .sort((a, b) => a - b)
-                .forEach(power => {
-                    const option = document.createElement('option');
-                    option.value = power;
-                    option.textContent = `${power} кВт`;
-                    powerSelect.appendChild(option);
-                });
-            
-            updateDependencies();
-        }
+    <div class="param">
+      <label>5. Пульсность:</label>
+      <select id="pulsation" onchange="updateNomenclature()"></select>
+    </div>
 
-        function onCapacitorTypeChange() {
-            const voltage = document.getElementById('voltage').value;
-            const power = document.getElementById('power').value;
-            const cap = document.getElementById('capacitorType');
-            const allowed = isFilmAllowed(voltage, power);
+    <!-- Пункт 6 — Тип конденсаторов -->
+    <div class="param">
+      <label>6. Тип конденсаторов:</label>
+      <select id="capacitorType" onchange="onCapacitorTypeChange()">
+        <option value="EL">Электролитические</option>
+        <option value="PF">Пленочные</option>
+      </select>
+      <div class="note">Плёночные доступны: 6 кВ — до 710 кВт, 10 кВ — до 1250 кВт.</div>
+    </div>
 
-            // Если выбраны пленочные вне допустимого диапазона — откат на электролитические
-            if (cap.value === 'PF' && !allowed) {
-                cap.value = 'EL';
-            }
-            applyCellSize(); // применяем актуальный суффикс
-            updateNomenclature();
-        }
+    <div class="param">
+      <label>7. Пусковой шкаф:</label>
+      <select id="starter" onchange="updateNomenclature()">
+        <option value="X">Отсутствует</option>
+        <option value="S">Включен</option>
+      </select>
+    </div>
 
-        function updateCapacitorAvailability() {
-            const voltage = document.getElementById('voltage').value;
-            const power = document.getElementById('power').value;
-            const cap = document.getElementById('capacitorType');
-            const filmOption = Array.from(cap.options).find(o => o.value === 'PF');
-            const allowed = isFilmAllowed(voltage, power);
+    <div class="param">
+      <label>8. Шкаф байпаса:</label>
+      <select id="bypass" onchange="updateNomenclature()">
+        <option value="X">Отсутствует</option>
+        <option value="A">Автоматический</option>
+        <option value="M">Ручной</option>
+      </select>
+    </div>
 
-            // Включаем/выключаем возможность выбора пленочных
-            if (filmOption) filmOption.disabled = !allowed;
+    <div class="param">
+      <label>9. Шкаф реактора:</label>
+      <select id="reactor" onchange="updateNomenclature()">
+        <option value="X">Отсутствует</option>
+        <option value="R">Включен</option>
+      </select>
+    </div>
 
-            // Если сейчас выбран PF, но уже нельзя — переключаем на EL
-            if (cap.value === 'PF' && !allowed) {
-                cap.value = 'EL';
-            }
-        }
+    <div class="param">
+      <label>10. Степень защиты:</label>
+      <select id="ip" onchange="updateNomenclature()">
+        <option value="31">IP31</option>
+        <option value="42">IP42</option>
+      </select>
+    </div>
 
-        function applyCellSize() {
-            const voltage = document.getElementById('voltage').value;
-            const power = document.getElementById('power').value;
-            const data = modelData[voltage][power];
-            const cap = document.getElementById('capacitorType').value;
-            const cellSize = document.getElementById('cellSize');
+    <div class="param">
+      <label>11. Плата расширения:</label>
+      <select id="expansion" onchange="updateNomenclature()">
+        <option value="X">Нет</option>
+        <option value="E">+8DI/DO</option>
+        <option value="2E">+16DI/DO</option>
+      </select>
+    </div>
 
-            if (cap === 'PF' && isFilmAllowed(voltage, power)) {
-                cellSize.value = 'PF'; // плёночные → суффикс PF
-            } else {
-                cellSize.value = data.size; // по таблице
-            }
-        }
+    <div class="param">
+      <label>12. ИБП:</label>
+      <select id="ups" onchange="updateNomenclature()">
+        <option value="X">Отсутствует</option>
+        <option value="U">Присутствует</option>
+      </select>
+    </div>
 
-        function updateDependencies() {
-            const voltage = document.getElementById('voltage').value;
-            const power = document.getElementById('power').value;
-            const data = modelData[voltage][power];
-            
-            document.getElementById('current').value = data.current;
+    <div class="param">
+      <label>13. Вводы/выводы:</label>
+      <select id="cable" onchange="updateNomenclature()">
+        <option value="D">Снизу</option>
+        <option value="T">Сверху</option>
+      </select>
+    </div>
 
-            // Пересоздаём список пульсностей по напряжению
-            const pulsationSelect = document.getElementById('pulsation');
-            pulsationSelect.innerHTML = voltage === 'T060' 
-                ? '<option value="30">30</option><option value="36">36</option>'
-                : '<option value="48">48</option><option value="54">54</option>';
+    <div class="param">
+      <label>14. Протокол связи:</label>
+      <select id="protocol" onchange="updateNomenclature()">
+        <option value="MR">Modbus RTU</option>
+        <option value="MT">Modbus TCP</option>
+        <option value="PB">ProfibusDP</option>
+        <option value="PN">ProfiNet</option>
+        <option value="CO">CanOpen</option>
+        <option value="EI">Ethernet/IP</option>
+      </select>
+    </div>
 
-            // Логика пускового шкафа (как была)
-            const starter = document.getElementById('starter');
-            starter.disabled = data.starter;
-            starter.value = data.starter ? 'S' : 'X';
+    <div class="param">
+      <label>15. Размер ячеек (суффикс):</label>
+      <select id="cellSize" onchange="updateNomenclature()" disabled>
+        <option value="PE">PE</option>
+        <option value="PA">PA</option>
+        <option value="PB">PB</option>
+        <option value="PC">PC</option>
+        <option value="PD">PD</option>
+        <option value="PF">PF</option>
+      </select>
+    </div>
 
-            // Актуализируем доступность пленочных и применяем суффикс размера
-            updateCapacitorAvailability();
-            applyCellSize();
+    <div class="param">
+      <label>16. Байпас ячейки:</label>
+      <select id="cellBypass" onchange="updateNomenclature()">
+        <option value="N">Отсутствует</option>
+        <option value="B">Присутствует</option>
+      </select>
+    </div>
 
-            updateNomenclature();
-        }
+    <div class="result-title">Итог</div>
+    <div id="result">ESQ F ME800-</div>
 
-        function getCellCount() {
-            const pulsation = document.getElementById('pulsation').value;
-            return {
-                '30': '5 ячеек на фазу',
-                '36': '6 ячеек на фазу',
-                '48': '8 ячеек на фазу',
-                '54': '9 ячеек на фазу'
-            }[pulsation] || '';
-        }
+    <div class="result-title">Ответ по старой номенклатуре</div>
+    <div id="old-result"></div>
 
-        function getOldNomenclatureCode() {
-            const newCode = document.getElementById('result').textContent;
-            const codeParts = newCode.split('-');
-            const lastPart = codeParts[codeParts.length - 1];
-            const lastThree = lastPart.slice(-3); // как в исходном файле
-            const voltage = document.getElementById('voltage').value;
-            const power = document.getElementById('power').value;
-            return `ESQ-ME800-${power}-${voltage}-${lastThree}`;
-        }
+    <a href="index.html" class="home-button">Вернуться на главную</a>
+    <a href="#" class="download-btn" onclick="downloadTKP(event)">Скачать ТКП</a>
+  </div>
 
-        function buildOldNomenclatureText() {
-            const voltageSelect = document.getElementById('voltage');
-            const voltageText = voltageSelect.options[voltageSelect.selectedIndex].text;
-            const power = document.getElementById('power').value;
-            const current = document.getElementById('current').value;
-            const ip = document.getElementById('ip').value;
-            const material = document.getElementById('material').value;
-            const bypassSelect = document.getElementById('bypass');
-            const bypassText = bypassSelect.options[bypassSelect.selectedIndex].text.toLowerCase();
-            const starter = document.getElementById('starter').value;
-            const reactor = document.getElementById('reactor').value;
-            const expansionSelect = document.getElementById('expansion');
-            const expansionText = expansionSelect.value !== 'X' 
-                ? expansionSelect.options[expansionSelect.selectedIndex].text.toLowerCase() 
-                : '';
-            const ups = document.getElementById('ups').value;
-            const cable = document.getElementById('cable').value;
-            const protocolSelect = document.getElementById('protocol');
-            const protocolText = {
-                'MR': 'Modbus RTU',
-                'MT': 'Modbus TCP',
-                'PB': 'ProfibusDP',
-                'PN': 'ProfiNet',
-                'CO': 'CanOpen',
-                'EI': 'Ethernet/IP'
-            }[protocolSelect.value];
-            const cellBypass = document.getElementById('cellBypass').value;
+  <div class="footer"><p>© 2025 ESQ</p></div>
 
-            const parts = [
-                getOldNomenclatureCode(),
-                voltageText,
-                `${power} кВт`,
-                `${current} А`,
-                 `IP${ip}`,
-                `${material === 'AL' ? 'алюминиевый' : 'медный'} трансформатор`,
-                getCellCount()
-            ];
+  <script>
+    // ----- ДАННЫЕ МОДЕЛЕЙ (ток и суффикс ячейки) -----
+    const modelData = {
+      'T060': {
+        '280': {current:'34',size:'PE',starter:false},  '315': {current:'38',size:'PE',starter:false},
+        '355': {current:'43',size:'PE',starter:false},  '400': {current:'48',size:'PE',starter:false},
+        '450': {current:'54',size:'PE',starter:false},  '500': {current:'61',size:'PE',starter:false},
+        '560': {current:'67',size:'PE',starter:false},  '630': {current:'77',size:'PE',starter:false},
+        '710': {current:'87',size:'PE',starter:false},  '800': {current:'96',size:'PE',starter:false},
+        '900': {current:'108',size:'PE',starter:false}, '1000':{current:'120',size:'PE',starter:false},
+        '1120':{current:'135',size:'PE',starter:false}, '1250':{current:'154',size:'PE',starter:false},
+        '1400':{current:'173',size:'PE',starter:false}, '1500':{current:'183',size:'PE',starter:false},
+        '1600':{current:'192',size:'PE',starter:false}, '1800':{current:'217',size:'PA',starter:true},
+        '2000':{current:'241',size:'PA',starter:true},  '2240':{current:'269',size:'PB',starter:true},
+        '2500':{current:'303',size:'PB',starter:true},  '2600':{current:'318',size:'PB',starter:true},
+        '2800':{current:'337',size:'PB',starter:true},  '3150':{current:'385',size:'PC',starter:true},
+        '3550':{current:'433',size:'PC',starter:true},  '4000':{current:'481',size:'PC',starter:true},
+        '4500':{current:'558',size:'PC',starter:true},  '5000':{current:'600',size:'PC',starter:true},
+        '5600':{current:'673',size:'PD',starter:true},  '6300':{current:'770',size:'PD',starter:true},
+        '7100':{current:'870',size:'PD',starter:true},  '8000':{current:'962',size:'PD',starter:true}
+      },
+      'T100': {
+        '280': {current:'20',size:'PE',starter:false},  '315': {current:'23',size:'PE',starter:false},
+        '355': {current:'26',size:'PE',starter:false},  '400': {current:'29',size:'PE',starter:false},
+        '450': {current:'32',size:'PE',starter:false},  '500': {current:'36',size:'PE',starter:false},
+        '560': {current:'40',size:'PE',starter:false},  '630': {current:'46',size:'PE',starter:false},
+        '710': {current:'52',size:'PE',starter:false},  '800': {current:'58',size:'PE',starter:false},
+        '900': {current:'65',size:'PE',starter:false},  '1000':{current:'72',size:'PE',starter:false},
+        '1120':{current:'81',size:'PE',starter:false},  '1250':{current:'92',size:'PE',starter:false},
+        '1400':{current:'104',size:'PE',starter:false}, '1500':{current:'110',size:'PE',starter:false},
+        '1600':{current:'115',size:'PE',starter:false}, '1800':{current:'130',size:'PE',starter:false},
+        '2000':{current:'144',size:'PE',starter:false}, '2240':{current:'162',size:'PE',starter:false},
+        '2500':{current:'182',size:'PE',starter:false}, '2650':{current:'191',size:'PE',starter:false},
+        '2800':{current:'202',size:'PA',starter:true},  '3150':{current:'231',size:'PA',starter:true},
+        '3400':{current:'245',size:'PA',starter:true},  '3600':{current:'260',size:'PA',starter:true},
+        '4000':{current:'289',size:'PB',starter:true},  '4500':{current:'335',size:'PB',starter:true},
+        '5000':{current:'364',size:'PC',starter:true},  '5600':{current:'404',size:'PC',starter:true},
+        '6300':{current:'462',size:'PC',starter:true},  '7100':{current:'520',size:'PC',starter:true},
+        '8000':{current:'577',size:'PC',starter:true},  '9000':{current:'650',size:'PD',starter:true},
+        '10000':{current:'720',size:'PD',starter:true}, '11200':{current:'810',size:'PD',starter:true},
+        '12500':{current:'920',size:'PD',starter:true}
+      }
+    };
 
-            const additions = [];
-            if (cellBypass === 'B') additions.push('с байпас силовой ячейки');
-            if (cellBypass === 'N') additions.push('без байпас силовой ячейки');
-            if (starter === 'S') additions.push('пусковой шкаф');
-            if (reactor === 'R') additions.push('шкаф реактора');
-            if (bypassSelect.value !== 'X') additions.push(`${bypassText} шкаф байпаса`);
-            if (ups === 'U') additions.push('ИБП');
-            if (expansionSelect.value !== 'X') additions.push(expansionText);
-            additions.push(protocolText);
-            additions.push(cable === 'T' ? 'вводы сверху' : 'вводы снизу');
+    // ----- ГАБАРИТЫ И МАССА (из таблиц техописания) -----
+    // Формат: mechanicalData[напряжение]['мощность_кВт'] = { size: 'Ш×Г×В, мм', weight: 'т' }
+    const mechanicalData = {
+      'T060': {
+        // 6 кВ — стр. 15
+        '280':  { size:'2025×1325×2480', weight:'2.0' },
+        '315':  { size:'2025×1325×2480', weight:'2.0' },
+        '355':  { size:'2025×1325×2480', weight:'2.1' },
+        '400':  { size:'2025×1325×2480', weight:'2.2' },
+        '450':  { size:'2025×1325×2480', weight:'2.3' },
+        '500':  { size:'2025×1325×2480', weight:'2.3' },
+        '560':  { size:'2025×1325×2480', weight:'2.4' },
+        '630':  { size:'2300×1500×2480', weight:'2.6' },
+        '710':  { size:'2300×1500×2480', weight:'2.6' },
+        '800':  { size:'2300×1500×2480', weight:'2.8' },
+        '900':  { size:'2300×1500×2480', weight:'2.9' },
+        '1000': { size:'2300×1500×2480', weight:'3.0' },
+        '1120': { size:'2300×1500×2480', weight:'3.3' },
+        '1250': { size:'2300×1500×2532', weight:'3.6' },
+        '1400': { size:'2300×1500×2532', weight:'3.9' },
+        '1500': { size:'2300×1500×2532', weight:'4.2' },
+        '1600': { size:'3500×1600×2731', weight:'7.0' }, // включая пусковой шкаф
+        '1800': { size:'3500×1600×2731', weight:'6.7' },
+        '2000': { size:'3500×1600×2731', weight:'9.0' },
+        '2240': { size:'4405×1500×2895', weight:'9.0' }, // включая пусковой шкаф
+        '2500': { size:'4405×1500×2895', weight:'9.0' },
+        '2600': { size:'4405×1500×2895', weight:'9.8' },
+        '2800': { size:'4705×1600×2895', weight:'10.2' }, // включая пусковой шкаф
+        '3150': { size:'7434×1600×2916', weight:'12.9' }, // включая пусковой шкаф
+        '3550': { size:'7434×1600×2916', weight:'14.0' },
+        '4000': { size:'7434×1600×2916', weight:'14.3' },
+        '4500': { size:'7434×1600×2916', weight:'15.5' },
+        '5000': { size:'7434×1600×2916', weight:'16.7' },
+        '5600': { size:'9270×1980×3438', weight:'20.7' }, // включая пусковой шкаф
+        '6300': { size:'9270×1980×3438', weight:'—'   },
+        '7100': { size:'9270×1980×3438', weight:'22.2' },
+        '8000': { size:'9270×1980×3438', weight:'—'   }
+      },
+      'T100': {
+        // 10 кВ — стр. 17
+        '280':  { size:'2700×1325×2480', weight:'2.4' },
+        '315':  { size:'2700×1325×2480', weight:'2.5' },
+        '355':  { size:'2700×1325×2480', weight:'2.5' },
+        '400':  { size:'2700×1325×2480', weight:'2.6' },
+        '450':  { size:'2700×1325×2480', weight:'2.6' },
+        '500':  { size:'2700×1325×2480', weight:'2.7' },
+        '560':  { size:'2700×1325×2480', weight:'2.8' },
+        '630':  { size:'2700×1325×2480', weight:'2.9' },
+        '710':  { size:'2700×1325×2480', weight:'2.9' },
+        '800':  { size:'2700×1325×2480', weight:'3.1' },
+        '900':  { size:'2700×1325×2480', weight:'3.3' },
+        '1000': { size:'2700×1325×2480', weight:'3.5' },
+        '1120': { size:'3000×1500×2532', weight:'3.7' },
+        '1250': { size:'3000×1500×2532', weight:'3.9' },
+        '1400': { size:'3000×1500×2532', weight:'4.1' },
+        '1500': { size:'3000×1500×2532', weight:'—'   },
+        '1600': { size:'3000×1500×2532', weight:'4.4' },
+        '1800': { size:'3000×1500×2532', weight:'—'   },
+        '2000': { size:'3000×1500×2532', weight:'4.9' },
+        '2240': { size:'4500×1600×2731', weight:'5.1' }, // включая пусковой шкаф
+        '2500': { size:'4500×1600×2731', weight:'5.4' },
+        '2650': { size:'4500×1600×2731', weight:'5.8' },
+        '2800': { size:'7200×1600×2895', weight:'8.5' }, // включая пусковой шкаф
+        '3150': { size:'7200×1600×2895', weight:'9.3' },
+        '3400': { size:'7200×1600×2895', weight:'9.8' },
+        '3600': { size:'7200×1600×2895', weight:'10.2' },
+        '4000': { size:'11034×1700×2895', weight:'14.5' }, // включая пусковой шкаф
+        '4500': { size:'11034×1700×2895', weight:'15.2' },
+        '5000': { size:'11334×1700×2895', weight:'16.7' }, // включая пусковой шкаф
+        '5600': { size:'11334×1700×2895', weight:'18.5' },
+        '6300': { size:'11334×1700×2895', weight:'18.9' },
+        '7100': { size:'11334×1700×2895', weight:'20.2' },
+        '8000': { size:'11334×1700×2895', weight:'21.5' },
+        '9000': { size:'16550×1980×3438', weight:'41.0' }, // включая пусковой шкаф
+        '10000':{ size:'16550×1980×3438', weight:'—'   },
+        '11200':{ size:'16550×1980×3438', weight:'41.8' },
+        '12500':{ size:'16550×1980×3438', weight:'42.4' }
+      }
+    };
 
-            return parts.concat(additions).filter(Boolean).join(', ');
-        }
+    // ----- ЛОГИКА ПЛЁНОЧНЫХ -----
+    function isFilmAllowed(voltage, power){
+      const p = Number(power);
+      if (voltage==='T060') return p <= 710;
+      if (voltage==='T100') return p <= 1250;
+      return false;
+    }
 
-        function updateNomenclature() {
-            const params = [
-                document.getElementById('power').value + 'P',
-                document.getElementById('current').value + 'А',
-                document.getElementById('voltage').value,
-                document.getElementById('material').value,
-                document.getElementById('pulsation').value,
-                document.getElementById('starter').value,
-                document.getElementById('bypass').value,
-                document.getElementById('reactor').value,
-                document.getElementById('ip').value,
-                document.getElementById('expansion').value,
-                document.getElementById('ups').value,
-                document.getElementById('cable').value,
-                document.getElementById('protocol').value,
-                '-' + document.getElementById('cellSize').value,
-                document.getElementById('cellBypass').value
-            ];
-            
-            document.getElementById('result').textContent = `ESQ F ME800-${params.join('')}`;
-            document.getElementById('old-result').textContent = buildOldNomenclatureText();
-        }
+    // ----- UI ОБНОВЛЕНИЯ -----
+    function updatePowerOptions(){
+      const v = document.getElementById('voltage').value;
+      const powerSel = document.getElementById('power');
+      powerSel.innerHTML = '';
+      Object.keys(modelData[v]).sort((a,b)=>a-b).forEach(p=>{
+        const opt=document.createElement('option'); opt.value=p; opt.textContent=`${p} кВт`; powerSel.appendChild(opt);
+      });
+      updateDependencies();
+    }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Значения по умолчанию
-            document.getElementById('capacitorType').value = 'EL'; // по умолчанию электролитические
-            updatePowerOptions();
+    function onCapacitorTypeChange(){
+      const v = document.getElementById('voltage').value;
+      const p = document.getElementById('power').value;
+      const cap = document.getElementById('capacitorType');
+      const allowed = isFilmAllowed(v,p);
+      if (cap.value==='PF' && !allowed) cap.value='EL';
+      applyCellSize();
+      updateNomenclature();
+    }
 
-            // Слежение за изменениями
-            document.querySelectorAll('select').forEach(el => {
-                if (el.id === 'voltage') {
-                    el.addEventListener('change', updatePowerOptions);
-                } else if (el.id === 'power') {
-                    el.addEventListener('change', updateDependencies);
-                } else {
-                    el.addEventListener('change', updateNomenclature);
-                }
-            });
-        });
-    </script>
+    function updateCapacitorAvailability(){
+      const v = document.getElementById('voltage').value;
+      const p = document.getElementById('power').value;
+      const cap = document.getElementById('capacitorType');
+      const filmOpt = Array.from(cap.options).find(o=>o.value==='PF');
+      const allowed = isFilmAllowed(v,p);
+      if (filmOpt) filmOpt.disabled = !allowed;
+      if (cap.value==='PF' && !allowed) cap.value='EL';
+    }
+
+    function applyCellSize(){
+      const v = document.getElementById('voltage').value;
+      const p = document.getElementById('power').value;
+      const data = modelData[v][p];
+      const cap = document.getElementById('capacitorType').value;
+      const cell = document.getElementById('cellSize');
+      if (cap==='PF' && isFilmAllowed(v,p)) cell.value='PF';
+      else cell.value=data.size;
+    }
+
+    function updateDependencies(){
+      const v = document.getElementById('voltage').value;
+      const p = document.getElementById('power').value;
+      const data = modelData[v][p];
+      document.getElementById('current').value = data.current;
+
+      const pulsSel = document.getElementById('pulsation');
+      pulsSel.innerHTML = (v==='T060')
+        ? '<option value="30">30</option><option value="36">36</option>'
+        : '<option value="48">48</option><option value="54">54</option>';
+
+      const starter = document.getElementById('starter');
+      starter.disabled = data.starter;
+      starter.value = data.starter ? 'S' : 'X';
+
+      updateCapacitorAvailability();
+      applyCellSize();
+      updateNomenclature();
+    }
+
+    function getCellCount(){
+      const p = document.getElementById('pulsation').value;
+      return ({'30':'5 ячеек на фазу','36':'6 ячеек на фазу','48':'8 ячеек на фазу','54':'9 ячеек на фазу'})[p] || '';
+    }
+
+    function getOldNomenclatureCode(){
+      const newCode = document.getElementById('result').textContent;
+      const lastPart = newCode.split('-').pop();
+      const lastThree = lastPart.slice(-3);
+      const v = document.getElementById('voltage').value;
+      const p = document.getElementById('power').value;
+      return `ESQ-ME800-${p}-${v}-${lastThree}`;
+    }
+
+    function buildOldNomenclatureText(){
+      const vSel = document.getElementById('voltage');
+      const vText = vSel.options[vSel.selectedIndex].text;
+      const p = document.getElementById('power').value;
+      const i = document.getElementById('current').value;
+      const ip = document.getElementById('ip').value;
+      const material = document.getElementById('material').value;
+      const bypassSel = document.getElementById('bypass');
+      const bypassText = bypassSel.options[bypassSel.selectedIndex].text.toLowerCase();
+      const starter = document.getElementById('starter').value;
+      const reactor = document.getElementById('reactor').value;
+      const expansionSel = document.getElementById('expansion');
+      const expansionText = expansionSel.value!=='X' ? expansionSel.options[expansionSel.selectedIndex].text.toLowerCase() : '';
+      const ups = document.getElementById('ups').value;
+      const cable = document.getElementById('cable').value;
+      const protoText = ({MR:'Modbus RTU',MT:'Modbus TCP',PB:'ProfibusDP',PN:'ProfiNet',CO:'CanOpen',EI:'Ethernet/IP'})[document.getElementById('protocol').value];
+      const cellBypass = document.getElementById('cellBypass').value;
+
+      const parts = [ getOldNomenclatureCode(), vText, `${p} кВт`, `${i} А`, `IP${ip}`, `${material==='AL'?'алюминиевый':'медный'} трансформатор`, getCellCount() ];
+      const adds = [];
+      adds.push(cellBypass==='B' ? 'с байпас силовой ячейки' : 'без байпас силовой ячейки');
+      if (starter==='S') adds.push('пусковой шкаф');
+      if (reactor==='R') adds.push('шкаф реактора');
+      if (bypassSel.value!=='X') adds.push(`${bypassText} шкаф байпаса`);
+      if (ups==='U') adds.push('ИБП');
+      if (expansionSel.value!=='X') adds.push(expansionText);
+      adds.push(protoText);
+      adds.push(cable==='T'?'вводы сверху':'вводы снизу');
+      return parts.concat(adds).filter(Boolean).join(', ');
+    }
+
+    function updateNomenclature(){
+      const params = [
+        document.getElementById('power').value + 'P',
+        document.getElementById('current').value + 'А',
+        document.getElementById('voltage').value,
+        document.getElementById('material').value,
+        document.getElementById('pulsation').value,
+        document.getElementById('starter').value,
+        document.getElementById('bypass').value,
+        document.getElementById('reactor').value,
+        document.getElementById('ip').value,
+        document.getElementById('expansion').value,
+        document.getElementById('ups').value,
+        document.getElementById('cable').value,
+        document.getElementById('protocol').value,
+        '-' + document.getElementById('cellSize').value,
+        document.getElementById('cellBypass').value
+      ];
+      document.getElementById('result').textContent = `ESQ F ME800-${params.join('')}`;
+      document.getElementById('old-result').textContent = buildOldNomenclatureText();
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      document.getElementById('capacitorType').value='EL';
+      updatePowerOptions();
+      document.querySelectorAll('select').forEach(el=>{
+        if (el.id==='voltage') el.addEventListener('change', updatePowerOptions);
+        else if (el.id==='power') el.addEventListener('change', updateDependencies);
+        else el.addEventListener('change', updateNomenclature);
+      });
+    });
+
+    // ----- ВСПОМОГАТЕЛЬНЫЕ -----
+    function esc(str){ return String(str||'').replace(/[&<>"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
+
+    function getMechanicalFor(v, p){
+      const rec = (mechanicalData[v] && mechanicalData[v][p]) ? mechanicalData[v][p] : null;
+      return {
+        size: rec?.size || '—',
+        weight: rec?.weight || '—'
+      };
+    }
+
+    // ----- ТКП → PDF -----
+    function buildTechDataBlocks(){
+      const v = document.getElementById('voltage').value;
+      const cellsPerPhase = (v==='T060') ? '5 (для 6 кВ)' : '8 (для 10 кВ)';
+      return `
+        <h3>Технические данные (по техописанию)</h3>
+        <table>
+          <tr><th>Параметр</th><th>Значение</th></tr>
+          <tr><td>Тип нагрузки</td><td>Асинхронные/синхронные двигатели</td></tr>
+          <tr><td>Напряжение питающей сети</td><td>3/3.3/6/6.3/10/11 кВ, ±10%</td></tr>
+          <tr><td>Частота питающей сети</td><td>50/60 Гц, ±5%</td></tr>
+          <tr><td>Выходная частота</td><td>0.1–300 Гц</td></tr>
+          <tr><td>КПД (с трансформатором)</td><td>≈96%</td></tr>
+          <tr><td>Коэффициент мощности</td><td>≥0.95</td></tr>
+          <tr><td>Количество ячеек на фазу</td><td>${cellsPerPhase}</td></tr>
+          <tr><td>Перегрузочная способность</td><td>120% в течение 60 с</td></tr>
+          <tr><td>Питание цепей управления</td><td>3PH+N, 380 В AC ±15% (5–50 кВА)</td></tr>
+          <tr><td>Охлаждение</td><td>Воздушное, принудительное</td></tr>
+          <tr><td>Условия эксплуатации</td><td>0…+40 °C; влажность ≤95% (без конденсата); высота ≤1000 м</td></tr>
+          <tr><td>Степень защиты (стандарт)</td><td>IP31</td></tr>
+          <tr><td>Тип конденсаторов (стандарт)</td><td>Электролитические</td></tr>
+        </table>
+        <p class="footnote">Источник: таблицы «Характеристики и габариты ME800 на 6/10 кВ» (стр. 15, 17 техописания).</p>
+      `;
+    }
+
+    function buildMechTableBlock(){
+      const v = document.getElementById('voltage').value;
+      const p = document.getElementById('power').value;
+      const mech = getMechanicalFor(v, p);
+      return `
+        <h3>Габариты и масса</h3>
+        <table>
+          <tr><th>Параметр</th><th>Значение</th></tr>
+          <tr><td>Мощность</td><td>${esc(p)} кВт</td></tr>
+          <tr><td>Габариты (Ш×Г×В), мм</td><td>${esc(mech.size)}</td></tr>
+          <tr><td>Масса, т</td><td>${esc(mech.weight)}</td></tr>
+        </table>
+        <p class="footnote">Данные соответствуют техописанию; для позиций с «—» размер/масса в источнике не указаны явно (наследуются блоком выше).</p>
+      `;
+    }
+
+    function buildTKPHtml(){
+      const dt = new Date().toLocaleString();
+      const vSel = document.getElementById('voltage');
+      const voltageText = vSel.options[vSel.selectedIndex].text;
+      const voltageCode = vSel.value;
+
+      const pSel = document.getElementById('power');
+      const powerText = pSel.options[pSel.selectedIndex]?.text || '';
+      const current = document.getElementById('current').value;
+
+      const ip = document.getElementById('ip').value;
+      const material = document.getElementById('material').value === 'AL' ? 'Алюминий' : 'Медь';
+      const pulsation = document.getElementById('pulsation').value;
+      const starter = document.getElementById('starter').value === 'S' ? 'Пусковой шкаф' : 'Без пускового шкафа';
+      const bypass = document.getElementById('bypass').value;
+      const bypassText = bypass === 'A' ? 'Шкаф байпаса (автоматический)' : (bypass === 'M' ? 'Шкаф байпаса (ручной)' : 'Без шкафа байпаса');
+      const reactor = document.getElementById('reactor').value === 'R' ? 'Шкаф реактора' : 'Без шкафа реактора';
+      const expansion = document.getElementById('expansion');
+      const expansionText = expansion.value==='X' ? '—' : expansion.options[expansion.selectedIndex].text;
+      const ups = document.getElementById('ups').value === 'U' ? 'ИБП' : 'Без ИБП';
+      const cable = document.getElementById('cable').value === 'T' ? 'Вводы сверху' : 'Вводы снизу';
+      const protoMap = {MR:'Modbus RTU',MT:'Modbus TCP',PB:'ProfibusDP',PN:'ProfiNet',CO:'CanOpen',EI:'Ethernet/IP'};
+      const proto = protoMap[document.getElementById('protocol').value];
+      const capacitorType = document.getElementById('capacitorType').value === 'PF' ? 'Плёночные' : 'Электролитические';
+      const cellSize = document.getElementById('cellSize').value;
+      const cellBypass = document.getElementById('cellBypass').value === 'B' ? 'С байпасом силовой ячейки' : 'Без байпаса силовой ячейки';
+
+      const skuNew = document.getElementById('result').textContent;
+      const skuOld = document.getElementById('old-result').textContent;
+
+      const html = `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>ТКП — ${esc(skuNew)}</title>
+<style>
+  body{font-family:Segoe UI,Arial,sans-serif;background:#fff;color:#1f3147;margin:24px}
+  h1{margin:0 0 6px}
+  .meta{color:#6b7a90;margin-bottom:14px}
+  .sku{font-family:ui-monospace, Menlo, Consolas, monospace;background:#f6f8fb;border:1px solid #e6ecf5;border-radius:8px;padding:10px;margin:10px 0;font-weight:700}
+  table{border-collapse:collapse;width:100%;margin-top:10px}
+  th,td{border:1px solid #e6ecf5;padding:8px;text-align:left;font-size:13px}
+  th{background:#f3f6fb}
+  h3{margin:18px 0 8px}
+  .foot{margin-top:16px;color:#6b7a90;font-size:12px}
+  .footnote{color:#6b7a90;font-size:12px;margin-top:6px}
+</style>
+</head>
+<body>
+  <h1>Технико-коммерческое предложение</h1>
+  <div class="meta">Дата формирования: ${esc(dt)}</div>
+
+  <div class="sku">Новая номенклатура: ${esc(skuNew)}</div>
+  <div class="sku">Старая номенклатура: ${esc(skuOld)}</div>
+
+  <h3>Выбранная конфигурация</h3>
+  <table>
+    <tr><th>Параметр</th><th>Значение</th></tr>
+    <tr><td>Напряжение</td><td>${esc(voltageText)} (${esc(voltageCode)})</td></tr>
+    <tr><td>Мощность ПЧ</td><td>${esc(powerText)}</td></tr>
+    <tr><td>Номинальный ток</td><td>${esc(current)} А</td></tr>
+    <tr><td>Степень защиты</td><td>IP${esc(ip)}</td></tr>
+    <tr><td>Материал обмоток</td><td>${esc(material)}</td></tr>
+    <tr><td>Пульсность</td><td>${esc(pulsation)}</td></tr>
+    <tr><td>Пусковой шкаф</td><td>${esc(starter)}</td></tr>
+    <tr><td>Шкаф байпаса</td><td>${esc(bypassText)}</td></tr>
+    <tr><td>Шкаф реактора</td><td>${esc(reactor)}</td></tr>
+    <tr><td>Плата расширения</td><td>${esc(expansionText)}</td></tr>
+    <tr><td>ИБП</td><td>${esc(ups)}</td></tr>
+    <tr><td>Вводы/выводы</td><td>${esc(cable)}</td></tr>
+    <tr><td>Протокол связи</td><td>${esc(proto)}</td></tr>
+    <tr><td>Тип конденсаторов</td><td>${esc(capacitorType)}</td></tr>
+    <tr><td>Размер ячеек (суффикс)</td><td>${esc(cellSize)}</td></tr>
+    <tr><td>Байпас силовой ячейки</td><td>${esc(cellBypass)}</td></tr>
+  </table>
+
+  ${buildTechDataBlocks()}
+  ${buildMechTableBlock()}
+
+  <div class="foot">Файл сформирован автоматически конфигуратором ESQ F ME 800.</div>
+</body>
+</html>`;
+      return html;
+    }
+
+    function downloadTKP(e){
+      e.preventDefault();
+      updateNomenclature(); // актуализируем перед выгрузкой
+      const html = buildTKPHtml();
+
+      // Временной DOM для html2pdf
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      document.body.appendChild(container);
+      const opt = {
+        margin:       10,
+        filename:     `TKP_${(document.getElementById('result').textContent||'').replace(/\s+/g,'')}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      html2pdf().from(container).set(opt).save().then(()=>{
+        document.body.removeChild(container);
+      });
+    }
+  </script>
 </body>
 </html>
-
-
