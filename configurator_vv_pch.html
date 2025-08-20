@@ -600,30 +600,60 @@
       return html;
     }
 
-    function downloadTKP(e){
+   <script>
+function downloadTKP(e){
   e.preventDefault();
   updateNomenclature(); // актуализируем перед выгрузкой
+
+  // 1) Проверка, что библиотека html2pdf подгружена
+  if (typeof html2pdf === 'undefined' || !html2pdf) {
+    alert('Не удалось загрузить модуль html2pdf.js. Проверьте подключение CDN <html2pdf.bundle.min.js>.');
+    return;
+  }
+
+  // 2) Собираем HTML для ТКП
   const html = buildTKPHtml();
 
-  // Создаём скрытый контейнер
-  const container = document.createElement('div');
-  container.style.display = 'none';
-  container.innerHTML = html;
-  document.body.appendChild(container);
+  // 3) Файл-нейм (без пробелов и «опасных» символов)
+  const safeName = (`TKP_${(document.getElementById('result').textContent||'')
+     .replace(/\s+/g,'')
+     .replace(/[^\w\-А-Яа-яЁё]/g,'')}` || 'TKP_ESQ').trim();
 
+  // 4) Опции PDF
   const opt = {
     margin:       10,
-    filename:     `TKP_${(document.getElementById('result').textContent||'').replace(/\s+/g,'')}.pdf`,
+    filename:     `${safeName}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true },
+    html2canvas:  { scale: 2, useCORS: true }, // без подмены стилей/шрифтов
     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
-  html2pdf().set(opt).from(container).save().then(()=>{
-    document.body.removeChild(container);
-  });
+  // 5) Генерация PDF напрямую из HTML-строки (без вставки в body)
+  try {
+    html2pdf().set(opt).from(html).save();
+  } catch (err) {
+    console.error(err);
+    // Фолбэк: аккуратно попробуем скрытый контейнер вне экрана (html2canvas не любит display:none)
+    try {
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.left = '-99999px';
+      container.style.top = '0';
+      container.style.opacity = '0';
+      container.innerHTML = html;
+      document.body.appendChild(container);
+      html2pdf().set(opt).from(container).save().then(()=>{
+        document.body.removeChild(container);
+      });
+    } catch (err2) {
+      console.error(err2);
+      alert('Не удалось сформировать PDF. Попробуйте обновить страницу или проверить блокировщики.');
+    }
+  }
 }
+</script>
   </script>
 </body>
 </html>
+
 
