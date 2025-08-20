@@ -175,14 +175,18 @@
             <select id="pulsation" onchange="updateNomenclature()"></select>
         </div>
 
-  <!-- НОВОЕ -->
-        <div class="param">
-            <label>6. Тип конденсаторов:</label>
-            <select id="capacitorType" onchange="onCapacitorTypeChange()">
-                <option value="EL">Электролитические</option>
-                <option value="PF">Пленочные</option>
-            </select>
-        </div>
+<div class="param">
+    <label>6. Тип конденсаторов:</label>
+    <div style="flex:2 1 300px; display:flex; flex-direction:column;">
+        <select id="capacitorType" onchange="onCapacitorTypeChange()">
+            <option value="EL">Электролитические</option>
+            <option value="PF">Пленочные</option>
+        </select>
+        <small style="color:#666; font-size:12px; margin-top:4px;">
+            Пленочные доступны: 6 кВ до 710 кВт, 10 кВ до 1250 кВт
+        </small>
+    </div>
+</div>
 
         <div class="param">
             <label>7. Пусковой шкаф:</label>
@@ -571,4 +575,5 @@
     </script>
 </body>
 </html>
+
 
