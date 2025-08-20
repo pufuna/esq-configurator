@@ -48,9 +48,10 @@
     .muted{color:#6b7a90}
     .sku{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f6f8fb;border:1px solid #e6ecf5;border-radius:8px;padding:10px;margin:10px 0;font-weight:700}
 
-    /* Чертёж внутри техописания */
+    /* Чертёж */
     .drawing-block{margin-top:16px}
     .drawing-iframe{width:100%;height:620px;border:1px solid #e6ecf5;border-radius:10px}
+    .drawing-img{max-width:100%;height:auto;border:1px solid #e6ecf5;border-radius:10px}
     .drawing-empty{padding:10px;color:#6b7a90;background:#fafcff;border:1px dashed #d8e1f0;border-radius:10px}
     .drawing-link{margin-top:8px}
     .drawing-link a{color:#1f6feb;text-decoration:none}
@@ -218,7 +219,7 @@
   <div class="footer"><p>© 2025 ESQ</p></div>
 
   <script>
-    /* ===== ДАННЫЕ МОДЕЛЕЙ (ток и суффикс ячейки) ===== */
+    /* ===== ДАННЫЕ МОДЕЛЕЙ (ток и тип ячеек) ===== */
     const modelData = {
       'T060': {
         '280': {current:'34',size:'PE',starter:false},  '315': {current:'38',size:'PE',starter:false},
@@ -261,7 +262,7 @@
       }
     };
 
-    /* ===== ГАБАРИТЫ И МАССА ===== */
+    /* ===== ГАБАРИТЫ/МАССА для обычных моделей ===== */
     const mechanicalData = {
       'T060': {
         '280':  { size:'2025×1325×2480', weight:'2.0' },
@@ -293,9 +294,9 @@
         '4500': { size:'7434×1600×2916', weight:'15.5' },
         '5000': { size:'7434×1600×2916', weight:'16.7' },
         '5600': { size:'9270×1980×3438', weight:'20.7' },
-        '6300': { size:'9270×1980×3438', weight:'20.7' },
+        '6300': { size:'9270×1980×3438', weight:'—'   },
         '7100': { size:'9270×1980×3438', weight:'22.2' },
-        '8000': { size:'9270×1980×3438', weight:'22.2' }
+        '8000': { size:'9270×1980×3438', weight:'—'   }
       },
       'T100': {
         '280':  { size:'2700×1325×2480', weight:'2.4' },
@@ -313,9 +314,9 @@
         '1120': { size:'3000×1500×2532', weight:'3.7' },
         '1250': { size:'3000×1500×2532', weight:'3.9' },
         '1400': { size:'3000×1500×2532', weight:'4.1' },
-        '1500': { size:'3000×1500×2532', weight:'4.3' },
+        '1500': { size:'3000×1500×2532', weight:'—'   },
         '1600': { size:'3000×1500×2532', weight:'4.4' },
-        '1800': { size:'3000×1500×2532', weight:'4.7' },
+        '1800': { size:'3000×1500×2532', weight:'—'   },
         '2000': { size:'3000×1500×2532', weight:'4.9' },
         '2240': { size:'4500×1600×2731', weight:'5.1' },
         '2500': { size:'4500×1600×2731', weight:'5.4' },
@@ -332,9 +333,22 @@
         '7100': { size:'11334×1700×2895', weight:'20.2' },
         '8000': { size:'11334×1700×2895', weight:'21.5' },
         '9000': { size:'16550×1980×3438', weight:'41.0' },
-        '10000':{ size:'16550×1980×3438', weight:'41'   },
+        '10000':{ size:'16550×1980×3438', weight:'—'   },
         '11200':{ size:'16550×1980×3438', weight:'41.8' },
         '12500':{ size:'16550×1980×3438', weight:'42.4' }
+      }
+    };
+
+    /* ===== ГАБАРИТЫ/МАССА для моделей с плёночными (PFN) ===== */
+    // (значения примерные — из вашей таблицы PFN; при необходимости обновите веса)
+    const mechanicalPFN = {
+      'T060': { // 6 кВ: 280…710 кВт
+        size: '1425×1800×2431',
+        weights: { '280':'1.9','315':'1.9','355':'2.0','400':'2.1','450':'2.2','500':'2.2','560':'2.3','630':'2.5','710':'2.5' }
+      },
+      'T100': { // 10 кВ: 280…1250 кВт
+        size: '1425×1800×2431',
+        weights: { '280':'2.2','315':'2.3','400':'2.5','450':'2.6','500':'2.7','560':'2.8','630':'2.9','710':'3.0','800':'3.1','900':'3.2','1000':'3.4','1120':'3.7','1250':'4.0' }
       }
     };
 
@@ -477,14 +491,21 @@
       document.getElementById('old-result').textContent = buildOldNomenclatureText();
     }
 
-    /* ===== ТЕХОПИСАНИЕ ===== */
+    /* ===== ВСПОМОГАТЕЛЬНЫЕ ===== */
     function esc(str){ return String(str||'').replace(/[&<>"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
 
     function getMechanicalFor(v, p){
+      // PF: использовать PFN-таблицу — но показываем размеры/массу только когда байпаса нет
+      const isPF = document.getElementById('capacitorType').value === 'PF';
+      if (isPF) {
+        const tab = mechanicalPFN[v];
+        return { size: tab?.size || '—', weight: tab?.weights?.[p] || '—' };
+      }
       const rec = (mechanicalData[v] && mechanicalData[v][p]) ? mechanicalData[v][p] : null;
       return { size: rec?.size || '—', weight: rec?.weight || '—' };
     }
 
+    /* ===== ТЕХОПИСАНИЕ ===== */
     function buildTechDescriptionHtml(){
       const now = new Date().toLocaleString();
       const vSel = document.getElementById('voltage');
@@ -514,7 +535,6 @@
       const cellBypass = document.getElementById('cellBypass').value === 'B' ? 'Да' : 'Нет';
 
       const skuNew = document.getElementById('result').textContent;
-      const mech = getMechanicalFor(voltageCode, powerVal);
 
       const intro = `
         Преобразователь частоты ESQ ME800 предназначен для управления скоростью вращения
@@ -528,6 +548,21 @@
       const reactorYN = yn(reactorVal === 'R');
       const upsYN = yn(upsVal === 'U');
       const bypassMode = (bypassVal === 'A') ? 'Автоматический' : (bypassVal === 'M' ? 'Ручной' : 'Нет');
+
+      // Габариты/масса показываем только при отсутствии шкафа байпаса
+      let mechBlock = '';
+      if (bypassVal === 'X') {
+        const mech = getMechanicalFor(voltageCode, powerVal);
+        mechBlock = `
+          <h3>Габариты и масса</h3>
+          <table>
+            <tr><th>Параметр</th><th>Значение</th></tr>
+            <tr><td>Мощность</td><td>${esc(powerVal)} кВт</td></tr>
+            <tr><td>Габариты (Ш×Г×В), мм</td><td>${esc(mech.size)}</td></tr>
+            <tr><td>Масса, т</td><td>${esc(mech.weight)}</td></tr>
+          </table>
+        `;
+      }
 
       return `
         <h2>Техническое описание конфигурации</h2>
@@ -545,7 +580,7 @@
           <tr><td>Номинальный ток</td><td>${esc(current)} А</td></tr>
           <tr><td>Степень защиты</td><td>IP${esc(ip)}</td></tr>
           <tr><td>Материал обмоток трансформатора</td><td>${esc(material)}</td></tr>
-          <tr><td>Пульсность / кол-во ячеек</td><td>${esc(pulsation)} (${esc(cellsPerPhase)})</td></tr>
+          <tr><td>Пульсность / ячеек на фазу</td><td>${esc(pulsation)} (${esc(cellsPerPhase)})</td></tr>
           <tr><td>Пусковой шкаф</td><td>${esc(starterYN)}</td></tr>
           <tr><td>Шкаф байпаса</td><td>${esc(bypassMode)}</td></tr>
           <tr><td>Шкаф реактора</td><td>${esc(reactorYN)}</td></tr>
@@ -554,7 +589,7 @@
           <tr><td>Вводы/выводы</td><td>${esc(cable)}</td></tr>
           <tr><td>Протокол связи</td><td>${esc(proto)}</td></tr>
           <tr><td>Тип конденсаторов</td><td>${esc(capacitorType)}</td></tr>
-          <tr><td>Тип силовых ячеек</td><td>${esc(cellSize)}</td></tr>
+          <tr><td>Тип силовых ячеек (суффикс)</td><td>${esc(cellSize)}</td></tr>
           <tr><td>Байпас силовой ячейки</td><td>${esc(cellBypass)}</td></tr>
         </table>
 
@@ -566,84 +601,79 @@
           <tr><td>КПД (с трансформатором)</td><td>≈96%</td></tr>
           <tr><td>Коэффициент мощности</td><td>≥0.95</td></tr>
           <tr><td>Перегрузочная способность</td><td>120% в течение 60 с; 150% в течение 3 с</td></tr>
+          <tr><td>Отклонение коэффициента искажений синусоидальности U/I</td><td>Не более 5% на входе и на выходе</td></tr>
+          <tr><td>Метод управления ПЧ</td><td>Управление V/f; Векторное управление без обратной связи; Векторное управление с обратной связью</td></tr>
           <tr><td>Питание цепей управления</td><td>3PH+N, 380 В AC ±15% (5–50 кВА)</td></tr>
           <tr><td>Охлаждение</td><td>Воздушное, принудительное</td></tr>
           <tr><td>Условия эксплуатации</td><td>0…+40 °C; влажность ≤95% без конденсации; высота ≤1000 м</td></tr>
         </table>
 
+        ${mechBlock}
+
         <div id="drawing-block" class="drawing-block"></div>
       `;
     }
 
-    /* ===== Чертёж: построение имён и вывод ===== */
-  function buildDrawingCandidates(){
-  const v = document.getElementById('voltage').value;   // T060 / T100
-  const p = document.getElementById('power').value;     // "900", "2800", ...
-  const data = modelData[v][p];
-  const current = Number(document.getElementById('current').value || 0);
+    /* ===== Чертёж: кандидаты имён и вывод ===== */
+    function buildDrawingCandidates(){
+      const v = document.getElementById('voltage').value; // T060 / T100
+      const p = document.getElementById('power').value;
+      const data = modelData[v][p];
+      const current = Number(document.getElementById('current').value || 0);
+      const cap = document.getElementById('capacitorType').value;
 
-  // Поддержка 6KV и 6KW (на случай разных имён файлов)
-  const kvTokens = (v === 'T060') ? ['6KV','6KW'] : ['10KV'];
+      // Если плёночные — ВСЕГДА использовать PFN чертёж, независимо от байпаса
+      if (cap === 'PF') {
+        const pfUrl6 = 'assets/drawings1/PFN 6 kV.png';
+        const pfUrl10 = 'assets/drawings1/PFN 10 kV.png';
+        return [ encodeURI(v==='T060' ? pfUrl6 : pfUrl10) ];
+      }
 
-  // Флаги
-  const needPS   = Boolean(data?.starter) || current > 200;   // нужен +ПШ?
-  const bypassV  = document.getElementById('bypass')?.value;  // X / A / M
-  const isBypass = (bypassV === 'A' || bypassV === 'M');
+      // Иначе — прежняя логика (обычные чертежи)
+      const kvTokens = (v === 'T060') ? ['6KV','6KW'] : ['10KV'];
+      const needPS   = Boolean(data?.starter) || current > 200;
+      const bypassV  = document.getElementById('bypass')?.value;  // X/A/M
+      const isBypass = (bypassV === 'A' || bypassV === 'M');
 
-  // Папки по приоритету
-  const folders = isBypass
-    ? ['assets/drawings1/','assets/drawings/']
-    : ['assets/drawings/','assets/drawings1/'];
+      const folders = isBypass
+        ? ['assets/drawings1/','assets/drawings/']
+        : ['assets/drawings/','assets/drawings1/'];
 
-  // Конструктор базовых имён (кириллица!)
-  // Собираем варианты порядка тегов: [ШАБ_ШРБ, ПШ] и [ПШ, ШАБ_ШРБ]
-  const makeBases = (kv) => {
-    const plain = `${kv} ${p} KW габаритный чертеж`;
-    const psh   = `${kv} ${p} KW +ПШ габаритный чертеж`;
-    const shab  = `${kv} ${p} KW + ШАБ_ШРБ габаритный чертеж`;
+      const makeBases = (kv) => {
+        const plain = `${kv} ${p} KW габаритный чертеж`;
+        const psh   = `${kv} ${p} KW +ПШ габаритный чертеж`;
+        const shab  = `${kv} ${p} KW + ШАБ_ШРБ габаритный чертеж`;
+        const both1 = `${kv} ${p} KW + ШАБ_ШРБ +ПШ габаритный чертеж`;
+        const both2 = `${kv} ${p} KW +ПШ + ШАБ_ШРБ габаритный чертеж`;
+        if (isBypass && needPS)   return [both1, both2, shab, psh, plain];
+        if (isBypass && !needPS)  return [shab, both1, both2, plain, psh];
+        if (!isBypass && needPS)  return [psh, plain, both1, both2, shab];
+        return [plain, psh, shab, both1, both2];
+      };
 
-    const both1 = `${kv} ${p} KW + ШАБ_ШРБ +ПШ габаритный чертеж`;
-    const both2 = `${kv} ${p} KW +ПШ + ШАБ_ШРБ габаритный чертеж`;
+      function plusSpacingVariants(str){
+        const variants = new Set([str, str.replace('KW  +', 'KW +')]);
+        const arr = [];
+        for (const s of variants){
+          arr.push(s, s.replace(/\s*\+\s*/g,' + '), s.replace(/\s*\+\s*/g,' +'), s.replace(/\s*\+\s*/g,'+ '), s.replace(/\s*\+\s*/g,'+'));
+        }
+        return Array.from(new Set(arr));
+      }
 
-    // Приоритет по выбранным опциям
-    if (isBypass && needPS)   return [both1, both2, shab, psh, plain];
-    if (isBypass && !needPS)  return [shab, both1, both2, plain, psh];
-    if (!isBypass && needPS)  return [psh, plain, both1, both2, shab];
-    return [plain, psh, shab, both1, both2];
-  };
-
-  // Варианты пробелов вокруг плюса: " + ", " +", "+ ", "+"
-  function plusSpacingVariants(str){
-    const variants = new Set();
-    const bases = [str];
-    // Нормализация двойных пробелов перед "+": "KW  +" -> "KW +"
-    bases.push(str.replace('KW  +', 'KW +'));
-
-    for (const s of bases){
-      variants.add(s);
-      variants.add(s.replace(/\s*\+\s*/g, ' + '));
-      variants.add(s.replace(/\s*\+\s*/g, ' +'));
-      variants.add(s.replace(/\s*\+\s*/g, '+ '));
-      variants.add(s.replace(/\s*\+\s*/g, '+'));
-    }
-    return [...variants];
-  }
-
-  const exts = ['.pdf','.PDF'];
-  const candidates = [];
-
-  for (const folder of folders){
-    for (const kv of kvTokens){
-      for (const base of makeBases(kv)){
-        for (const spaced of plusSpacingVariants(base)){
-          for (const e of exts){
-            candidates.push(encodeURI(folder + spaced + e));
+      const exts = ['.pdf','.PDF'];
+      const candidates = [];
+      for (const folder of folders){
+        for (const kv of kvTokens){
+          for (const base of makeBases(kv)){
+            for (const spaced of plusSpacingVariants(base)){
+              for (const e of exts){
+                candidates.push(encodeURI(folder + spaced + e));
+              }
+            }
           }
         }
       }
-    }
-  }
-  return candidates;
+      return candidates;
     }
 
     async function findFirstExisting(urls){
@@ -651,7 +681,7 @@
         try{
           const r = await fetch(url, {method:'HEAD', cache:'no-store'});
           if (r.ok) return url;
-        }catch(e){ /* пробуем следующий */ }
+        }catch(e){ /* next */ }
       }
       return null;
     }
@@ -664,9 +694,12 @@
       const found = await findFirstExisting(candidates);
 
       if (found){
+        const isImage = /\.(png|jpg|jpeg|webp|gif)$/i.test(found);
         box.innerHTML = `
           <h3>Габаритный чертёж</h3>
-          <iframe class="drawing-iframe" src="${found}"></iframe>
+          ${isImage
+            ? `<img class="drawing-img" src="${found}" alt="Габаритный чертёж">`
+            : `<iframe class="drawing-iframe" src="${found}"></iframe>`}
           <div class="drawing-link"><a href="${found}" target="_blank" rel="noopener">Открыть в новой вкладке</a></div>
           <p style="font-size:0.85em;color:#555;margin-top:6px;">
             <i>*Шкаф реактора на габаритных чертежах не отображен</i>
@@ -698,29 +731,14 @@
     async function copyTechDesc(e){
       e.preventDefault();
       const box = document.getElementById('techdesc');
-      if (!box || box.style.display === 'none' || !box.innerText.trim()) {
-        const tmp = document.createElement('div');
-        tmp.style.position='fixed'; tmp.style.left='-99999px'; tmp.style.top='0';
-        tmp.innerHTML = buildTechDescriptionHtml();
-        document.body.appendChild(tmp);
-        const text = tmp.innerText.replace(/\n{3,}/g, '\n\n').trim();
-        document.body.removeChild(tmp);
-        try{ await navigator.clipboard.writeText(text); alert('Описание скопировано в буфер обмена.'); }
-        catch(err){ fallbackCopy(text); }
-        return;
-      }
-      const text = box.innerText.replace(/\n{3,}/g, '\n\n').trim();
+      const textSource = (box && box.style.display !== 'none' && box.innerText.trim())
+        ? box : (() => { const t=document.createElement('div'); t.style.position='fixed'; t.style.left='-99999px'; t.innerHTML=buildTechDescriptionHtml(); document.body.appendChild(t); return t; })();
+      const text = textSource.innerText.replace(/\n{3,}/g, '\n\n').trim();
       try{ await navigator.clipboard.writeText(text); alert('Описание скопировано в буфер обмена.'); }
-      catch(err){ fallbackCopy(text); }
-    }
-
-    function fallbackCopy(text){
-      const ta = document.createElement('textarea');
-      ta.value = text; ta.setAttribute('readonly','');
-      ta.style.position='fixed'; ta.style.left='-9999px';
-      document.body.appendChild(ta); ta.select(); document.execCommand('copy');
-      document.body.removeChild(ta);
-      alert('Описание скопировано (fallback).');
+      catch(err){
+        const ta=document.createElement('textarea'); ta.value=text; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); alert('Описание скопировано (fallback).');
+      }
+      if (textSource !== box) document.body.removeChild(textSource);
     }
 
     /* ===== Инициализация ===== */
@@ -736,4 +754,3 @@
   </script>
 </body>
 </html>
-
