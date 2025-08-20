@@ -576,44 +576,76 @@
     }
 
     /* ===== Чертёж: построение имён и вывод ===== */
-    function buildDrawingCandidates(){
-      const v = document.getElementById('voltage').value;   // T060 / T100
-      const p = document.getElementById('power').value;     // мощность, строка
-      const data = modelData[v][p];
-      const current = Number(document.getElementById('current').value || 0);
+function buildDrawingCandidates(){
+  const v = document.getElementById('voltage').value;   // T060 / T100
+  const p = document.getElementById('power').value;     // "900", "2800", ...
+  const data = modelData[v][p];
+  const current = Number(document.getElementById('current').value || 0);
 
-      // Для 6 кВ поддержим и 6KV, и 6KW (на случай разных имён), для 10 кВ — 10KV
-      const kvTokens = (v === 'T060') ? ['6KV','6KW'] : ['10KV'];
+  // Поддержка 6KV и 6KW (на случай разных имён файлов)
+  const kvTokens = (v === 'T060') ? ['6KV','6KW'] : ['10KV'];
 
-      // Нужен ПШ?
-      const needPS = Boolean(data?.starter) || current > 200;
+  // Флаги
+  const needPS   = Boolean(data?.starter) || current > 200;   // нужен +ПШ?
+  const bypassV  = document.getElementById('bypass')?.value;  // X / A / M
+  const isBypass = (bypassV === 'A' || bypassV === 'M');
 
-      // Байпас выбран?
-      const bypassVal = document.getElementById('bypass')?.value; // X/A/M
-      const isBypass = (bypassVal === 'A' || bypassVal === 'M');
+  // Папки по приоритету
+  const folders = isBypass
+    ? ['assets/drawings1/','assets/drawings/']
+    : ['assets/drawings/','assets/drawings1/'];
 
-      // Папки в порядке приоритета (если выбран байпас — сначала drawings1)
-      const folders = isBypass
-        ? ['assets/drawings1/','assets/drawings/']
-        : ['assets/drawings/','assets/drawings1/'];
+  // Конструктор базовых имён (кириллица!)
+  // Собираем варианты порядка тегов: [ШАБ_ШРБ, ПШ] и [ПШ, ШАБ_ШРБ]
+  const makeBases = (kv) => {
+    const plain = `${kv} ${p} KW габаритный чертеж`;
+    const psh   = `${kv} ${p} KW +ПШ габаритный чертеж`;
+    const shab  = `${kv} ${p} KW + ШАБ_ШРБ габаритный чертеж`;
 
-      // Базы имён (кириллица!)
-      // + ШАБ_ШРБ — для чертежей со шкафом автомат/ручной байпаса
-      function basesFor(kv){
-        const basePlain        = `${kv} ${p} KW габаритный чертеж`;
-        const basePSH          = `${kv} ${p} KW +ПШ габаритный чертеж`;
-        const baseBypass       = `${kv} ${p} KW + ШАБ_ШРБ габаритный чертеж`;
-        const baseBypassWithPS = `${kv} ${p} KW + ШАБ_ШРБ +ПШ габаритный чертеж`;
-        const arr = [];
-        if (isBypass){
-          if (needPS) arr.push(baseBypassWithPS, baseBypass, basePSH, basePlain);
-          else        arr.push(baseBypass, baseBypassWithPS, basePlain, basePSH);
-        }else{
-          if (needPS) arr.push(basePSH, basePlain, baseBypassWithPS, baseBypass);
-          else        arr.push(basePlain, basePSH, baseBypass, baseBypassWithPS);
+    const both1 = `${kv} ${p} KW + ШАБ_ШРБ +ПШ габаритный чертеж`;
+    const both2 = `${kv} ${p} KW +ПШ + ШАБ_ШРБ габаритный чертеж`;
+
+    // Приоритет по выбранным опциям
+    if (isBypass && needPS)   return [both1, both2, shab, psh, plain];
+    if (isBypass && !needPS)  return [shab, both1, both2, plain, psh];
+    if (!isBypass && needPS)  return [psh, plain, both1, both2, shab];
+    return [plain, psh, shab, both1, both2];
+  };
+
+  // Варианты пробелов вокруг плюса: " + ", " +", "+ ", "+"
+  function plusSpacingVariants(str){
+    const variants = new Set();
+    const bases = [str];
+    // Нормализация двойных пробелов перед "+": "KW  +" -> "KW +"
+    bases.push(str.replace('KW  +', 'KW +'));
+
+    for (const s of bases){
+      variants.add(s);
+      variants.add(s.replace(/\s*\+\s*/g, ' + '));
+      variants.add(s.replace(/\s*\+\s*/g, ' +'));
+      variants.add(s.replace(/\s*\+\s*/g, '+ '));
+      variants.add(s.replace(/\s*\+\s*/g, '+'));
+    }
+    return [...variants];
+  }
+
+  const exts = ['.pdf','.PDF'];
+  const candidates = [];
+
+  for (const folder of folders){
+    for (const kv of kvTokens){
+      for (const base of makeBases(kv)){
+        for (const spaced of plusSpacingVariants(base)){
+          for (const e of exts){
+            candidates.push(encodeURI(folder + spaced + e));
+          }
         }
-        return arr;
       }
+    }
+  }
+  return candidates;
+}
+
 
       // Иногда бывает двойной пробел перед "+", попробуем оба
       const normalizeSpaces = b => {
@@ -729,3 +761,4 @@
   </script>
 </body>
 </html>
+
