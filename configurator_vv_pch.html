@@ -601,25 +601,29 @@
     }
 
     function downloadTKP(e){
-      e.preventDefault();
-      updateNomenclature(); // актуализируем перед выгрузкой
-      const html = buildTKPHtml();
+  e.preventDefault();
+  updateNomenclature(); // актуализируем перед выгрузкой
+  const html = buildTKPHtml();
 
-      // Временной DOM для html2pdf
-      const container = document.createElement('div');
-      container.innerHTML = html;
-      document.body.appendChild(container);
-      const opt = {
-        margin:       10,
-        filename:     `TKP_${(document.getElementById('result').textContent||'').replace(/\s+/g,'')}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-      html2pdf().from(container).set(opt).save().then(()=>{
-        document.body.removeChild(container);
-      });
-    }
+  // Создаём скрытый контейнер
+  const container = document.createElement('div');
+  container.style.display = 'none';
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  const opt = {
+    margin:       10,
+    filename:     `TKP_${(document.getElementById('result').textContent||'').replace(/\s+/g,'')}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(container).save().then(()=>{
+    document.body.removeChild(container);
+  });
+}
   </script>
 </body>
 </html>
+
