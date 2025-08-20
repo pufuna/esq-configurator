@@ -175,8 +175,17 @@
             <select id="pulsation" onchange="updateNomenclature()"></select>
         </div>
 
+  <!-- НОВОЕ -->
         <div class="param">
-            <label>6. Пусковой шкаф:</label>
+            <label>6. Тип конденсаторов:</label>
+            <select id="capacitorType" onchange="onCapacitorTypeChange()">
+                <option value="EL">Электролитические</option>
+                <option value="PF">Пленочные</option>
+            </select>
+        </div>
+
+        <div class="param">
+            <label>7. Пусковой шкаф:</label>
             <select id="starter" onchange="updateNomenclature()">
                 <option value="X">Отсутствует</option>
                 <option value="S">Включен</option>
@@ -184,7 +193,7 @@
         </div>
 
         <div class="param">
-            <label>7. Шкаф байпаса:</label>
+            <label>8. Шкаф байпаса:</label>
             <select id="bypass" onchange="updateNomenclature()">
                 <option value="X">Отсутствует</option>
                 <option value="A">Автоматический</option>
@@ -193,7 +202,7 @@
         </div>
 
         <div class="param">
-            <label>8. Шкаф реактора:</label>
+            <label>9. Шкаф реактора:</label>
             <select id="reactor" onchange="updateNomenclature()">
                 <option value="X">Отсутствует</option>
                 <option value="R">Включен</option>
@@ -201,7 +210,7 @@
         </div>
 
         <div class="param">
-            <label>9. Степень защиты:</label>
+            <label>10. Степень защиты:</label>
             <select id="ip" onchange="updateNomenclature()">
                 <option value="31">IP31</option>
                 <option value="42">IP42</option>
@@ -209,7 +218,7 @@
         </div>
 
         <div class="param">
-            <label>10. Плата расширения:</label>
+            <label>11. Плата расширения:</label>
             <select id="expansion" onchange="updateNomenclature()">
                 <option value="X">Нет</option>
                 <option value="E">+8DI/DO</option>
@@ -218,7 +227,7 @@
         </div>
 
         <div class="param">
-            <label>11. ИБП:</label>
+            <label>12. ИБП:</label>
             <select id="ups" onchange="updateNomenclature()">
                <option value="X">Отсутствует</option>
                 <option value="U">Присутствует</option>
@@ -226,7 +235,7 @@
         </div>
 
         <div class="param">
-            <label>12. Вводы/выводы:</label>
+            <label>13. Вводы/выводы:</label>
             <select id="cable" onchange="updateNomenclature()">
                 <option value="D">Снизу</option>
                 <option value="T">Сверху</option>
@@ -234,7 +243,7 @@
         </div>
 
         <div class="param">
-            <label>13. Протокол связи:</label>
+            <label>14. Протокол связи:</label>
             <select id="protocol" onchange="updateNomenclature()">
                 <option value="MR">Modbus RTU</option>
                 <option value="MT">Modbus TCP</option>
@@ -246,18 +255,19 @@
         </div>
 
         <div class="param">
-            <label>14. Размер ячеек:</label>
+            <label>15. Размер ячеек:</label>
             <select id="cellSize" onchange="updateNomenclature()" disabled>
                 <option value="PE">PE</option>
                 <option value="PA">PA</option>
                 <option value="PB">PB</option>
                 <option value="PC">PC</option>
                 <option value="PD">PD</option>
+                <option value="PF">PF</option><!-- добавлен PF -->
             </select>
         </div>
 
         <div class="param">
-            <label>15. Байпас ячейки:</label>
+            <label>16. Байпас ячейки:</label>
             <select id="cellBypass" onchange="updateNomenclature()">
                 <option value="N">Отсутствует</option>
                 <option value="B">Присутствует</option>
@@ -278,7 +288,6 @@
     </div>
 
     <script>
-        // Обновлено: size (PE/PА/PB/PC/PD) строго по таблицам PDF для 6 кВ (T060) и 10 кВ (T100).
         const modelData = {
             'T060': {
                 '280':  {current: '34',  size: 'PE', starter: false},
@@ -295,7 +304,7 @@
                 '1000': {current: '120', size: 'PE', starter: false},
                 '1120': {current: '135', size: 'PE', starter: false},
                 '1250': {current: '154', size: 'PE', starter: false},
-                '1400': {current: '173', size: 'PE', starter: false},
+                '1400': {current: '173', size: 'PE', starter: false}, // исправлено ранее
                 '1500': {current: '183', size: 'PE', starter: false},
                 '1600': {current: '192', size: 'PE', starter: false},
                 '1800': {current: '217', size: 'PA', starter: true},
@@ -355,6 +364,13 @@
             }
         };
 
+        function isFilmAllowed(voltage, power) {
+            const p = Number(power);
+            if (voltage === 'T060') return p <= 710;    // 6 кВ: до 710 кВт включительно
+            if (voltage === 'T100') return p <= 1250;   // 10 кВ: до 1250 кВт включительно
+            return false;
+        }
+
         function updatePowerOptions() {
             const voltage = document.getElementById('voltage').value;
             const powerSelect = document.getElementById('power');
@@ -372,16 +388,56 @@
             updateDependencies();
         }
 
+        function onCapacitorTypeChange() {
+            const voltage = document.getElementById('voltage').value;
+            const power = document.getElementById('power').value;
+            const cap = document.getElementById('capacitorType');
+            const allowed = isFilmAllowed(voltage, power);
+
+            // Если выбраны пленочные вне допустимого диапазона — откат на электролитические
+            if (cap.value === 'PF' && !allowed) {
+                cap.value = 'EL';
+            }
+            applyCellSize(); // применяем актуальный суффикс
+            updateNomenclature();
+        }
+
+        function updateCapacitorAvailability() {
+            const voltage = document.getElementById('voltage').value;
+            const power = document.getElementById('power').value;
+            const cap = document.getElementById('capacitorType');
+            const filmOption = Array.from(cap.options).find(o => o.value === 'PF');
+            const allowed = isFilmAllowed(voltage, power);
+
+            // Включаем/выключаем возможность выбора пленочных
+            if (filmOption) filmOption.disabled = !allowed;
+
+            // Если сейчас выбран PF, но уже нельзя — переключаем на EL
+            if (cap.value === 'PF' && !allowed) {
+                cap.value = 'EL';
+            }
+        }
+
+        function applyCellSize() {
+            const voltage = document.getElementById('voltage').value;
+            const power = document.getElementById('power').value;
+            const data = modelData[voltage][power];
+            const cap = document.getElementById('capacitorType').value;
+            const cellSize = document.getElementById('cellSize');
+
+            if (cap === 'PF' && isFilmAllowed(voltage, power)) {
+                cellSize.value = 'PF'; // плёночные → суффикс PF
+            } else {
+                cellSize.value = data.size; // по таблице
+            }
+        }
+
         function updateDependencies() {
             const voltage = document.getElementById('voltage').value;
             const power = document.getElementById('power').value;
             const data = modelData[voltage][power];
             
             document.getElementById('current').value = data.current;
-
-            // Автовыбор размера ячеек по таблице
-            const cellSize = document.getElementById('cellSize');
-            cellSize.value = data.size;
 
             // Пересоздаём список пульсностей по напряжению
             const pulsationSelect = document.getElementById('pulsation');
@@ -393,7 +449,11 @@
             const starter = document.getElementById('starter');
             starter.disabled = data.starter;
             starter.value = data.starter ? 'S' : 'X';
-            
+
+            // Актуализируем доступность пленочных и применяем суффикс размера
+            updateCapacitorAvailability();
+            applyCellSize();
+
             updateNomenclature();
         }
 
@@ -411,8 +471,7 @@
             const newCode = document.getElementById('result').textContent;
             const codeParts = newCode.split('-');
             const lastPart = codeParts[codeParts.length - 1];
-            const lastThree = lastPart.slice(-3);
-            
+            const lastThree = lastPart.slice(-3); // как в исходном файле
             const voltage = document.getElementById('voltage').value;
             const power = document.getElementById('power').value;
             return `ESQ-ME800-${power}-${voltage}-${lastThree}`;
@@ -494,10 +553,20 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Значения по умолчанию
+            document.getElementById('capacitorType').value = 'EL'; // по умолчанию электролитические
             updatePowerOptions();
-            document.querySelectorAll('select').forEach(el => 
-                el.addEventListener('change', updateNomenclature)
-            );
+
+            // Слежение за изменениями
+            document.querySelectorAll('select').forEach(el => {
+                if (el.id === 'voltage') {
+                    el.addEventListener('change', updatePowerOptions);
+                } else if (el.id === 'power') {
+                    el.addEventListener('change', updateDependencies);
+                } else {
+                    el.addEventListener('change', updateNomenclature);
+                }
+            });
         });
     </script>
 </body>
