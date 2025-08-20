@@ -218,7 +218,7 @@
   <div class="footer"><p>© 2025 ESQ</p></div>
 
   <script>
-    // ----- ДАННЫЕ МОДЕЛЕЙ (ток и суффикс ячейки) -----
+    /* ===== ДАННЫЕ МОДЕЛЕЙ (ток и суффикс ячейки) ===== */
     const modelData = {
       'T060': {
         '280': {current:'34',size:'PE',starter:false},  '315': {current:'38',size:'PE',starter:false},
@@ -261,7 +261,7 @@
       }
     };
 
-    // ----- ГАБАРИТЫ И МАССА -----
+    /* ===== ГАБАРИТЫ И МАССА ===== */
     const mechanicalData = {
       'T060': {
         '280':  { size:'2025×1325×2480', weight:'2.0' },
@@ -338,7 +338,7 @@
       }
     };
 
-    // ----- ЛОГИКА ПЛЁНОЧНЫХ -----
+    /* ===== Плёночные конденсаторы ===== */
     function isFilmAllowed(voltage, power){
       const p = Number(power);
       if (voltage==='T060') return p <= 710;
@@ -346,7 +346,7 @@
       return false;
     }
 
-    // ----- UI ОБНОВЛЕНИЯ -----
+    /* ===== UI ===== */
     function updatePowerOptions(){
       const v = document.getElementById('voltage').value;
       const powerSel = document.getElementById('power');
@@ -477,7 +477,7 @@
       document.getElementById('old-result').textContent = buildOldNomenclatureText();
     }
 
-    // ----- ТЕХОПИСАНИЕ -----
+    /* ===== ТЕХОПИСАНИЕ ===== */
     function esc(str){ return String(str||'').replace(/[&<>"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
 
     function getMechanicalFor(v, p){
@@ -487,7 +487,6 @@
 
     function buildTechDescriptionHtml(){
       const now = new Date().toLocaleString();
-
       const vSel = document.getElementById('voltage');
       const voltageText = vSel.options[vSel.selectedIndex].text;
       const voltageCode = vSel.value;
@@ -515,7 +514,6 @@
       const cellBypass = document.getElementById('cellBypass').value === 'B' ? 'Да' : 'Нет';
 
       const skuNew = document.getElementById('result').textContent;
-
       const mech = getMechanicalFor(voltageCode, powerVal);
 
       const intro = `
@@ -525,7 +523,6 @@
         сохраняет высокий КПД и коэффициент мощности.
       `;
 
-      // маппинги Да/Нет и режимов
       const yn = v => v ? 'Да' : 'Нет';
       const starterYN = yn(starterVal === 'S');
       const reactorYN = yn(reactorVal === 'R');
@@ -578,48 +575,107 @@
       `;
     }
 
-    // --- Построение имени чертежа и вывод ниже техописания ---
-    function computeDrawingFile(){
+    /* ===== Чертёж: построение имён и вывод ===== */
+    function buildDrawingCandidates(){
       const v = document.getElementById('voltage').value;   // T060 / T100
-      const p = document.getElementById('power').value;     // мощность (строка)
+      const p = document.getElementById('power').value;     // мощность, строка
       const data = modelData[v][p];
       const current = Number(document.getElementById('current').value || 0);
 
-      const kvText = (v === 'T060') ? '6KV' : '10KV';
-      // Требуется ПШ по данным таблицы или если ток > 200 А
+      // Для 6 кВ поддержим и 6KV, и 6KW (на случай разных имён), для 10 кВ — 10KV
+      const kvTokens = (v === 'T060') ? ['6KV','6KW'] : ['10KV'];
+
+      // Нужен ПШ?
       const needPS = Boolean(data?.starter) || current > 200;
 
-      const base = needPS
-        ? `${kvText} ${p} KW +ПШ габаритный чертеж.pdf`
-        : `${kvText} ${p} KW габаритный чертеж.pdf`;
+      // Байпас выбран?
+      const bypassVal = document.getElementById('bypass')?.value; // X/A/M
+      const isBypass = (bypassVal === 'A' || bypassVal === 'M');
 
-      const path = `assets/drawings/${base}`;
-      return { base, pathEncoded: encodeURI(path) };
+      // Папки в порядке приоритета (если выбран байпас — сначала drawings1)
+      const folders = isBypass
+        ? ['assets/drawings1/','assets/drawings/']
+        : ['assets/drawings/','assets/drawings1/'];
+
+      // Базы имён (кириллица!)
+      // + ШАБ_ШРБ — для чертежей со шкафом автомат/ручной байпаса
+      function basesFor(kv){
+        const basePlain        = `${kv} ${p} KW габаритный чертеж`;
+        const basePSH          = `${kv} ${p} KW +ПШ габаритный чертеж`;
+        const baseBypass       = `${kv} ${p} KW + ШАБ_ШРБ габаритный чертеж`;
+        const baseBypassWithPS = `${kv} ${p} KW + ШАБ_ШРБ +ПШ габаритный чертеж`;
+        const arr = [];
+        if (isBypass){
+          if (needPS) arr.push(baseBypassWithPS, baseBypass, basePSH, basePlain);
+          else        arr.push(baseBypass, baseBypassWithPS, basePlain, basePSH);
+        }else{
+          if (needPS) arr.push(basePSH, basePlain, baseBypassWithPS, baseBypass);
+          else        arr.push(basePlain, basePSH, baseBypass, baseBypassWithPS);
+        }
+        return arr;
+      }
+
+      // Иногда бывает двойной пробел перед "+", попробуем оба
+      const normalizeSpaces = b => {
+        const v1 = b;
+        const v2 = b.replace('KW  +', 'KW +');
+        return (v1 === v2) ? [v1] : [v1, v2];
+      };
+
+      const exts = ['.pdf','.PDF'];
+      const candidates = [];
+
+      for (const folder of folders){
+        for (const kv of kvTokens){
+          for (const b of basesFor(kv)){
+            for (const name of normalizeSpaces(b)){
+              for (const e of exts){
+                candidates.push(encodeURI(folder + name + e));
+              }
+            }
+          }
+        }
+      }
+      return candidates;
+    }
+
+    async function findFirstExisting(urls){
+      for (const url of urls){
+        try{
+          const r = await fetch(url, {method:'HEAD', cache:'no-store'});
+          if (r.ok) return url;
+        }catch(e){ /* пробуем следующий */ }
+      }
+      return null;
     }
 
     async function updateDrawingBlock(){
       const box = document.getElementById('drawing-block');
       if (!box) return;
 
-      const { pathEncoded } = computeDrawingFile();
+      const candidates = buildDrawingCandidates();
+      const found = await findFirstExisting(candidates);
 
-      try{
-        // Проверяем, существует ли файл (HEAD)
-        const res = await fetch(pathEncoded, { method:'HEAD' });
-        if (res.ok){
-          box.innerHTML = `
-            <h3>Габаритный чертёж</h3>
-            <iframe class="drawing-iframe" src="${pathEncoded}"></iframe>
-            <div class="drawing-link"><a href="${pathEncoded}" target="_blank" rel="noopener">Открыть в новой вкладке</a></div>
-          `;
-        } else {
-          box.innerHTML = `<div class="drawing-empty">Подходящий файл чертежа не найден в <code>assets/drawings/</code>.</div>`;
-        }
-      }catch(e){
-        box.innerHTML = `<div class="drawing-empty">Не удалось загрузить чертёж. Проверьте имя файла и расположение.</div>`;
+      if (found){
+        box.innerHTML = `
+          <h3>Габаритный чертёж</h3>
+          <iframe class="drawing-iframe" src="${found}"></iframe>
+          <div class="drawing-link"><a href="${found}" target="_blank" rel="noopener">Открыть в новой вкладке</a></div>
+          <p style="font-size:0.85em;color:#555;margin-top:6px;">
+            <i>*Шкаф реактора на габаритных чертежах не отображен</i>
+          </p>
+        `;
+      } else {
+        box.innerHTML = `
+          <div class="drawing-empty">
+            Подходящий файл чертежа не найден.<br>
+            Искомые варианты:<br>
+            <small>${candidates.map(x=>x.replace(/^.*assets\//,'assets/')).join('<br>')}</small>
+          </div>`;
       }
     }
 
+    /* ===== Показ/копирование техописания ===== */
     function toggleTechDesc(e){
       e.preventDefault();
       updateNomenclature();
@@ -627,7 +683,6 @@
       box.innerHTML = buildTechDescriptionHtml();
       box.style.display = (box.style.display === 'none' || box.style.display === '') ? 'block' : 'none';
       if (box.style.display === 'block') {
-        // подгружаем чертёж сразу после генерации описания
         updateDrawingBlock();
         box.scrollIntoView({behavior:'smooth', block:'start'});
       }
@@ -643,35 +698,25 @@
         document.body.appendChild(tmp);
         const text = tmp.innerText.replace(/\n{3,}/g, '\n\n').trim();
         document.body.removeChild(tmp);
-        try{
-          await navigator.clipboard.writeText(text);
-          alert('Описание скопировано в буфер обмена.');
-        }catch(err){
-          fallbackCopy(text);
-        }
+        try{ await navigator.clipboard.writeText(text); alert('Описание скопировано в буфер обмена.'); }
+        catch(err){ fallbackCopy(text); }
         return;
       }
       const text = box.innerText.replace(/\n{3,}/g, '\n\n').trim();
-      try{
-        await navigator.clipboard.writeText(text);
-        alert('Описание скопировано в буфер обмена.');
-      }catch(err){
-        fallbackCopy(text);
-      }
+      try{ await navigator.clipboard.writeText(text); alert('Описание скопировано в буфер обмена.'); }
+      catch(err){ fallbackCopy(text); }
     }
 
     function fallbackCopy(text){
       const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.setAttribute('readonly','');
+      ta.value = text; ta.setAttribute('readonly','');
       ta.style.position='fixed'; ta.style.left='-9999px';
-      document.body.appendChild(ta);
-      ta.select(); document.execCommand('copy');
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy');
       document.body.removeChild(ta);
       alert('Описание скопировано (fallback).');
     }
 
-    // Инициализация
+    /* ===== Инициализация ===== */
     document.addEventListener('DOMContentLoaded', ()=>{
       document.getElementById('capacitorType').value='EL';
       updatePowerOptions();
