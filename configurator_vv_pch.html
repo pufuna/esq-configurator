@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <title>Конфигуратор преобразователя частоты ESQ F ME 800</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- PDF генератор -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-YcsIPmQY2pQFm2y+m5gK1Ewq3MZ8w5JjW2Vq2h1r3yV2Xo1r0tD0r5jQ7r+0J8G4JYkC1XbEwB0Y3O1QKz3a7Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <style>
     body{
       margin:0;padding:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;
@@ -26,14 +24,29 @@
       font-size:24px;color:#2c3e50;border:1px solid #eee;text-align:center;font-weight:bold
     }
     .result-title{font-size:1.5em;margin-bottom:15px;color:#2c3e50;font-weight:700;text-align:center}
-    .home-button,.download-btn{
+    .home-button,.techdesc-btn,.copy-btn{
       display:inline-block;padding:12px 30px;background:#2c3e50;color:#fff;text-decoration:none;border-radius:25px;
       transition:background .3s;font-weight:600;width:100%;text-align:center;box-sizing:border-box
     }
     .home-button{margin:20px 0 10px}
     .home-button:hover{background:#34495e;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
-    .download-btn{margin:10px 0 20px;background:#0f6b3f}
-    .download-btn:hover{background:#11824c;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    .techdesc-btn{margin:10px 0;background:#0f6b3f}
+    .techdesc-btn:hover{background:#11824c;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    .copy-btn{margin:10px 0;background:#1f6feb}
+    .copy-btn:hover{background:#2556b8;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+
+    /* Блок технического описания */
+    .techdesc{
+      display:none;margin-top:10px;padding:20px;background:#fff;border:1px solid #e6ecf5;border-radius:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,.06)
+    }
+    .techdesc h2{margin:0 0 8px;color:#1f3147}
+    .meta{color:#6b7a90;margin-bottom:12px}
+    table{border-collapse:collapse;width:100%;margin:12px 0}
+    th,td{border:1px solid #e6ecf5;padding:8px;text-align:left;font-size:14px}
+    th{background:#f3f6fb}
+    .muted{color:#6b7a90}
+    .sku{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f6f8fb;border:1px solid #e6ecf5;border-radius:8px;padding:10px;margin:10px 0;font-weight:700}
     @media (max-width:768px){
       .configurator{width:95%;padding:20px;margin:20px auto}
       .param{flex-direction:column;align-items:stretch}
@@ -86,7 +99,7 @@
         <option value="EL">Электролитические</option>
         <option value="PF">Пленочные</option>
       </select>
-      <div class="note">Плёночные доступны: 6 кВ — до 710 кВт, 10 кВ — до 1250 кВт.</div>
+      <div class="note">Плёночные доступны: 6 кВ — до 710 кВт, 10 кВ — до 1250 кВт. При выборе плёночных суффикс ячейки = PF.</div>
     </div>
 
     <div class="param">
@@ -160,7 +173,7 @@
     </div>
 
     <div class="param">
-      <label>15. Размер ячеек (суффикс):</label>
+      <label>15. Тип силовых ячеек:</label>
       <select id="cellSize" onchange="updateNomenclature()" disabled>
         <option value="PE">PE</option>
         <option value="PA">PA</option>
@@ -186,7 +199,11 @@
     <div id="old-result"></div>
 
     <a href="index.html" class="home-button">Вернуться на главную</a>
-    <a href="#" class="download-btn" onclick="downloadTKP(event)">Скачать ТКП</a>
+    <a href="#" class="techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
+    <a href="#" class="copy-btn" onclick="copyTechDesc(event)">Копировать описание</a>
+
+    <!-- Здесь будет появляться техническое описание -->
+    <div id="techdesc" class="techdesc"></div>
   </div>
 
   <div class="footer"><p>© 2025 ESQ</p></div>
@@ -235,11 +252,9 @@
       }
     };
 
-    // ----- ГАБАРИТЫ И МАССА (из таблиц техописания) -----
-    // Формат: mechanicalData[напряжение]['мощность_кВт'] = { size: 'Ш×Г×В, мм', weight: 'т' }
+    // ----- ГАБАРИТЫ И МАССА -----
     const mechanicalData = {
       'T060': {
-        // 6 кВ — стр. 15
         '280':  { size:'2025×1325×2480', weight:'2.0' },
         '315':  { size:'2025×1325×2480', weight:'2.0' },
         '355':  { size:'2025×1325×2480', weight:'2.1' },
@@ -256,25 +271,24 @@
         '1250': { size:'2300×1500×2532', weight:'3.6' },
         '1400': { size:'2300×1500×2532', weight:'3.9' },
         '1500': { size:'2300×1500×2532', weight:'4.2' },
-        '1600': { size:'3500×1600×2731', weight:'7.0' }, // включая пусковой шкаф
+        '1600': { size:'3500×1600×2731', weight:'7.0' },
         '1800': { size:'3500×1600×2731', weight:'6.7' },
         '2000': { size:'3500×1600×2731', weight:'9.0' },
-        '2240': { size:'4405×1500×2895', weight:'9.0' }, // включая пусковой шкаф
+        '2240': { size:'4405×1500×2895', weight:'9.0' },
         '2500': { size:'4405×1500×2895', weight:'9.0' },
         '2600': { size:'4405×1500×2895', weight:'9.8' },
-        '2800': { size:'4705×1600×2895', weight:'10.2' }, // включая пусковой шкаф
-        '3150': { size:'7434×1600×2916', weight:'12.9' }, // включая пусковой шкаф
+        '2800': { size:'4705×1600×2895', weight:'10.2' },
+        '3150': { size:'7434×1600×2916', weight:'12.9' },
         '3550': { size:'7434×1600×2916', weight:'14.0' },
         '4000': { size:'7434×1600×2916', weight:'14.3' },
         '4500': { size:'7434×1600×2916', weight:'15.5' },
         '5000': { size:'7434×1600×2916', weight:'16.7' },
-        '5600': { size:'9270×1980×3438', weight:'20.7' }, // включая пусковой шкаф
+        '5600': { size:'9270×1980×3438', weight:'20.7' },
         '6300': { size:'9270×1980×3438', weight:'—'   },
         '7100': { size:'9270×1980×3438', weight:'22.2' },
         '8000': { size:'9270×1980×3438', weight:'—'   }
       },
       'T100': {
-        // 10 кВ — стр. 17
         '280':  { size:'2700×1325×2480', weight:'2.4' },
         '315':  { size:'2700×1325×2480', weight:'2.5' },
         '355':  { size:'2700×1325×2480', weight:'2.5' },
@@ -294,21 +308,21 @@
         '1600': { size:'3000×1500×2532', weight:'4.4' },
         '1800': { size:'3000×1500×2532', weight:'—'   },
         '2000': { size:'3000×1500×2532', weight:'4.9' },
-        '2240': { size:'4500×1600×2731', weight:'5.1' }, // включая пусковой шкаф
+        '2240': { size:'4500×1600×2731', weight:'5.1' },
         '2500': { size:'4500×1600×2731', weight:'5.4' },
         '2650': { size:'4500×1600×2731', weight:'5.8' },
-        '2800': { size:'7200×1600×2895', weight:'8.5' }, // включая пусковой шкаф
+        '2800': { size:'7200×1600×2895', weight:'8.5' },
         '3150': { size:'7200×1600×2895', weight:'9.3' },
         '3400': { size:'7200×1600×2895', weight:'9.8' },
         '3600': { size:'7200×1600×2895', weight:'10.2' },
-        '4000': { size:'11034×1700×2895', weight:'14.5' }, // включая пусковой шкаф
+        '4000': { size:'11034×1700×2895', weight:'14.5' },
         '4500': { size:'11034×1700×2895', weight:'15.2' },
-        '5000': { size:'11334×1700×2895', weight:'16.7' }, // включая пусковой шкаф
+        '5000': { size:'11334×1700×2895', weight:'16.7' },
         '5600': { size:'11334×1700×2895', weight:'18.5' },
         '6300': { size:'11334×1700×2895', weight:'18.9' },
         '7100': { size:'11334×1700×2895', weight:'20.2' },
         '8000': { size:'11334×1700×2895', weight:'21.5' },
-        '9000': { size:'16550×1980×3438', weight:'41.0' }, // включая пусковой шкаф
+        '9000': { size:'16550×1980×3438', weight:'41.0' },
         '10000':{ size:'16550×1980×3438', weight:'—'   },
         '11200':{ size:'16550×1980×3438', weight:'41.8' },
         '12500':{ size:'16550×1980×3438', weight:'42.4' }
@@ -416,7 +430,10 @@
       const protoText = ({MR:'Modbus RTU',MT:'Modbus TCP',PB:'ProfibusDP',PN:'ProfiNet',CO:'CanOpen',EI:'Ethernet/IP'})[document.getElementById('protocol').value];
       const cellBypass = document.getElementById('cellBypass').value;
 
-      const parts = [ getOldNomenclatureCode(), vText, `${p} кВт`, `${i} А`, `IP${ip}`, `${material==='AL'?'алюминиевый':'медный'} трансформатор`, getCellCount() ];
+      const parts = [
+        getOldNomenclatureCode(), vText, `${p} кВт`, `${i} А`, `IP${ip}`,
+        `${material==='AL'?'алюминиевый':'медный'} трансформатор`, getCellCount()
+      ];
       const adds = [];
       adds.push(cellBypass==='B' ? 'с байпас силовой ячейки' : 'без байпас силовой ячейки');
       if (starter==='S') adds.push('пусковой шкаф');
@@ -451,6 +468,163 @@
       document.getElementById('old-result').textContent = buildOldNomenclatureText();
     }
 
+    // ----- ТЕХОПИСАНИЕ -----
+    function esc(str){ return String(str||'').replace(/[&<>"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
+
+    function getMechanicalFor(v, p){
+      const rec = (mechanicalData[v] && mechanicalData[v][p]) ? mechanicalData[v][p] : null;
+      return { size: rec?.size || '—', weight: rec?.weight || '—' };
+    }
+
+    function buildTechDescriptionHtml(){
+      const now = new Date().toLocaleString();
+
+      const vSel = document.getElementById('voltage');
+      const voltageText = vSel.options[vSel.selectedIndex].text;
+      const voltageCode = vSel.value;
+
+      const pSel = document.getElementById('power');
+      const powerText = pSel.options[pSel.selectedIndex]?.text || '';
+      const powerVal = document.getElementById('power').value;
+      const current = document.getElementById('current').value;
+
+      const ip = document.getElementById('ip').value;
+      const material = document.getElementById('material').value === 'AL' ? 'Алюминий' : 'Медь';
+      const pulsation = document.getElementById('pulsation').value;
+      const cellsPerPhase = getCellCount();
+      const starterVal = document.getElementById('starter').value;
+      const bypassVal = document.getElementById('bypass').value;
+      const reactorVal = document.getElementById('reactor').value;
+      const expansion = document.getElementById('expansion');
+      const expansionText = expansion.value==='X' ? 'Нет' : expansion.options[expansion.selectedIndex].text;
+      const upsVal = document.getElementById('ups').value;
+      const cable = document.getElementById('cable').value === 'T' ? 'Сверху' : 'Снизу';
+      const protoMap = {MR:'Modbus RTU',MT:'Modbus TCP',PB:'ProfibusDP',PN:'ProfiNet',CO:'CanOpen',EI:'Ethernet/IP'};
+      const proto = protoMap[document.getElementById('protocol').value];
+      const capacitorType = document.getElementById('capacitorType').value === 'PF' ? 'Плёночные' : 'Электролитические';
+      const cellSize = document.getElementById('cellSize').value;
+      const cellBypass = document.getElementById('cellBypass').value === 'B' ? 'Да' : 'Нет';
+
+      const skuNew = document.getElementById('result').textContent;
+
+      const mech = getMechanicalFor(voltageCode, powerVal);
+
+      const intro = `
+        Преобразователь частоты ESQ ME800 предназначен для управления скоростью вращения
+        асинхронных электродвигателей в системах электропривода высокого напряжения.
+        Устройство обеспечивает плавный пуск, торможение и регулирование частоты в широком диапазоне,
+        сохраняет высокий КПД и коэффициент мощности.
+      `;
+
+      // маппинги Да/Нет и режимов
+      const yn = v => v ? 'Да' : 'Нет';
+      const starterYN = yn(starterVal === 'S');
+      const reactorYN = yn(reactorVal === 'R');
+      const upsYN = yn(upsVal === 'U');
+      const bypassMode = (bypassVal === 'A') ? 'Автоматический' : (bypassVal === 'M' ? 'Ручной' : 'Нет');
+
+      return `
+        <h2>Техническое описание конфигурации</h2>
+        <div class="meta">Дата формирования: ${esc(now)}</div>
+
+        <div class="sku">${esc(skuNew)}</div>
+
+        <p class="muted">${esc(intro)}</p>
+
+        <h3>Выбранные параметры</h3>
+        <table>
+          <tr><th>Параметр</th><th>Значение</th></tr>
+          <tr><td>Напряжение</td><td>${esc(voltageText)} (${esc(voltageCode)})</td></tr>
+          <tr><td>Мощность ПЧ</td><td>${esc(powerText)}</td></tr>
+          <tr><td>Номинальный ток</td><td>${esc(current)} А</td></tr>
+          <tr><td>Степень защиты</td><td>IP${esc(ip)}</td></tr>
+          <tr><td>Материал обмоток трансформатора</td><td>${esc(material)}</td></tr>
+          <tr><td>Пульсность / кол-во ячеек</td><td>${esc(pulsation)} (${esc(cellsPerPhase)})</td></tr>
+          <tr><td>Пусковой шкаф</td><td>${esc(starterYN)}</td></tr>
+          <tr><td>Шкаф байпаса</td><td>${esc(bypassMode)}</td></tr>
+          <tr><td>Шкаф реактора</td><td>${esc(reactorYN)}</td></tr>
+          <tr><td>Плата расширения</td><td>${esc(expansionText)}</td></tr>
+          <tr><td>ИБП</td><td>${esc(upsYN)}</td></tr>
+          <tr><td>Вводы/выводы</td><td>${esc(cable)}</td></tr>
+          <tr><td>Протокол связи</td><td>${esc(proto)}</td></tr>
+          <tr><td>Тип конденсаторов</td><td>${esc(capacitorType)}</td></tr>
+          <tr><td>Тип силовых ячеек</td><td>${esc(cellSize)}</td></tr>
+          <tr><td>Байпас силовой ячейки</td><td>${esc(cellBypass)}</td></tr>
+        </table>
+
+        <h3>Технические характеристики (постоянные)</h3>
+        <table>
+          <tr><th>Параметр</th><th>Значение</th></tr>
+          <tr><td>Частота питающей сети</td><td>50/60 Гц, ±5%</td></tr>
+          <tr><td>Выходная частота</td><td>0.1–300 Гц</td></tr>
+          <tr><td>КПД (с трансформатором)</td><td>≈96%</td></tr>
+          <tr><td>Коэффициент мощности</td><td>≥0.95</td></tr>
+          <tr><td>Перегрузочная способность</td><td>120% в течение 60 с; 150% в течение 3 с</td></tr>
+          <tr><td>Питание цепей управления</td><td>3PH+N, 380 В AC ±15% (5–50 кВА)</td></tr>
+          <tr><td>Охлаждение</td><td>Воздушное, принудительное</td></tr>
+          <tr><td>Условия эксплуатации</td><td>0…+40 °C; влажность ≤95% без конденсации; высота ≤1000 м</td></tr>
+        </table>
+
+        <h3>Габариты и масса</h3>
+        <table>
+          <tr><th>Параметр</th><th>Значение</th></tr>
+          <tr><td>Мощность</td><td>${esc(powerVal)} кВт</td></tr>
+          <tr><td>Габариты (Ш×Г×В), мм</td><td>${esc(mech.size)}</td></tr>
+          <tr><td>Масса, т</td><td>${esc(mech.weight)}</td></tr>
+        </table>
+      `;
+    }
+
+    function toggleTechDesc(e){
+      e.preventDefault();
+      updateNomenclature();
+      const box = document.getElementById('techdesc');
+      box.innerHTML = buildTechDescriptionHtml();
+      box.style.display = (box.style.display === 'none' || box.style.display === '') ? 'block' : 'none';
+      if (box.style.display === 'block') {
+        box.scrollIntoView({behavior:'smooth', block:'start'});
+      }
+    }
+
+    async function copyTechDesc(e){
+      e.preventDefault();
+      const box = document.getElementById('techdesc');
+      if (!box || box.style.display === 'none' || !box.innerText.trim()) {
+        // если описание ещё не показано — соберём на лету (без отображения)
+        const tmp = document.createElement('div');
+        tmp.style.position='fixed'; tmp.style.left='-99999px'; tmp.style.top='0'; tmp.innerHTML = buildTechDescriptionHtml();
+        document.body.appendChild(tmp);
+        const text = tmp.innerText.replace(/\n{3,}/g, '\n\n').trim();
+        document.body.removeChild(tmp);
+        try{
+          await navigator.clipboard.writeText(text);
+          alert('Описание скопировано в буфер обмена.');
+        }catch(err){
+          fallbackCopy(text);
+        }
+        return;
+      }
+      const text = box.innerText.replace(/\n{3,}/g, '\n\n').trim();
+      try{
+        await navigator.clipboard.writeText(text);
+        alert('Описание скопировано в буфер обмена.');
+      }catch(err){
+        fallbackCopy(text);
+      }
+    }
+
+    function fallbackCopy(text){
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly','');
+      ta.style.position='fixed'; ta.style.left='-9999px';
+      document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+      alert('Описание скопировано (fallback).');
+    }
+
+    // Инициализация
     document.addEventListener('DOMContentLoaded', ()=>{
       document.getElementById('capacitorType').value='EL';
       updatePowerOptions();
@@ -460,166 +634,6 @@
         else el.addEventListener('change', updateNomenclature);
       });
     });
-
-    // ----- ВСПОМОГАТЕЛЬНЫЕ -----
-    function esc(str){ return String(str||'').replace(/[&<>"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
-
-    function getMechanicalFor(v, p){
-      const rec = (mechanicalData[v] && mechanicalData[v][p]) ? mechanicalData[v][p] : null;
-      return {
-        size: rec?.size || '—',
-        weight: rec?.weight || '—'
-      };
-    }
-
-    // ----- ТКП → PDF -----
-    function buildTechDataBlocks(){
-      const v = document.getElementById('voltage').value;
-      const cellsPerPhase = (v==='T060') ? '5 (для 6 кВ)' : '8 (для 10 кВ)';
-      return `
-        <h3>Технические данные (по техописанию)</h3>
-        <table>
-          <tr><th>Параметр</th><th>Значение</th></tr>
-          <tr><td>Тип нагрузки</td><td>Асинхронные/синхронные двигатели</td></tr>
-          <tr><td>Напряжение питающей сети</td><td>3/3.3/6/6.3/10/11 кВ, ±10%</td></tr>
-          <tr><td>Частота питающей сети</td><td>50/60 Гц, ±5%</td></tr>
-          <tr><td>Выходная частота</td><td>0.1–300 Гц</td></tr>
-          <tr><td>КПД (с трансформатором)</td><td>≈96%</td></tr>
-          <tr><td>Коэффициент мощности</td><td>≥0.95</td></tr>
-          <tr><td>Количество ячеек на фазу</td><td>${cellsPerPhase}</td></tr>
-          <tr><td>Перегрузочная способность</td><td>120% в течение 60 с</td></tr>
-          <tr><td>Питание цепей управления</td><td>3PH+N, 380 В AC ±15% (5–50 кВА)</td></tr>
-          <tr><td>Охлаждение</td><td>Воздушное, принудительное</td></tr>
-          <tr><td>Условия эксплуатации</td><td>0…+40 °C; влажность ≤95% (без конденсата); высота ≤1000 м</td></tr>
-          <tr><td>Степень защиты (стандарт)</td><td>IP31</td></tr>
-          <tr><td>Тип конденсаторов (стандарт)</td><td>Электролитические</td></tr>
-        </table>
-        <p class="footnote">Источник: таблицы «Характеристики и габариты ME800 на 6/10 кВ» (стр. 15, 17 техописания).</p>
-      `;
-    }
-
-    function buildMechTableBlock(){
-      const v = document.getElementById('voltage').value;
-      const p = document.getElementById('power').value;
-      const mech = getMechanicalFor(v, p);
-      return `
-        <h3>Габариты и масса</h3>
-        <table>
-          <tr><th>Параметр</th><th>Значение</th></tr>
-          <tr><td>Мощность</td><td>${esc(p)} кВт</td></tr>
-          <tr><td>Габариты (Ш×Г×В), мм</td><td>${esc(mech.size)}</td></tr>
-          <tr><td>Масса, т</td><td>${esc(mech.weight)}</td></tr>
-        </table>
-        <p class="footnote">Данные соответствуют техописанию; для позиций с «—» размер/масса в источнике не указаны явно (наследуются блоком выше).</p>
-      `;
-    }
-
-    function buildTKPHtml(){
-      const dt = new Date().toLocaleString();
-      const vSel = document.getElementById('voltage');
-      const voltageText = vSel.options[vSel.selectedIndex].text;
-      const voltageCode = vSel.value;
-
-      const pSel = document.getElementById('power');
-      const powerText = pSel.options[pSel.selectedIndex]?.text || '';
-      const current = document.getElementById('current').value;
-
-      const ip = document.getElementById('ip').value;
-      const material = document.getElementById('material').value === 'AL' ? 'Алюминий' : 'Медь';
-      const pulsation = document.getElementById('pulsation').value;
-      const starter = document.getElementById('starter').value === 'S' ? 'Пусковой шкаф' : 'Без пускового шкафа';
-      const bypass = document.getElementById('bypass').value;
-      const bypassText = bypass === 'A' ? 'Шкаф байпаса (автоматический)' : (bypass === 'M' ? 'Шкаф байпаса (ручной)' : 'Без шкафа байпаса');
-      const reactor = document.getElementById('reactor').value === 'R' ? 'Шкаф реактора' : 'Без шкафа реактора';
-      const expansion = document.getElementById('expansion');
-      const expansionText = expansion.value==='X' ? '—' : expansion.options[expansion.selectedIndex].text;
-      const ups = document.getElementById('ups').value === 'U' ? 'ИБП' : 'Без ИБП';
-      const cable = document.getElementById('cable').value === 'T' ? 'Вводы сверху' : 'Вводы снизу';
-      const protoMap = {MR:'Modbus RTU',MT:'Modbus TCP',PB:'ProfibusDP',PN:'ProfiNet',CO:'CanOpen',EI:'Ethernet/IP'};
-      const proto = protoMap[document.getElementById('protocol').value];
-      const capacitorType = document.getElementById('capacitorType').value === 'PF' ? 'Плёночные' : 'Электролитические';
-      const cellSize = document.getElementById('cellSize').value;
-      const cellBypass = document.getElementById('cellBypass').value === 'B' ? 'С байпасом силовой ячейки' : 'Без байпаса силовой ячейки';
-
-      const skuNew = document.getElementById('result').textContent;
-      const skuOld = document.getElementById('old-result').textContent;
-
-      const html = `
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<title>ТКП — ${esc(skuNew)}</title>
-<style>
-  body{font-family:Segoe UI,Arial,sans-serif;background:#fff;color:#1f3147;margin:24px}
-  h1{margin:0 0 6px}
-  .meta{color:#6b7a90;margin-bottom:14px}
-  .sku{font-family:ui-monospace, Menlo, Consolas, monospace;background:#f6f8fb;border:1px solid #e6ecf5;border-radius:8px;padding:10px;margin:10px 0;font-weight:700}
-  table{border-collapse:collapse;width:100%;margin-top:10px}
-  th,td{border:1px solid #e6ecf5;padding:8px;text-align:left;font-size:13px}
-  th{background:#f3f6fb}
-  h3{margin:18px 0 8px}
-  .foot{margin-top:16px;color:#6b7a90;font-size:12px}
-  .footnote{color:#6b7a90;font-size:12px;margin-top:6px}
-</style>
-</head>
-<body>
-  <h1>Технико-коммерческое предложение</h1>
-  <div class="meta">Дата формирования: ${esc(dt)}</div>
-
-  <div class="sku">Новая номенклатура: ${esc(skuNew)}</div>
-  <div class="sku">Старая номенклатура: ${esc(skuOld)}</div>
-
-  <h3>Выбранная конфигурация</h3>
-  <table>
-    <tr><th>Параметр</th><th>Значение</th></tr>
-    <tr><td>Напряжение</td><td>${esc(voltageText)} (${esc(voltageCode)})</td></tr>
-    <tr><td>Мощность ПЧ</td><td>${esc(powerText)}</td></tr>
-    <tr><td>Номинальный ток</td><td>${esc(current)} А</td></tr>
-    <tr><td>Степень защиты</td><td>IP${esc(ip)}</td></tr>
-    <tr><td>Материал обмоток</td><td>${esc(material)}</td></tr>
-    <tr><td>Пульсность</td><td>${esc(pulsation)}</td></tr>
-    <tr><td>Пусковой шкаф</td><td>${esc(starter)}</td></tr>
-    <tr><td>Шкаф байпаса</td><td>${esc(bypassText)}</td></tr>
-    <tr><td>Шкаф реактора</td><td>${esc(reactor)}</td></tr>
-    <tr><td>Плата расширения</td><td>${esc(expansionText)}</td></tr>
-    <tr><td>ИБП</td><td>${esc(ups)}</td></tr>
-    <tr><td>Вводы/выводы</td><td>${esc(cable)}</td></tr>
-    <tr><td>Протокол связи</td><td>${esc(proto)}</td></tr>
-    <tr><td>Тип конденсаторов</td><td>${esc(capacitorType)}</td></tr>
-    <tr><td>Размер ячеек (суффикс)</td><td>${esc(cellSize)}</td></tr>
-    <tr><td>Байпас силовой ячейки</td><td>${esc(cellBypass)}</td></tr>
-  </table>
-
-  ${buildTechDataBlocks()}
-  ${buildMechTableBlock()}
-
-  <div class="foot">Файл сформирован автоматически конфигуратором ESQ F ME 800.</div>
-</body>
-</html>`;
-      return html;
-    }
-
-    function downloadTKP(e){
-      e.preventDefault();
-      updateNomenclature(); // актуализируем перед выгрузкой
-      const html = buildTKPHtml();
-
-      // Временной DOM для html2pdf
-      const container = document.createElement('div');
-      container.innerHTML = html;
-      document.body.appendChild(container);
-      const opt = {
-        margin:       10,
-        filename:     `TKP_${(document.getElementById('result').textContent||'').replace(/\s+/g,'')}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-      html2pdf().from(container).set(opt).save().then(()=>{
-        document.body.removeChild(container);
-      });
-    }
   </script>
 </body>
 </html>
