@@ -47,6 +47,15 @@
     th{background:#f3f6fb}
     .muted{color:#6b7a90}
     .sku{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f6f8fb;border:1px solid #e6ecf5;border-radius:8px;padding:10px;margin:10px 0;font-weight:700}
+
+    /* Чертёж внутри техописания */
+    .drawing-block{margin-top:16px}
+    .drawing-iframe{width:100%;height:620px;border:1px solid #e6ecf5;border-radius:10px}
+    .drawing-empty{padding:10px;color:#6b7a90;background:#fafcff;border:1px dashed #d8e1f0;border-radius:10px}
+    .drawing-link{margin-top:8px}
+    .drawing-link a{color:#1f6feb;text-decoration:none}
+    .drawing-link a:hover{text-decoration:underline}
+
     @media (max-width:768px){
       .configurator{width:95%;padding:20px;margin:20px auto}
       .param{flex-direction:column;align-items:stretch}
@@ -113,7 +122,7 @@
     <div class="param">
       <label>8. Шкаф байпаса:</label>
       <select id="bypass" onchange="updateNomenclature()">
-        <option value="X">Отсутствует</option>
+        <option value="X">Нет</option>
         <option value="A">Автоматический</option>
         <option value="M">Ручной</option>
       </select>
@@ -173,7 +182,7 @@
     </div>
 
     <div class="param">
-      <label>15. Тип силовых ячеек:</label>
+      <label>15. Размер ячеек (суффикс):</label>
       <select id="cellSize" onchange="updateNomenclature()" disabled>
         <option value="PE">PE</option>
         <option value="PA">PA</option>
@@ -202,7 +211,7 @@
     <a href="#" class="techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
     <a href="#" class="copy-btn" onclick="copyTechDesc(event)">Копировать описание</a>
 
-    <!-- Здесь будет появляться техническое описание -->
+    <!-- Техописание (внутри него появится и чертёж) -->
     <div id="techdesc" class="techdesc"></div>
   </div>
 
@@ -548,7 +557,7 @@
           <tr><td>Вводы/выводы</td><td>${esc(cable)}</td></tr>
           <tr><td>Протокол связи</td><td>${esc(proto)}</td></tr>
           <tr><td>Тип конденсаторов</td><td>${esc(capacitorType)}</td></tr>
-          <tr><td>Тип силовых ячеек</td><td>${esc(cellSize)}</td></tr>
+          <tr><td>Размер силовых ячеек (суффикс)</td><td>${esc(cellSize)}</td></tr>
           <tr><td>Байпас силовой ячейки</td><td>${esc(cellBypass)}</td></tr>
         </table>
 
@@ -565,14 +574,50 @@
           <tr><td>Условия эксплуатации</td><td>0…+40 °C; влажность ≤95% без конденсации; высота ≤1000 м</td></tr>
         </table>
 
-        <h3>Габариты и масса</h3>
-        <table>
-          <tr><th>Параметр</th><th>Значение</th></tr>
-          <tr><td>Мощность</td><td>${esc(powerVal)} кВт</td></tr>
-          <tr><td>Габариты (Ш×Г×В), мм</td><td>${esc(mech.size)}</td></tr>
-          <tr><td>Масса, т</td><td>${esc(mech.weight)}</td></tr>
-        </table>
+        <div id="drawing-block" class="drawing-block"></div>
       `;
+    }
+
+    // --- Построение имени чертежа и вывод ниже техописания ---
+    function computeDrawingFile(){
+      const v = document.getElementById('voltage').value;   // T060 / T100
+      const p = document.getElementById('power').value;     // мощность (строка)
+      const data = modelData[v][p];
+      const current = Number(document.getElementById('current').value || 0);
+
+      const kvText = (v === 'T060') ? '6KV' : '10KV';
+      // Требуется ПШ по данным таблицы или если ток > 200 А
+      const needPS = Boolean(data?.starter) || current > 200;
+
+      const base = needPS
+        ? `${kvText} ${p} KW +ПШ габаритный чертеж.pdf`
+        : `${kvText} ${p} KW габаритный чертеж.pdf`;
+
+      const path = `assets/drawings/${base}`;
+      return { base, pathEncoded: encodeURI(path) };
+    }
+
+    async function updateDrawingBlock(){
+      const box = document.getElementById('drawing-block');
+      if (!box) return;
+
+      const { pathEncoded } = computeDrawingFile();
+
+      try{
+        // Проверяем, существует ли файл (HEAD)
+        const res = await fetch(pathEncoded, { method:'HEAD' });
+        if (res.ok){
+          box.innerHTML = `
+            <h3>Габаритный чертёж</h3>
+            <iframe class="drawing-iframe" src="${pathEncoded}"></iframe>
+            <div class="drawing-link"><a href="${pathEncoded}" target="_blank" rel="noopener">Открыть в новой вкладке</a></div>
+          `;
+        } else {
+          box.innerHTML = `<div class="drawing-empty">Подходящий файл чертежа не найден в <code>assets/drawings/</code>.</div>`;
+        }
+      }catch(e){
+        box.innerHTML = `<div class="drawing-empty">Не удалось загрузить чертёж. Проверьте имя файла и расположение.</div>`;
+      }
     }
 
     function toggleTechDesc(e){
@@ -582,6 +627,8 @@
       box.innerHTML = buildTechDescriptionHtml();
       box.style.display = (box.style.display === 'none' || box.style.display === '') ? 'block' : 'none';
       if (box.style.display === 'block') {
+        // подгружаем чертёж сразу после генерации описания
+        updateDrawingBlock();
         box.scrollIntoView({behavior:'smooth', block:'start'});
       }
     }
@@ -590,9 +637,9 @@
       e.preventDefault();
       const box = document.getElementById('techdesc');
       if (!box || box.style.display === 'none' || !box.innerText.trim()) {
-        // если описание ещё не показано — соберём на лету (без отображения)
         const tmp = document.createElement('div');
-        tmp.style.position='fixed'; tmp.style.left='-99999px'; tmp.style.top='0'; tmp.innerHTML = buildTechDescriptionHtml();
+        tmp.style.position='fixed'; tmp.style.left='-99999px'; tmp.style.top='0';
+        tmp.innerHTML = buildTechDescriptionHtml();
         document.body.appendChild(tmp);
         const text = tmp.innerText.replace(/\n{3,}/g, '\n\n').trim();
         document.body.removeChild(tmp);
