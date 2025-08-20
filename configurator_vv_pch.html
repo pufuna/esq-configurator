@@ -576,7 +576,7 @@
     }
 
     /* ===== Чертёж: построение имён и вывод ===== */
-function buildDrawingCandidates(){
+  function buildDrawingCandidates(){
   const v = document.getElementById('voltage').value;   // T060 / T100
   const p = document.getElementById('power').value;     // "900", "2800", ...
   const data = modelData[v][p];
@@ -644,31 +644,6 @@ function buildDrawingCandidates(){
     }
   }
   return candidates;
-}
-
-
-      // Иногда бывает двойной пробел перед "+", попробуем оба
-      const normalizeSpaces = b => {
-        const v1 = b;
-        const v2 = b.replace('KW  +', 'KW +');
-        return (v1 === v2) ? [v1] : [v1, v2];
-      };
-
-      const exts = ['.pdf','.PDF'];
-      const candidates = [];
-
-      for (const folder of folders){
-        for (const kv of kvTokens){
-          for (const b of basesFor(kv)){
-            for (const name of normalizeSpaces(b)){
-              for (const e of exts){
-                candidates.push(encodeURI(folder + name + e));
-              }
-            }
-          }
-        }
-      }
-      return candidates;
     }
 
     async function findFirstExisting(urls){
@@ -761,4 +736,3 @@ function buildDrawingCandidates(){
   </script>
 </body>
 </html>
-
