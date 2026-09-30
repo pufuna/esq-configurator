@@ -10,7 +10,8 @@
    Таблица FIELDS снята с шаблона: границы надписи, базовая линия, кегль и цвет. */
 (function () {
   'use strict';
-  const { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix } = window.PDFLib;
+  const { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix,
+    rectangle, clipEvenOdd, endPath, decodePDFRawStream } = window.PDFLib;
   const $ = id => document.getElementById(id);
   const WHITE = rgb(1, 1, 1), BLACK = rgb(0, 0, 0), BAND = rgb(10 / 255, 105 / 255, 114 / 255), NAVY = rgb(.137, .122, .129);
   const KV = { T060: 6, T100: 10 }, CELLS = { 30: 5, 36: 6, 48: 8, 54: 9 };
@@ -42,7 +43,7 @@
     p13_u: [13, 388.22, 439.24, 166.29, 10.99, 157.51, 167.83, [0.0, 0.0, 0.0]],
     p13_p: [13, 379.04, 418.0, 184.3, 10.99, 175.69, 185.84, [0.0, 0.0, 0.0]],
     p13_i: [13, 387.32, 412.42, 202.3, 10.99, 193.33, 203.84, [0.0, 0.0, 0.0]],
-    p13_uout: [13, 394.88, 426.1, 238.03, 10.99, 229.33, 241.01, [0.0, 0.0, 0.0]],
+    p13_uout: [13, 394.88, 426.1, 238.03, 10.99, 229.33, 239.6, [0.0, 0.0, 0.0]],
     p13_eff: [13, 377.78, 438.88, 279.82, 10.99, 271.68, 281.36, [0.0, 0.0, 0.0]],
     p13_n: [13, 395.96, 429.34, 308.98, 10.99, 300.84, 310.52, [0.0, 0.0, 0.0]],
     p13_mat: [13, 438.44, 451.84, 707.04, 10.99, 698.41, 708.58, [0.0, 0.0, 0.0]],
@@ -115,24 +116,61 @@
     return F;
   }
 
-  /* Старый чертёж шаблона (стр. 10) убирается маской: всё исходное содержимое страницы внутри этих зон
-     не рисуется и не печатается. Рамка, заголовок «2.5 Габаритный чертёж», таблица веса и штамп — вне зон и остаются.
-     Зоны сняты с шаблона: рамка 110,7…720,3; заголовок до 102,5; таблица веса 472,5…570,1 × 421,6…481,6; штамп от 489,2. */
+  /* Старый чертёж шаблона (стр. 10) для электролитов. Зоны сняты с шаблона: рамка 110,7…720,3; заголовок до 102,5;
+     таблица веса 472,5…570,1 × 421,6…481,6; штамп от 489,2 — всё это вне зон и остаётся. */
   const OLD_DRAWING_ZONES = [
     [111.2, 103.3, 719.8, 420.9],   // поле видов
     [111.2, 420.9, 471.9, 488.0],   // слева от таблицы веса («Вид сверху»)
     [570.7, 420.9, 719.8, 488.0],   // справа от таблицы веса (нижние выноски)
     [471.9, 482.3, 570.7, 488.0]    // под таблицей веса
   ];
-  function maskOut(doc, page, zones) {
-    const W = page.getWidth(), H = page.getHeight(), n = v => +v.toFixed(2);
-    let op = `q 0 0 ${n(W)} ${n(H)} re `;
-    for (const [x0, y0, x1, y1] of zones) op += `${n(x0)} ${n(H - y1)} ${n(x1 - x0)} ${n(y1 - y0)} re `;
-    op += 'W* n\n';                                   // «чётно-нечётный» клип: страница минус зоны
-    page.node.normalize();
+
+  /* Маски. Старое значение не закрывается белым прямоугольником, а вырезается: исходное содержимое страницы
+     обёрнуто в область отсечения «страница минус зоны», поэтому внутри зон оно не рисуется и не печатается.
+     Каждая зона вычитается отдельным отсечением, так что пересекающиеся зоны тоже работают. */
+  function prepareMasks(doc, pages) {
+    const slots = pages.map(p => {
+      p.node.normalize();
+      const arr = p.node.Contents();
+      const pre = doc.context.register(doc.context.stream(' ')), post = doc.context.register(doc.context.stream(' '));
+      arr.insert(0, pre); arr.push(post);
+      return { p, pre, post, zones: [] };
+    });
+    return {
+      add(i, x0, y0, x1, y1) { slots[i].zones.push([x0, y0, x1, y1]); },   // зона в координатах «как на экране»
+      apply() {
+        for (const sl of slots) {
+          if (!sl.zones.length) continue;
+          const W = sl.p.getWidth(), H = sl.p.getHeight(), r = sl.p.getRotation().angle, n = v => +v.toFixed(2);
+          let op = 'q\n';
+          for (const [x0, y0, x1, y1] of sl.zones) {
+            const [a, b, c, d] = r === 90 ? [y0, x0, y1, x1] : [x0, H - y1, x1, H - y0];   // /Rotate 90 у стр. 7 и 9
+            op += `0 0 ${n(W)} ${n(H)} re ${n(a)} ${n(b)} ${n(c - a)} ${n(d - b)} re W* n\n`;
+          }
+          doc.context.assign(sl.pre, doc.context.stream(op));
+          doc.context.assign(sl.post, doc.context.stream('\nQ\n'));
+        }
+      }
+    };
+  }
+
+  /* Удалить строку текста из потока страницы (обложка: «ESQ F ME800-PF»). Возвращает true, если нашла. */
+  function deleteLiteral(doc, page, literal) {
+    const pat = Array.from('(' + literal + ')', ch => ch.charCodeAt(0));
     const arr = page.node.Contents();
-    arr.insert(0, doc.context.register(doc.context.stream(op)));
-    arr.push(doc.context.register(doc.context.stream('\nQ')));
+    for (let i = 0; i < arr.size(); i++) {
+      const ref = arr.get(i), st = doc.context.lookup(ref);
+      if (!st || !st.dict || !st.contents) continue;
+      let bytes; try { bytes = decodePDFRawStream(st).decode(); } catch (e) { continue; }
+      outer: for (let j = 0; j + pat.length <= bytes.length; j++) {
+        for (let k = 0; k < pat.length; k++) if (bytes[j + k] !== pat[k]) continue outer;
+        const out = new Uint8Array(bytes.length - pat.length + 2);
+        out.set(bytes.subarray(0, j)); out[j] = 40; out[j + 1] = 41; out.set(bytes.subarray(j + pat.length), j + 2);   // «(…)» → «()»
+        doc.context.assign(ref, doc.context.flateStream(out));   // поток содержимого страницы: словарь, кроме сжатия, не нужен
+        return true;
+      }
+    }
+    return false;
   }
 
   async function generate(ev) {
@@ -146,7 +184,8 @@
       const doc = await PDFDocument.load(tpl);
       const F = makeFonts(GL, await doc.embedFont(StandardFonts.Helvetica));
       const pg = doc.getPages();
-      if (!s.film) maskOut(doc, pg[10], OLD_DRAWING_ZONES);   // для электролитов старого чертежа на стр. 10 нет совсем
+      const M = prepareMasks(doc, pg);
+      if (!s.film) OLD_DRAWING_ZONES.forEach(z => M.add(10, ...z));   // для электролитов старого чертежа на стр. 10 нет совсем
 
       /* ---------- помощники ---------- */
       const rot = p => p.getRotation().angle;
@@ -171,14 +210,15 @@
       // заменить надпись из таблицы FIELDS: стереть ровно её глифы и вписать новую на ту же базовую линию, тем же цветом
       const edit = (name, str, o = {}) => {
         const [pi, x0, x1, base, size, top, bot, col] = FIELDS[name], p = pg[pi];
-        rect(p, x0, top, x1, bot);
+        // с небольшим запасом, чтобы не оставалось тонких следов от краёв старых знаков (у ячеек топологии — ровно внутренность рамки)
+        if (/^p7_[ABC]/.test(name)) M.add(pi, x0, top, x1, bot); else M.add(pi, x0 - .5, top - .7, x1 + .5, bot + .6);
         const a = o.a || 'c', ax = o.ax ?? (a === 'l' ? x0 + .4 : a === 'r' ? x1 - .4 : (o.cx ?? (x0 + x1) / 2));
         put(p, str, ax, base, o.size || size, { f: 'iso', a, c: rgb(...col), maxW: o.maxW, hs: o.hs, skew: o.skew });
       };
       // цифра на плате приёмопередатчика (стр. 7): текст повёрнут, читается сверху вниз
       const board = (name, str) => {
         const [pi, x0, x1, , , top, bot, col] = FIELDS[name], p = pg[pi], sz = 3.6 * F.iso.upm / F.iso.cap, w = F.iso.width(str, sz);
-        rect(p, x0 - .2, top - .3, x1 + .2, bot + .3);
+        M.add(pi, x0 - .3, top - .4, x1 + .3, bot + .4);
         put(p, str, x0 + .5, (top + bot) / 2 - w / 2, sz, { dir: 'down', c: rgb(...col) });
       };
       const stamp = (name, land) => edit(name, s.mark, { size: 10.5, ...(land ? STAMP_LAND : STAMP_PORT) });
@@ -189,13 +229,13 @@
       };
 
       /* ---------- обложка (в шаблоне: Helvetica 20 и Tahoma 14, белым по бирюзовой плашке) ---------- */
-      rect(pg[0], 37.4, 711.6, 200.6, 733.6, BAND);
+      if (!deleteLiteral(doc, pg[0], 'ESQ F ME800-PF')) rect(pg[0], 37.4, 711.6, 200.6, 733.6, BAND);   // если строку не нашли — закрыть цветом плашки
       put(pg[0], s.mark.replace(/А/g, 'A'), 38.4, 727.9, 20, { f: 'helv', c: WHITE, maxW: 515 });
       if (s.who) put(pg[0], s.who, 108, 758.7, 14, { f: 'tahoma', c: WHITE, maxW: 300 });
       put(pg[0], new Date().toLocaleDateString('ru-RU'), 489, 755.7, 14, { f: 'tahoma', c: WHITE });
 
       /* ---------- стр. 3: предложение (Arial 10; количество и цена — Helvetica 12) ---------- */
-      rect(pg[3], 101, 153.5, 344, 212.5);
+      M.add(3, 101, 153.5, 344, 212.5);
       wrap(s.name, 'arial', 10, 238).forEach((l, i) => put(pg[3], l, 102.4, 162.8 + i * 11.15, 10, { f: 'arial' }));
       put(pg[3], String(s.qty), 373.6, 241.4, 12, { f: 'helv', a: 'r' });
       if (s.price) {
@@ -209,7 +249,7 @@
         [501.8, 511.4], [511.4, 534.7], [534.7, 545.7]];
       const G = [m[1], 'P', m[2], 'А', 'T', m[3].slice(1), m[4], m[5], m[6], m[7], m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15], '-', m[16], m[17]];
       const MS = 13.5 * F.iso.upm / F.iso.cap;                 // высота прописных как в шаблоне — 13,5 pt
-      rect(pg[5], 200.2, 120.4, 546.6, 135.6);
+      M.add(5, 200.2, 120.4, 546.6, 135.6);
       G.forEach((t, i) => {
         const sw = SL[i][1] - SL[i][0] - .6; let sz = MS;
         if (F.iso.width(t, sz) / sw > 1.45) sz = MS * .62;     // «2E» в узкой ячейке — мельче, а не сплющено
@@ -244,7 +284,7 @@
       edit('p10_w1', kg, { size: 8.8, skew: .27 });
       edit('p10_w2', kg, { size: 8.8, skew: .27 });
       stamp('p10_stamp', true);
-      if (!s.film) await drawDrawing(doc, pg[10], rect);    // для плёнки остаётся чертёж шаблона: 1800×1425×2431 общий для 6 и 10 кВ
+      if (!s.film) await drawDrawing(doc, pg[10]);    // для плёнки остаётся чертёж шаблона: 1800×1425×2431 общий для 6 и 10 кВ
 
       /* ---------- стр. 13 ---------- */
       edit('p13_name', s.mark, { cx: 406, maxW: 296 });
@@ -272,6 +312,7 @@
       /* ---------- стр. 15: отпайки первичной обмотки для 10 кВ ---------- */
       if (s.kv === 10) edit('p15_taps', '9,5 и 10,5 кВ', { a: 'l', maxW: 51.5 });
 
+      M.apply();
       const out = await doc.save();
       const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
       const link = document.createElement('a'); link.href = url;
@@ -343,7 +384,7 @@
     return { box, tb };
   }
 
-  async function drawDrawing(doc, page, rect) {
+  async function drawDrawing(doc, page) {
     const url = await window.findFirstExisting(window.buildDrawingCandidates());
     if (!url) { alert('Габаритный чертёж для этой мощности не найден в assets/ — поле чертежа в ТКП оставлено пустым.'); return; }
     const buf = await (await fetch(url)).arrayBuffer();
@@ -399,13 +440,17 @@
     // /Rotate исходного листа: встроенная страница рисуется без него, поэтому поворачиваем сами
     const cw = rot % 180 ? f.dh : f.dw, ch = rot % 180 ? f.dw : f.dh;
     const o = { 0: [X, Y], 90: [X, Y + f.dh], 180: [X + f.dw, Y + f.dh], 270: [X + f.dw, Y] }[rot] || [X, Y];
-    page.drawPage(em, { x: o[0], y: o[1], width: cw, height: ch, rotate: degrees(-rot) });
-
-    if (lay && lay.tb) {                               // закрыть основную надпись, если она попала в вырезку
+    page.pushOperators(pushGraphicsState());
+    if (lay && lay.tb) {                               // основная надпись листа, если попала в вырезку, отсекается
       const [bx0, by0, bx1, by1] = lay.box, k = f.dw / (bx1 - bx0);
       const tx0 = Math.max(bx0, lay.tb[0] - 3), ty0 = Math.max(by0, lay.tb[1] - 3);
-      if (tx0 < bx1 && ty0 < by1) rect(page, f.X + (tx0 - bx0) * k, f.Y + (ty0 - by0) * k, f.X + f.dw + .5, f.Y + f.dh + .5);
+      if (tx0 < bx1 && ty0 < by1) {
+        const hx0 = f.X + (tx0 - bx0) * k, hy0 = f.Y + (ty0 - by0) * k, hx1 = f.X + f.dw + 1, hy1 = f.Y + f.dh + 1;
+        page.pushOperators(rectangle(0, 0, page.getWidth(), H), rectangle(hx0, H - hy1, hx1 - hx0, hy1 - hy0), clipEvenOdd(), endPath());
+      }
     }
+    page.drawPage(em, { x: o[0], y: o[1], width: cw, height: ch, rotate: degrees(-rot) });
+    page.pushOperators(popGraphicsState());
   }
 
   window.downloadTKP = generate;
