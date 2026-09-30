@@ -1,10 +1,16 @@
 /* Генератор ТКП для конфигуратора ESQ F ME800.
-   Берёт assets/template.pdf и меняет в нём только зависящие от комплектации надписи.
-   Все координаты — pt от левого верхнего угла страницы «как её видит человек».
-   Таблица FIELDS снята с самого шаблона: границы надписи, базовая линия, кегль и цвет. */
+   Берёт assets/template.pdf и меняет в нём только надписи, зависящие от комплектации.
+
+   Буквы рисуются контурами из assets/glyphs.json. Контуры сняты с шрифтов, встроенных в сам шаблон
+   (ISOCPEUR — чертежи и таблицы, Arial — таблица предложения, Tahoma — обложка), поэтому вставки
+   выглядят как исходный текст и одинаково отображаются и печатаются в любой программе.
+   Шрифты в PDF не встраиваются, fontkit не нужен.
+
+   Координаты — pt от левого верхнего угла страницы «как её видит человек».
+   Таблица FIELDS снята с шаблона: границы надписи, базовая линия, кегль и цвет. */
 (function () {
   'use strict';
-  const { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix } = window.PDFLib;
+  const { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix } = window.PDFLib;
   const $ = id => document.getElementById(id);
   const WHITE = rgb(1, 1, 1), BLACK = rgb(0, 0, 0), BAND = rgb(10 / 255, 105 / 255, 114 / 255), NAVY = rgb(.137, .122, .129);
   const KV = { T060: 6, T100: 10 }, CELLS = { 30: 5, 36: 6, 48: 8, 54: 9 };
@@ -16,12 +22,12 @@
     p6_in: [6, 232.7, 274.9, 97.51, 7.38, 92.05, 99.58, [0.0, 0.384, 0.447]],
     p6_out: [6, 265.28, 313.24, 485.0, 7.38, 477.91, 487.07, [0.0, 0.384, 0.447]],
     p6_stamp: [6, 562.46, 576.76, 506.25, 11.0, 498.11, 507.79, [0.0, 0.0, 0.0]],
-    p7_A5: [7, 233.96, 245.56, 397.98, 9.13, 389.71, 399.26, [0.067, 0.412, 0.455]],
-    p7_B5: [7, 263.3, 274.36, 421.56, 9.13, 413.29, 422.84, [0.067, 0.412, 0.455]],
-    p7_C5: [7, 292.64, 303.16, 445.14, 9.13, 436.69, 446.42, [0.067, 0.412, 0.455]],
-    p7_A6: [7, 233.96, 245.56, 468.72, 9.13, 460.27, 470.0, [0.067, 0.412, 0.455]],
-    p7_B6: [7, 263.3, 274.36, 492.12, 9.13, 483.85, 493.4, [0.067, 0.412, 0.455]],
-    p7_C6: [7, 292.64, 303.16, 515.7, 9.13, 507.43, 516.98, [0.067, 0.412, 0.455]],
+    p7_A5: [7, 229.99, 252.34, 397.98, 9.13, 390.46, 401.05, [0.067, 0.412, 0.455]],
+    p7_B5: [7, 259.43, 281.67, 421.56, 9.13, 414.04, 424.63, [0.067, 0.412, 0.455]],
+    p7_C5: [7, 288.76, 311.11, 445.14, 9.13, 437.63, 448.11, [0.067, 0.412, 0.455]],
+    p7_A6: [7, 229.99, 252.34, 468.72, 9.13, 461.1, 471.69, [0.067, 0.412, 0.455]],
+    p7_B6: [7, 259.43, 281.67, 492.12, 9.13, 484.68, 495.16, [0.067, 0.412, 0.455]],
+    p7_C6: [7, 288.76, 311.11, 515.7, 9.13, 508.15, 518.75, [0.067, 0.412, 0.455]],
     p7_b7: [7, 347.54, 351.94, 444.78, 2.47, 442.95, 445.13, [0.067, 0.412, 0.455]],
     p7_b8: [7, 347.54, 351.94, 516.06, 2.47, 514.23, 516.41, [0.067, 0.412, 0.455]],
     p7_motor: [7, 253.94, 266.44, 635.76, 7.3, 630.36, 636.78, [0.067, 0.412, 0.455]],
@@ -81,19 +87,44 @@
     return s;
   }
 
+  /* ---------- векторный текст ---------- */
+  function makeFonts(GL, helv) {
+    const F = {};
+    for (const key of ['iso', 'arial', 'tahoma']) {
+      const f = GL[key], upm = f.upm, g = f.g;
+      const glyph = ch => g[ch] || g[ch.normalize('NFD')[0]] || g['?'] || g[' '];
+      F[key] = {
+        upm, cap: f.cap,
+        width: (str, size) => [...str].reduce((a, ch) => a + glyph(ch)[0], 0) * size / upm,
+        path(str) {                                            // один SVG-путь на всю строку, в единицах шрифта
+          let x = 0, out = '';
+          for (const ch of str) {
+            const [w, cmds] = glyph(ch);
+            for (const c of cmds) {
+              out += c[0];
+              for (let i = 1; i < c.length; i += 2) out += (i > 1 ? ',' : '') + +(c[i] + x).toFixed(1) + ',' + c[i + 1];
+              out += ' ';
+            }
+            x += w;
+          }
+          return out;
+        }
+      };
+    }
+    F.helv = { std: helv, width: (str, size) => helv.widthOfTextAtSize(str, size) };  // для надписей, набранных в шаблоне Helvetica
+    return F;
+  }
+
   async function generate(ev) {
     if (ev) ev.preventDefault();
     const btn = ev && ev.currentTarget; if (btn) btn.style.opacity = .6;
     try {
       const s = readState();
       if (!s.m) throw new Error('не удалось разобрать маркировку: ' + s.mark);
-      const urls = ['assets/template.pdf', 'assets/fonts/LiberationSans-Regular.ttf', 'assets/fonts/Carlito-Regular.ttf', 'assets/fonts/DejaVuSansCondensed.ttf'];
-      const [tpl, b1, b2, b3] = await Promise.all(urls.map(u => fetch(u).then(r => { if (!r.ok) throw new Error('Не найден файл ' + u); return r.arrayBuffer(); })));
+      const get = u => fetch(u).then(r => { if (!r.ok) throw new Error('Не найден файл ' + u); return r; });
+      const [tpl, GL] = await Promise.all([get('assets/template.pdf').then(r => r.arrayBuffer()), get('assets/glyphs.json').then(r => r.json())]);
       const doc = await PDFDocument.load(tpl);
-      doc.registerFontkit(window.fontkit);
-      const fA = await doc.embedFont(b1, { subset: true });   // Arial/Helvetica-подобный: обложка, таблица предложения
-      const fI = await doc.embedFont(b2, { subset: true });   // узкий, ближе всего к ISOCPEUR: чертежи и таблицы характеристик
-      const fT = await doc.embedFont(b3, { subset: true });   // Tahoma-подобный: подписи на обложке и в итогах
+      const F = makeFonts(GL, await doc.embedFont(StandardFonts.Helvetica));
       const pg = doc.getPages();
 
       /* ---------- помощники ---------- */
@@ -103,15 +134,17 @@
         if (rot(p) === 90) p.drawRectangle({ x: y0, y: x0, width: y1 - y0, height: x1 - x0, color: c, borderWidth: 0 });
         else p.drawRectangle({ x: x0, y: H - y1, width: x1 - x0, height: y1 - y0, color: c, borderWidth: 0 });
       };
-      // vx — якорь по горизонтали, vy — базовая линия; hs — сжатие по ширине; maxW — не шире; dir:'down' — как у цифр плат на стр. 7
+      /* vx — якорь по горизонтали, vy — базовая линия; o.f — шрифт (iso | arial | tahoma | helv);
+         o.hs — сжатие по ширине, o.maxW — не шире (сжимается), o.skew — наклон курсива, o.dir:'down' — текст сверху вниз */
       const put = (p, str, vx, vy, size, o = {}) => {
-        const f = o.f || fI, w0 = f.widthOfTextAtSize(str, size);
+        const f = F[o.f || 'iso'], w0 = f.width(str, size);
         let hs = o.hs || 1; if (o.maxW && w0 * hs > o.maxW) hs = o.maxW / w0;
         const w = w0 * hs; if (o.a === 'c') vx -= w / 2; else if (o.a === 'r') vx -= w;
-        const r = rot(p), H = p.getHeight(), th = (((o.dir === 'down' ? -90 : 0) + r) * Math.PI) / 180;
-        const ux = r === 90 ? vy : vx, uy = r === 90 ? vx : H - vy;
-        p.pushOperators(pushGraphicsState(), concatTransformationMatrix(hs * Math.cos(th), hs * Math.sin(th), -Math.sin(th), Math.cos(th), ux, uy));
-        p.drawText(str, { x: 0, y: 0, size, font: f, color: o.c || BLACK });
+        const r = rot(p), H = p.getHeight(), th = (((o.dir === 'down' ? -90 : 0) + r) * Math.PI) / 180, k = o.skew || 0;
+        const cs = Math.cos(th), sn = Math.sin(th), ux = r === 90 ? vy : vx, uy = r === 90 ? vx : H - vy;
+        p.pushOperators(pushGraphicsState(), concatTransformationMatrix(cs * hs, sn * hs, cs * k - sn, sn * k + cs, ux, uy));
+        if (f.std) p.drawText(str, { x: 0, y: 0, size, font: f.std, color: o.c || BLACK });
+        else p.drawSvgPath(f.path(str), { x: 0, y: 0, scale: size / f.upm, color: o.c || BLACK, borderWidth: 0 });
         p.pushOperators(popGraphicsState());
       };
       // заменить надпись из таблицы FIELDS: стереть ровно её глифы и вписать новую на ту же базовую линию, тем же цветом
@@ -119,62 +152,63 @@
         const [pi, x0, x1, base, size, top, bot, col] = FIELDS[name], p = pg[pi];
         rect(p, x0, top, x1, bot);
         const a = o.a || 'c', ax = o.ax ?? (a === 'l' ? x0 + .4 : a === 'r' ? x1 - .4 : (o.cx ?? (x0 + x1) / 2));
-        put(p, str, ax, base, (o.size || size) * (o.k || 1.02), { f: o.f || fI, a, c: rgb(...col), maxW: o.maxW, hs: o.hs });
+        put(p, str, ax, base, o.size || size, { f: 'iso', a, c: rgb(...col), maxW: o.maxW, hs: o.hs, skew: o.skew });
       };
-      // цифра на плате: текст на странице идёт сверху вниз, «верх» букв — вправо; базовая линия — левый край
+      // цифра на плате приёмопередатчика (стр. 7): текст повёрнут, читается сверху вниз
       const board = (name, str) => {
-        const [pi, x0, x1, , , top, bot, col] = FIELDS[name], p = pg[pi], sz = 5.6, hs = .65, w = fI.widthOfTextAtSize(str, sz) * hs;
+        const [pi, x0, x1, , , top, bot, col] = FIELDS[name], p = pg[pi], sz = 3.6 * F.iso.upm / F.iso.cap, w = F.iso.width(str, sz);
         rect(p, x0 - .2, top - .3, x1 + .2, bot + .3);
-        put(p, str, x0 + .4, (top + bot) / 2 - w / 2, sz, { f: fI, dir: 'down', hs, c: rgb(...col) });
+        put(p, str, x0 + .5, (top + bot) / 2 - w / 2, sz, { dir: 'down', c: rgb(...col) });
       };
-      const stamp = (name, land) => edit(name, s.mark, { size: 10, k: 1, a: 'c', ...(land ? STAMP_LAND : STAMP_PORT) });
+      const stamp = (name, land) => edit(name, s.mark, { size: 10.5, ...(land ? STAMP_LAND : STAMP_PORT) });
       const wrap = (str, f, size, maxW) => {
         const out = []; let cur = '';
-        for (const w of str.split(' ')) { const t = cur ? cur + ' ' + w : w; if (f.widthOfTextAtSize(t, size) > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
+        for (const w of str.split(' ')) { const t = cur ? cur + ' ' + w : w; if (F[f].width(t, size) > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
         out.push(cur); return out;
       };
 
-      /* ---------- обложка ---------- */
+      /* ---------- обложка (в шаблоне: Helvetica 20 и Tahoma 14, белым по бирюзовой плашке) ---------- */
       rect(pg[0], 37.4, 711.6, 200.6, 733.6, BAND);
-      put(pg[0], s.mark, 38, 727.9, 20, { f: fA, c: WHITE, maxW: 515 });
-      if (s.who) put(pg[0], s.who, 110, 758.1, 13, { f: fT, c: WHITE, maxW: 250 });
-      put(pg[0], new Date().toLocaleDateString('ru-RU'), 490, 758.1, 13, { f: fT, c: WHITE });
+      put(pg[0], s.mark.replace(/А/g, 'A'), 38.4, 727.9, 20, { f: 'helv', c: WHITE, maxW: 515 });
+      if (s.who) put(pg[0], s.who, 108, 758.7, 14, { f: 'tahoma', c: WHITE, maxW: 300 });
+      put(pg[0], new Date().toLocaleDateString('ru-RU'), 489, 755.7, 14, { f: 'tahoma', c: WHITE });
 
-      /* ---------- стр. 3: предложение ---------- */
+      /* ---------- стр. 3: предложение (Arial 10; количество и цена — Helvetica 12) ---------- */
       rect(pg[3], 101, 153.5, 344, 212.5);
-      wrap(s.name, fA, 10, 238).forEach((l, i) => put(pg[3], l, 102.4, 162.8 + i * 11.15, 10, { f: fA }));
-      put(pg[3], String(s.qty), 373.6, 241.4, 12, { f: fA, a: 'r' });
+      wrap(s.name, 'arial', 10, 238).forEach((l, i) => put(pg[3], l, 102.4, 162.8 + i * 11.15, 10, { f: 'arial' }));
+      put(pg[3], String(s.qty), 373.6, 241.4, 12, { f: 'helv', a: 'r' });
       if (s.price) {
-        put(pg[3], money(s.price), 471, 241.4, 12, { f: fA, a: 'c' });
-        put(pg[3], money(s.price * s.qty), 252.4, 359.6, 12, { f: fT, a: 'c', c: NAVY });
+        put(pg[3], money(s.price), 471, 241.4, 12, { f: 'helv', a: 'c' });
+        put(pg[3], money(s.price * s.qty), 252.4, 359.6, 12, { f: 'tahoma', a: 'c', c: NAVY });
       }
 
-      /* ---------- стр. 5: маркировка (подчёркивания и выноски шаблона остаются) ---------- */
+      /* ---------- стр. 5: маркировка — подчёркивания и выноски шаблона остаются, меняются только буквы ---------- */
       const m = s.m, SL = [[200.4, 236], [236, 247], [247, 273], [273, 285.3], [285.3, 296.3], [296.3, 325.1], [325.1, 347], [347, 366.1], [366.1, 377.1],
         [377.1, 389.5], [389.5, 401.8], [401.8, 422.3], [422.3, 431.9], [431.9, 442.9], [442.9, 453.9], [453.9, 477.2], [477.2, 489.5], [489.5, 501.8],
         [501.8, 511.4], [511.4, 534.7], [534.7, 545.7]];
       const G = [m[1], 'P', m[2], 'А', 'T', m[3].slice(1), m[4], m[5], m[6], m[7], m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15], '-', m[16], m[17]];
-      rect(pg[5], 81.4, 120.4, 546.6, 135.6);
-      put(pg[5], 'ESQ F ME800-', 82.5, 134.7, 20.5, { f: fI, maxW: 117.5 });
-      G.forEach((t, i) => {                                  // двухбуквенное значение в узкой ячейке (например 2E) — уменьшаем кегль, а не только сжимаем
-        const sw = SL[i][1] - SL[i][0] - .6; let sz = 20.5;
-        if (fI.widthOfTextAtSize(t, sz) / sw > 1.45) sz = 20.5 * .62;
-        put(pg[5], t, (SL[i][0] + SL[i][1]) / 2, 134.7, sz, { f: fI, a: 'c', maxW: sw });
+      const MS = 13.5 * F.iso.upm / F.iso.cap;                 // высота прописных как в шаблоне — 13,5 pt
+      rect(pg[5], 200.2, 120.4, 546.6, 135.6);
+      G.forEach((t, i) => {
+        const sw = SL[i][1] - SL[i][0] - .6; let sz = MS;
+        if (F.iso.width(t, sz) / sw > 1.45) sz = MS * .62;     // «2E» в узкой ячейке — мельче, а не сплющено
+        put(pg[5], t, (SL[i][0] + SL[i][1]) / 2, 134.7, sz, { a: 'c', maxW: sw });
       });
 
       /* ---------- стр. 6: схема коммутации ---------- */
-      if (!s.film) edit('p6_v', s.sec + 'V', { a: 'l', maxW: 19.3 });   // та же ширина, что у «710V»
+      if (!s.film) edit('p6_v', s.sec + 'V', { a: 'l' });
       if (s.kv === 10) edit('p6_in', '10кВ, 50Гц, 3ф.', { a: 'l' });
       edit('p6_out', s.kv + 'кВ, до ' + s.P + 'кВт', { a: 'c' });
       stamp('p6_stamp', true);
 
       /* ---------- стр. 7: топология ---------- */
       if (s.n !== 6) {
-        const ph = ['A', 'B', 'C'], a = s.n - 1, b = s.n;
-        ['A5', 'B5', 'C5'].forEach((k, i) => edit('p7_' + k, ph[i] + a, { size: 9.13 }));
-        ['A6', 'B6', 'C6'].forEach((k, i) => edit('p7_' + k, ph[i] + b, { size: 9.13 }));
+        const ph = ['A', 'B', 'C'];
+        const X = [235.05, 264.38, 293.82];                    // левый край подписи, как в шаблоне; стирается только внутренность рамки ячейки
+        ['A5', 'B5', 'C5'].forEach((k, i) => edit('p7_' + k, ph[i] + (s.n - 1), { size: 9.13, a: 'l', ax: X[i] }));
+        ['A6', 'B6', 'C6'].forEach((k, i) => edit('p7_' + k, ph[i] + s.n, { size: 9.13, a: 'l', ax: X[i] }));
       }
-      board('p7_b7', String(s.n - 1));                        // номера плат приёмопередатчиков (последние две)
+      board('p7_b7', String(s.n - 1));                         // номера двух последних плат приёмопередатчиков
       board('p7_b8', String(s.n));
       if (s.kv === 10) edit('p7_motor', '10 кВ', { a: 'l' });
       stamp('p7_stamp', false);
@@ -184,12 +218,12 @@
       if (s.kv === 10) edit('p9_v', '10 кВ.', { a: 'l' });
       stamp('p9_stamp', false);
 
-      /* ---------- стр. 10: вес, штамп, чертёж ---------- */
+      /* ---------- стр. 10: вес (курсив, как в таблице), штамп, чертёж ---------- */
       const kg = isNaN(s.wT) ? '—' : String(Math.round(s.wT * 1000));
-      edit('p10_w1', kg, { size: 9.5, k: 1 });
-      edit('p10_w2', kg, { size: 9.5, k: 1 });
+      edit('p10_w1', kg, { size: 8.8, skew: .27 });
+      edit('p10_w2', kg, { size: 8.8, skew: .27 });
       stamp('p10_stamp', true);
-      if (!s.film) await drawDrawing(doc, pg[10], rect);   // для плёнки остаётся чертёж из шаблона: габариты 1800×1425×2431 общие для 6 и 10 кВ
+      if (!s.film) await drawDrawing(doc, pg[10], rect);    // для плёнки остаётся чертёж шаблона: 1800×1425×2431 общий для 6 и 10 кВ
 
       /* ---------- стр. 13 ---------- */
       edit('p13_name', s.mark, { cx: 406, maxW: 296 });
@@ -206,7 +240,7 @@
 
       /* ---------- стр. 14 ---------- */
       edit('p14_ip', s.ip, { a: 'l' });
-      if (s.film) edit('p14_life', s.life, { a: 'l', maxW: 31.6, size: 11 });
+      if (s.film) edit('p14_life', s.life, { a: 'l', maxW: 31.6 });
       if (!s.film) edit('p14_cap', 'Электролитические', { cx: 409.5 });
       edit('p14_ups', s.ups ? 'Присутствует' : 'Отсутствует', { cx: 410 });
       if (s.proto !== 'Modbus RTU') edit('p14_proto', s.proto, { cx: 409.9 });
@@ -219,26 +253,140 @@
 
       const out = await doc.save();
       const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
-      const link = document.createElement('a'); link.href = url; link.download = 'TKP_' + s.mark.replace(/\u0410/g, 'A').replace(/ /g, '_') + '.pdf';   // имя файла только латиницей: так оно не теряется в браузерах
+      const link = document.createElement('a'); link.href = url;
+      link.download = 'TKP_' + s.mark.replace(/А/g, 'A').replace(/ /g, '_') + '.pdf';   // имя латиницей: так оно не теряется в браузерах
       document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (e) { console.error(e); alert('Не удалось сформировать ТКП: ' + e.message); }
     finally { if (btn) btn.style.opacity = 1; }
   }
 
-  /* Габаритный чертёж для электролитов: поле чертежа шаблона очищается (рамки, штамп и таблица веса остаются) и вставляется файл из assets/ */
+  /* ================= Габаритный чертёж для электролитов =================
+     Файл чертежа из assets/ — обычно целый лист: рамка, поле подшивки, основная надпись.
+     Лист рендерится через pdf.js в картинку, по ней находятся рамка и основная надпись,
+     затем из исходного PDF вырезается (в векторе) только поле с видами, а основная надпись закрывается.
+     Если рамку найти не удалось — вставляется весь лист, как раньше. */
+  const PDFJS_BASE = new URL(window.PDFJS_BASE || 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/legacy/build/', document.baseURI).href;
+  let pdfjsP = null;
+  const loadPdfjs = () => pdfjsP || (pdfjsP = import(PDFJS_BASE + 'pdf.min.mjs').then(m => {
+    m.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.mjs'; return m;
+  }));
+
+  // поиск рамки, основной надписи и границ изображения на отрисованном листе (пиксели, вид «как на экране»)
+  function findLayout(img, W, H) {
+    const d = img.data, dark = new Uint8Array(W * H);
+    for (let i = 0, j = 0; j < W * H; i += 4, j++) dark[j] = d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11 < 170 ? 1 : 0;
+    const D = (x, y) => dark[y * W + x];
+    const run = (get, n) => {                                   // самый длинный отрезок линии (разрывы до 2 px допускаются)
+      let best = [0, -1, -1], s = -1, last = -1, gap = 0;
+      for (let i = 0; i < n; i++) {
+        if (get(i)) { if (s < 0) s = i; last = i; gap = 0; }
+        else if (s >= 0 && ++gap > 2) { if (last - s > best[0]) best = [last - s, s, last]; s = -1; }
+      }
+      if (s >= 0 && last - s > best[0]) best = [last - s, s, last];
+      return best;
+    };
+    const rows = [], cols = [];
+    for (let y = 0; y < H; y++) { const r = run(x => D(x, y), W); if (r[0] >= .5 * W) rows.push({ y, s: r[1], e: r[2] }); }
+    for (let x = 0; x < W; x++) { const r = run(y => D(x, y), H); if (r[0] >= .5 * H) cols.push({ x, s: r[1], e: r[2] }); }
+    const lc = cols.filter(c => c.x < .2 * W), rc = cols.filter(c => c.x > .8 * W);
+    if (!lc.length || !rc.length) return null;
+    const L = Math.max(...lc.map(c => c.x)), R = Math.min(...rc.map(c => c.x));          // внутренние края рамки
+    const span = r => r.s <= L + .03 * W && r.e >= R - .03 * W;
+    const tr = rows.filter(r => r.y < .2 * H && span(r)), br = rows.filter(r => r.y > .8 * H && span(r));
+    if (!tr.length || !br.length) return null;
+    const T = Math.max(...tr.map(r => r.y)), B = Math.min(...br.map(r => r.y));
+    const fw = R - L, fh = B - T;
+
+    // основная надпись: левая граница — вертикаль, стоящая на нижней линии рамки, с горизонталью от неё до правой рамки
+    let tb = null;
+    const up = x => { let n = 0, gap = 0; for (let y = B - 1; y > T; y--) { if (D(x, y)) { n = B - y; gap = 0; } else if (++gap > 2) break; } return n; };
+    for (let x = Math.round(L + .3 * fw); x < R - .05 * fw && !tb; x++) {
+      const h = up(x);
+      if (h < .05 * fh || h > .5 * fh) continue;
+      const y = B - h;
+      for (let yy = y - 2; yy <= y + 2; yy++) {
+        let c = 0; for (let xx = x; xx <= R; xx++) c += D(xx, yy);
+        if (c >= .85 * (R - x)) { tb = [x, y, R, B]; break; }
+      }
+    }
+
+    // границы изображения внутри рамки без основной надписи
+    const ins = 4; let x0 = W, y0 = H, x1 = -1, y1 = -1;
+    for (let y = T + ins; y < B - ins; y++) for (let x = L + ins; x < R - ins; x++) {
+      if (!D(x, y) || (tb && x >= tb[0] - 3 && y >= tb[1] - 3)) continue;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    if (x1 < 0) return null;
+    const pad = Math.round(.012 * Math.max(W, H));
+    const box = [Math.max(L + 2, x0 - pad), Math.max(T + 2, y0 - pad), Math.min(R - 2, x1 + pad), Math.min(B - 2, y1 + pad)];
+    return { box, tb };
+  }
+
   async function drawDrawing(doc, page, rect) {
     const url = await window.findFirstExisting(window.buildDrawingCandidates());
     if (!url) { alert('Габаритный чертёж не найден в assets/ — в ТКП оставлен чертёж из шаблона (для плёночных конденсаторов).'); return; }
     const buf = await (await fetch(url)).arrayBuffer();
-    let w, h, draw;
-    if (/\.png$/i.test(url)) { const im = await doc.embedPng(buf); w = im.width; h = im.height; draw = o => page.drawImage(im, o); }
-    else if (/\.jpe?g$/i.test(url)) { const im = await doc.embedJpg(buf); w = im.width; h = im.height; draw = o => page.drawImage(im, o); }
-    else { const [em] = await doc.embedPdf(buf, [0]); w = em.width; h = em.height; draw = o => page.drawPage(em, o); }
-    const B = [116, 105, 714, 411], bw = B[2] - B[0], bh = B[3] - B[1], H = page.getHeight();   // ниже 411 — «Вид сверху» и таблица веса (её верх 421,6)
-    rect(page, 112, 103, 718, 416);                  // поле чертежа
+    const A = [116, 105, 714, 411], aw = A[2] - A[0], ah = A[3] - A[1], H = page.getHeight();   // ниже 411 — таблица веса (её верх 421,6)
+    rect(page, 112, 103, 718, 416);                  // поле чертежа шаблона
     rect(page, 112, 416, 471.5, 480);                // подпись «Вид сверху» слева от таблицы веса
-    const k = Math.min(bw / w, bh / h), dw = w * k, dh = h * k;
-    draw({ x: B[0] + (bw - dw) / 2, y: H - (B[1] + (bh - dh) / 2) - dh, width: dw, height: dh });
+    const fit = (w, h) => { const k = Math.min(aw / w, ah / h); return { k, dw: w * k, dh: h * k, X: A[0] + (aw - w * k) / 2, Y: A[1] + (ah - h * k) / 2 }; };
+
+    if (/\.(png|jpe?g)$/i.test(url)) {                // картинка: обрезаем на canvas
+      const im = await createImageBitmap(new Blob([buf]));
+      const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height;
+      const cx = cv.getContext('2d', { willReadFrequently: true }); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(im, 0, 0);
+      const lay = findLayout(cx.getImageData(0, 0, cv.width, cv.height), cv.width, cv.height);
+      let [bx0, by0, bx1, by1] = lay ? lay.box : [0, 0, cv.width, cv.height];
+      if (lay && lay.tb) { cx.fillRect(lay.tb[0] - 3, lay.tb[1] - 3, lay.tb[2] - lay.tb[0] + 6, lay.tb[3] - lay.tb[1] + 6); }
+      const out = document.createElement('canvas'); out.width = bx1 - bx0; out.height = by1 - by0;
+      out.getContext('2d').drawImage(cv, bx0, by0, out.width, out.height, 0, 0, out.width, out.height);
+      const png = await doc.embedPng(await (await new Promise(r => out.toBlob(r, 'image/png'))).arrayBuffer());
+      const f = fit(out.width, out.height);
+      page.drawImage(png, { x: f.X, y: H - f.Y - f.dh, width: f.dw, height: f.dh });
+      return;
+    }
+
+    // PDF: находим поле чертежа по картинке листа и вырезаем его из исходного PDF в векторе
+    const src = await PDFDocument.load(buf, { ignoreEncryption: true });
+    const srcPage = src.getPage(0);
+    let lay = null, vp = null, rot = srcPage.getRotation().angle % 360;
+    try {
+      const pdfjs = await loadPdfjs();
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(buf.slice(0)) }).promise;
+      const p1 = await pdf.getPage(1);
+      const v1 = p1.getViewport({ scale: 1 });
+      vp = p1.getViewport({ scale: 1800 / Math.max(v1.width, v1.height) });
+      const cv = document.createElement('canvas'); cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+      const ctx = cv.getContext('2d', { willReadFrequently: true });
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+      await p1.render({ canvas: cv, canvasContext: ctx, viewport: vp, annotationMode: 0 }).promise;
+      lay = findLayout(ctx.getImageData(0, 0, cv.width, cv.height), cv.width, cv.height);
+      rot = ((p1.rotate % 360) + 360) % 360;
+      pdf.destroy();
+    } catch (e) { console.warn('Не удалось разобрать лист чертежа, вставляю целиком:', e); lay = null; }
+
+    let bbox, vw, vh;                                  // bbox — в координатах исходного PDF; vw×vh — видимый размер вырезки (pt)
+    if (lay) {
+      const [ax, ay] = vp.convertToPdfPoint(lay.box[0], lay.box[1]), [bx, by] = vp.convertToPdfPoint(lay.box[2], lay.box[3]);
+      bbox = { left: Math.min(ax, bx), right: Math.max(ax, bx), bottom: Math.min(ay, by), top: Math.max(ay, by) };
+      vw = (lay.box[2] - lay.box[0]) / vp.scale; vh = (lay.box[3] - lay.box[1]) / vp.scale;
+    } else {
+      const mb = srcPage.getMediaBox();
+      bbox = { left: mb.x, bottom: mb.y, right: mb.x + mb.width, top: mb.y + mb.height };
+      [vw, vh] = rot % 180 ? [mb.height, mb.width] : [mb.width, mb.height];
+    }
+    const em = await doc.embedPage(srcPage, bbox);
+    const f = fit(vw, vh), X = f.X, Y = H - f.Y - f.dh; // нижний левый угол вырезки на листе ТКП
+    // /Rotate исходного листа: встроенная страница рисуется без него, поэтому поворачиваем сами
+    const cw = rot % 180 ? f.dh : f.dw, ch = rot % 180 ? f.dw : f.dh;
+    const o = { 0: [X, Y], 90: [X, Y + f.dh], 180: [X + f.dw, Y + f.dh], 270: [X + f.dw, Y] }[rot] || [X, Y];
+    page.drawPage(em, { x: o[0], y: o[1], width: cw, height: ch, rotate: degrees(-rot) });
+
+    if (lay && lay.tb) {                               // закрыть основную надпись, если она попала в вырезку
+      const [bx0, by0, bx1, by1] = lay.box, k = f.dw / (bx1 - bx0);
+      const tx0 = Math.max(bx0, lay.tb[0] - 3), ty0 = Math.max(by0, lay.tb[1] - 3);
+      if (tx0 < bx1 && ty0 < by1) rect(page, f.X + (tx0 - bx0) * k, f.Y + (ty0 - by0) * k, f.X + f.dw + .5, f.Y + f.dh + .5);
+    }
   }
 
   window.downloadTKP = generate;
