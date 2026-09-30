@@ -202,6 +202,19 @@
       </select>
     </div>
 
+    <div class="param">
+      <label>Составил (ФИО):</label>
+      <input type="text" id="tkpAuthor" placeholder="Для обложки ТКП">
+    </div>
+    <div class="param">
+      <label>Количество, шт:</label>
+      <input type="number" id="tkpQty" value="1" min="1">
+    </div>
+    <div class="param">
+      <label>Цена за ед., руб. (с НДС 22%):</label>
+      <input type="text" id="tkpPrice" placeholder="Необязательно">
+    </div>
+
     <div class="result-title">Итог</div>
     <div id="result">ESQ F ME800-</div>
 
@@ -211,6 +224,7 @@
     <a href="index.html" class="home-button">Вернуться на главную</a>
     <a href="#" class="techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
     <a href="#" class="copy-btn" onclick="copyTechDesc(event)">Копировать описание</a>
+    <a href="#" class="copy-btn" style="background:#e8631a" onclick="downloadTKP(event)">Скачать ТКП (PDF)</a>
 
     <!-- Техописание (внутри него появится и чертёж) -->
     <div id="techdesc" class="techdesc"></div>
@@ -752,6 +766,9 @@
       });
     });
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+  <script src="tkp.js"></script>
 </body>
 </html>
 
