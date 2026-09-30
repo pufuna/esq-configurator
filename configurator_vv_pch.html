@@ -203,6 +203,22 @@
     </div>
 
     <div class="param">
+      <label>17. Тип двигателя:</label>
+      <select id="motor" onchange="updateNomenclature()">
+        <option value="A">Асинхронный</option>
+        <option value="S">Синхронный</option>
+      </select>
+    </div>
+
+    <div class="param">
+      <label>18. Синхронный перевод на сеть:</label>
+      <select id="sync" onchange="updateNomenclature()">
+        <option value="X">Без синхронизации</option>
+        <option value="B">С синхронизацией</option>
+      </select>
+    </div>
+
+    <div class="param">
       <label>Составил (ФИО):</label>
       <input type="text" id="tkpAuthor" placeholder="Для обложки ТКП">
     </div>
@@ -362,7 +378,7 @@
       },
       'T100': { // 10 кВ: 280…1250 кВт
         size: '1800×1425×2431',
-        weights: { '280':'2.2','315':'2.3','400':'2.5','450':'2.6','500':'2.7','560':'2.8','630':'2.9','710':'3.0','800':'3.1','900':'3.2','1000':'3.4','1120':'3.7','1250':'4.0' }
+        weights: { '280':'2.2','315':'2.3','355':'2.4','400':'2.5','450':'2.6','500':'2.7','560':'2.8','630':'2.9','710':'3.0','800':'3.1','900':'3.2','1000':'3.4','1120':'3.7','1250':'4.0' }
       }
     };
 
@@ -480,13 +496,15 @@
       if (expansionSel.value!=='X') adds.push(expansionText);
       adds.push(protoText);
       adds.push(cable==='T'?'вводы сверху':'вводы снизу');
+      adds.push(document.getElementById('motor').value==='S'?'синхронный двигатель':'асинхронный двигатель');
+      adds.push(document.getElementById('sync').value==='B'?'с синхронизацией':'без синхронизации');
       return parts.concat(adds).filter(Boolean).join(', ');
     }
 
     function updateNomenclature(){
       const params = [
-        document.getElementById('power').value + 'P',
-        document.getElementById('current').value + 'А',
+        document.getElementById('power').value.padStart(4,'0') + 'P',
+        document.getElementById('current').value.padStart(3,'0') + 'А',
         document.getElementById('voltage').value,
         document.getElementById('material').value,
         document.getElementById('pulsation').value,
@@ -498,6 +516,8 @@
         document.getElementById('ups').value,
         document.getElementById('cable').value,
         document.getElementById('protocol').value,
+        document.getElementById('motor').value,
+        document.getElementById('sync').value,
         '-' + document.getElementById('cellSize').value,
         document.getElementById('cellBypass').value
       ];
@@ -602,6 +622,8 @@
           <tr><td>ИБП</td><td>${esc(upsYN)}</td></tr>
           <tr><td>Вводы/выводы</td><td>${esc(cable)}</td></tr>
           <tr><td>Протокол связи</td><td>${esc(proto)}</td></tr>
+          <tr><td>Тип двигателя</td><td>${document.getElementById('motor').value==='S'?'Синхронный':'Асинхронный'}</td></tr>
+          <tr><td>Синхронный перевод на сеть</td><td>${document.getElementById('sync').value==='B'?'С синхронизацией':'Без синхронизации'}</td></tr>
           <tr><td>Тип конденсаторов</td><td>${esc(capacitorType)}</td></tr>
           <tr><td>Тип силовых ячеек</td><td>${esc(cellSize)}</td></tr>
           <tr><td>Байпас силовой ячейки</td><td>${esc(cellBypass)}</td></tr>
