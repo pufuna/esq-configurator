@@ -115,6 +115,26 @@
     return F;
   }
 
+  /* Старый чертёж шаблона (стр. 10) убирается маской: всё исходное содержимое страницы внутри этих зон
+     не рисуется и не печатается. Рамка, заголовок «2.5 Габаритный чертёж», таблица веса и штамп — вне зон и остаются.
+     Зоны сняты с шаблона: рамка 110,7…720,3; заголовок до 102,5; таблица веса 472,5…570,1 × 421,6…481,6; штамп от 489,2. */
+  const OLD_DRAWING_ZONES = [
+    [111.2, 103.3, 719.8, 420.9],   // поле видов
+    [111.2, 420.9, 471.9, 488.0],   // слева от таблицы веса («Вид сверху»)
+    [570.7, 420.9, 719.8, 488.0],   // справа от таблицы веса (нижние выноски)
+    [471.9, 482.3, 570.7, 488.0]    // под таблицей веса
+  ];
+  function maskOut(doc, page, zones) {
+    const W = page.getWidth(), H = page.getHeight(), n = v => +v.toFixed(2);
+    let op = `q 0 0 ${n(W)} ${n(H)} re `;
+    for (const [x0, y0, x1, y1] of zones) op += `${n(x0)} ${n(H - y1)} ${n(x1 - x0)} ${n(y1 - y0)} re `;
+    op += 'W* n\n';                                   // «чётно-нечётный» клип: страница минус зоны
+    page.node.normalize();
+    const arr = page.node.Contents();
+    arr.insert(0, doc.context.register(doc.context.stream(op)));
+    arr.push(doc.context.register(doc.context.stream('\nQ')));
+  }
+
   async function generate(ev) {
     if (ev) ev.preventDefault();
     const btn = ev && ev.currentTarget; if (btn) btn.style.opacity = .6;
@@ -126,6 +146,7 @@
       const doc = await PDFDocument.load(tpl);
       const F = makeFonts(GL, await doc.embedFont(StandardFonts.Helvetica));
       const pg = doc.getPages();
+      if (!s.film) maskOut(doc, pg[10], OLD_DRAWING_ZONES);   // для электролитов старого чертежа на стр. 10 нет совсем
 
       /* ---------- помощники ---------- */
       const rot = p => p.getRotation().angle;
@@ -324,11 +345,9 @@
 
   async function drawDrawing(doc, page, rect) {
     const url = await window.findFirstExisting(window.buildDrawingCandidates());
-    if (!url) { alert('Габаритный чертёж не найден в assets/ — в ТКП оставлен чертёж из шаблона (для плёночных конденсаторов).'); return; }
+    if (!url) { alert('Габаритный чертёж для этой мощности не найден в assets/ — поле чертежа в ТКП оставлено пустым.'); return; }
     const buf = await (await fetch(url)).arrayBuffer();
     const A = [116, 105, 714, 411], aw = A[2] - A[0], ah = A[3] - A[1], H = page.getHeight();   // ниже 411 — таблица веса (её верх 421,6)
-    rect(page, 112, 103, 718, 416);                  // поле чертежа шаблона
-    rect(page, 112, 416, 471.5, 480);                // подпись «Вид сверху» слева от таблицы веса
     const fit = (w, h) => { const k = Math.min(aw / w, ah / h); return { k, dw: w * k, dh: h * k, X: A[0] + (aw - w * k) / 2, Y: A[1] + (ah - h * k) / 2 }; };
 
     if (/\.(png|jpe?g)$/i.test(url)) {                // картинка: обрезаем на canvas
