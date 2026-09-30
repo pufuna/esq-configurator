@@ -65,6 +65,41 @@
     h1{color:#2c3e50;text-align:center;margin-bottom:15px;font-size:2.2em;text-shadow:0 2px 4px rgba(0,0,0,.1)}
     .title-sub{display:block;font-size:1.8em;margin-top:10px;color:#2c3e50}
     .footer{text-align:center;padding:20px;background:rgba(44,62,80,.9);color:#fff;width:100%;margin-top:auto;backdrop-filter:blur(5px)}
+
+    /* Расшифровка маркировки */
+    .decode{margin:10px 0 30px;padding:18px 20px;background:#f8f9fa;border:1px solid #eee;border-radius:10px}
+    .decode h3{margin:0 0 12px;color:#2c3e50;font-size:1.1em;text-align:center}
+    .dc-code{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:3px 2px;margin-bottom:16px}
+    .dc-seg{display:flex;flex-direction:column;align-items:center;padding:4px 5px 2px;border-radius:6px;cursor:default;transition:background .15s}
+    .dc-seg b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;color:#2c3e50;border-bottom:2px solid #c9d3df;padding:0 1px 2px;white-space:nowrap}
+    .dc-seg i{font-style:normal;font-size:11px;color:#6b7a90;margin-top:3px}
+    .dc-sep{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;color:#9aa6b5;padding:4px 1px 0;font-weight:700}
+    .dc-seg.hl{background:#e3edff}.dc-seg.hl b{border-bottom-color:#1f6feb;color:#1f6feb}
+    .dc-table{width:100%;border-collapse:collapse;font-size:14px;background:#fff}
+    .dc-table th,.dc-table td{border:1px solid #e6ecf5;padding:7px 9px;text-align:left;vertical-align:top}
+    .dc-table th{background:#f3f6fb;color:#2c3e50;font-weight:600}
+    .dc-table td:first-child{width:28px;text-align:center;color:#6b7a90}
+    .dc-table td.dc-c{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;color:#2c3e50;white-space:nowrap}
+    .dc-table .dc-v{display:block;font-size:12px;color:#8391a5;margin-top:3px}
+    .dc-table tr.hl,.dc-table tr.hl td{background:#eef4ff}
+    @media (max-width:768px){
+      .decode{padding:12px 8px}
+      .dc-seg b,.dc-sep{font-size:15px}
+      /* на телефоне строки таблицы — карточки: № | код | параметр, ниже выбранное значение */
+      .dc-table{font-size:13px}
+      .dc-table thead{display:none}
+      .dc-table,.dc-table tbody{display:block}
+      .dc-table tr{display:grid;grid-template-columns:24px 76px 1fr;border:1px solid #e6ecf5;border-top:none;background:#fff}
+      .dc-table tr:first-child{border-top:1px solid #e6ecf5}
+      .dc-table td{border:none;padding:6px 5px 2px}
+      .dc-table td:first-child{width:auto}
+      .dc-table td.dc-c{white-space:normal}
+      .dc-table td:nth-child(3){font-weight:600;color:#2c3e50}
+      .dc-table td:nth-child(4){grid-column:2 / 4;padding:0 5px 7px}
+    }
+    /* страница не должна быть шире экрана */
+    .configurator,.footer{box-sizing:border-box}
+    #result,#old-result{overflow-wrap:anywhere}
   </style>
 </head>
 <body>
@@ -233,6 +268,15 @@
 
     <div class="result-title">Итог</div>
     <div id="result">ESQ F ME800-</div>
+
+    <div class="decode">
+      <h3>Расшифровка маркировки</h3>
+      <div class="dc-code" id="dc-code"></div>
+      <table class="dc-table">
+        <thead><tr><th>№</th><th>Код</th><th>Что означает</th><th>Выбрано</th></tr></thead>
+        <tbody id="dc-body"></tbody>
+      </table>
+    </div>
 
     <div class="result-title">Ответ по старой номенклатуре</div>
     <div id="old-result"></div>
@@ -523,6 +567,49 @@
       ];
       document.getElementById('result').textContent = `ESQ F ME800-${params.join('')}`;
       document.getElementById('old-result').textContent = buildOldNomenclatureText();
+      renderDecode();
+    }
+
+    /* ===== Расшифровка маркировки (позиции 1–18, как в описании модели в ТКП) ===== */
+    function renderDecode(){
+      const $v = id => document.getElementById(id).value;
+      const $t = id => { const s = document.getElementById(id); return s.options[s.selectedIndex].text; };
+      const yn = (v, on) => v === on ? 'включен в комплектацию' : 'не включен в комплектацию';
+      const cells = ({'30':5,'36':6,'48':8,'54':9})[$v('pulsation')];
+      const seg = [
+        ['ESQ F ME800', 'Модель ПЧ', 'Высоковольтный преобразователь частоты ESQ F ME800', ''],
+        [$v('power').padStart(4,'0') + 'P', 'Мощность ПЧ, кВт', $v('power') + ' кВт', 'четыре цифры мощности и буква P'],
+        [$v('current').padStart(3,'0') + 'А', 'Ток ПЧ, А', $v('current') + ' А', 'три цифры тока и буква А'],
+        [$v('voltage'), 'Напряжение ПЧ', $t('voltage'), 'T060 — 6 кВ; T100 — 10 кВ'],
+        [$v('material'), 'Материал обмоток трансформатора', $t('material').toLowerCase(), 'AL — алюминий; CU — медь'],
+        [$v('pulsation'), 'Пульсность схемы выпрямления', $v('pulsation') + '-пульсная, ' + cells + ' ячеек на фазу', '6 кВ: 30 или 36; 10 кВ: 48 или 54'],
+        [$v('starter'), 'Пусковой шкаф', yn($v('starter'), 'S'), 'S — включен; X — не включен'],
+        [$v('bypass'), 'Шкаф байпаса', ({A:'автоматический байпас', M:'ручной байпас', X:'без шкафа байпаса'})[$v('bypass')], 'A — автоматический; M — ручной; X — без шкафа байпаса'],
+        [$v('reactor'), 'Шкаф реактора', yn($v('reactor'), 'R'), 'R — включен; X — не включен'],
+        [$v('ip'), 'Степень защиты', 'IP' + $v('ip'), '31 — IP31; 42 — IP42'],
+        [$v('expansion'), 'Плата расширения входов', $v('expansion') === 'X' ? 'платы расширения отсутствуют' : $t('expansion'), 'E — +8DI/DO; 2E — +16DI/DO; X — нет'],
+        [$v('ups'), 'ИБП', yn($v('ups'), 'U'), 'U — включен; X — не включен'],
+        [$v('cable'), 'Ввод/вывод кабелей', $v('cable') === 'T' ? 'сверху' : 'снизу', 'D — снизу; T — сверху'],
+        [$v('protocol'), 'Протокол связи', $t('protocol'), 'MR — Modbus RTU; MT — Modbus TCP; PB — ProfibusDP; PN — ProfiNet; CO — CanOpen; EI — Ethernet/IP'],
+        [$v('motor'), 'Тип двигателя', $v('motor') === 'S' ? 'синхронный' : 'асинхронный', 'A — асинхронный; S — синхронный'],
+        [$v('sync'), 'Синхронный перевод на сеть', $v('sync') === 'B' ? 'с синхронизацией' : 'без синхронизации', 'X — без синхронизации; B — с синхронизацией'],
+        [$v('cellSize'), 'Тип силовой ячейки', $v('cellSize') + ($v('cellSize') === 'PF' ? ' — с плёночными конденсаторами' : ''), 'определяется мощностью и типом конденсаторов'],
+        [$v('cellBypass'), 'Байпас силовой ячейки', yn($v('cellBypass'), 'B'), 'B — включен; N — не включен']
+      ];
+      const sepAfter = {0:'-', 15:'-'};     // дефисы в маркировке: после модели и перед типом ячейки
+      document.getElementById('dc-code').innerHTML = seg.map((s, i) =>
+        `<span class="dc-seg" data-i="${i}"><b>${esc(s[0])}</b><i>${i + 1}</i></span>` + (sepAfter[i] ? '<span class="dc-sep">-</span>' : '')).join('');
+      document.getElementById('dc-body').innerHTML = seg.map((s, i) =>
+        `<tr data-i="${i}"><td>${i + 1}</td><td class="dc-c">${esc(s[0])}</td><td>${esc(s[1])}</td><td>${esc(s[2])}${s[3] ? `<span class="dc-v">${esc(s[3])}</span>` : ''}</td></tr>`).join('');
+    }
+    // подсветка: наведение на часть кода выделяет строку таблицы и наоборот
+    ['dc-code','dc-body'].forEach(id => {
+      const box = document.getElementById(id);
+      box.addEventListener('mouseover', e => { const el = e.target.closest('[data-i]'); if (el) dcHighlight(el.dataset.i); });
+      box.addEventListener('mouseleave', () => dcHighlight(null));
+    });
+    function dcHighlight(i){
+      document.querySelectorAll('.dc-seg, #dc-body tr').forEach(el => el.classList.toggle('hl', el.dataset.i === i));
     }
 
     /* ===== ВСПОМОГАТЕЛЬНЫЕ ===== */
