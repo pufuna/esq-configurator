@@ -1,79 +1,179 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <title>Конфигуратор УПП ESQ-HVS</title>
+  <meta charset="UTF-8">
+  <title>Конфигуратор устройства плавного пуска ESQ F HVS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body{margin:0;padding:0;font-family:Segoe UI, Arial, sans-serif;background:#f5f7fb;display:flex;min-height:100vh}
-    .wrap{margin:auto;max-width:920px;width:92%;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:28px}
-    h1{margin:0 0 22px;color:#1f3147}
-    .row{display:flex;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid #eef1f6;flex-wrap:wrap}
-    label{min-width:280px;color:#25364a}
-    select,input{flex:1;min-width:260px;padding:10px 12px;border:1px solid #dfe6ef;border-radius:8px;background:#fff}
-    .result{margin-top:22px;padding:16px;border:1px dashed #d6deeb;border-radius:10px;background:#f9fbff;font:600 20px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;color:#1f3147}
-    .back-btn{margin-top:24px;display:inline-block;padding:12px 22px;background:#1f3147;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;transition:.2s}
-    .back-btn:hover{background:#2d4665}
-    @media (max-width:720px){label{min-width:100%}}
+    body{
+      margin:0;padding:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;
+      display:flex;flex-direction:column;align-items:center;
+      background:linear-gradient(rgba(0,0,0,0.4),rgba(0,0,0,0.4)), url('background2.jpg') center/cover fixed;
+      position:relative
+    }
+    .configurator{
+      width:90%;max-width:800px;margin:40px auto;padding:30px;background:rgba(255,255,255,.9);
+      border-radius:15px;box-shadow:0 8px 32px rgba(0,0,0,.1);backdrop-filter:blur(5px)
+    }
+    .param{margin-bottom:20px;display:flex;flex-wrap:wrap;gap:15px;align-items:center;padding:15px;border-bottom:1px solid #eee}
+    label{flex:1 1 250px;font-weight:500;color:#2c3e50;min-width:250px}
+    select,input{flex:2 1 300px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff}
+    .note{flex:1 1 100%;margin-top:6px;color:#666;font-size:12px}
+    .note.warn{color:#b54708;font-weight:600}
+    #result{
+      margin:30px 0 10px;padding:20px;background:#f8f9fa;border-radius:10px;font-family:monospace;
+      font-size:24px;color:#2c3e50;border:1px solid #eee;text-align:center;font-weight:bold;overflow-wrap:anywhere
+    }
+    #summary{margin:0 0 30px;padding:0 10px;text-align:center;color:#4a5a6e;font-size:14px;line-height:1.5}
+    .result-title{font-size:1.5em;margin-bottom:15px;color:#2c3e50;font-weight:700;text-align:center}
+    .home-button,.techdesc-btn,.copy-btn{
+      display:inline-block;padding:12px 30px;background:#2c3e50;color:#fff;text-decoration:none;border-radius:25px;
+      transition:background .3s;font-weight:600;width:100%;text-align:center;box-sizing:border-box
+    }
+    .home-button{margin:20px 0 10px}
+    .home-button:hover{background:#34495e;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    .techdesc-btn{margin:10px 0;background:#0f6b3f}
+    .techdesc-btn:hover{background:#11824c;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    .copy-btn{margin:10px 0;background:#1f6feb}
+    .copy-btn:hover{background:#2556b8;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+
+    .techdesc{
+      display:none;margin-top:10px;padding:20px;background:#fff;border:1px solid #e6ecf5;border-radius:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,.06)
+    }
+    .techdesc h2{margin:0 0 8px;color:#1f3147}
+    .meta{color:#6b7a90;margin-bottom:12px}
+    table{border-collapse:collapse;width:100%;margin:12px 0}
+    th,td{border:1px solid #e6ecf5;padding:8px;text-align:left;font-size:14px}
+    th{background:#f3f6fb}
+    .muted{color:#6b7a90}
+    .sku{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f6f8fb;border:1px solid #e6ecf5;border-radius:8px;padding:10px;margin:10px 0;font-weight:700}
+    .drawing-img{max-width:100%;height:auto;border:1px solid #e6ecf5;border-radius:10px;background:#fff}
+    .drawing-empty{padding:10px;color:#6b7a90;background:#fafcff;border:1px dashed #d8e1f0;border-radius:10px}
+
+    @media (max-width:768px){
+      .configurator{width:95%;padding:20px;margin:20px auto}
+      .param{flex-direction:column;align-items:stretch}
+      label,select,input{flex:1 1 100%}
+    }
+    h1{color:#2c3e50;text-align:center;margin-bottom:15px;font-size:2.2em;text-shadow:0 2px 4px rgba(0,0,0,.1)}
+    .title-sub{display:block;font-size:1.8em;margin-top:10px;color:#2c3e50}
+    .footer{text-align:center;padding:20px;background:rgba(44,62,80,.9);color:#fff;width:100%;margin-top:auto;backdrop-filter:blur(5px)}
+
+    /* Расшифровка маркировки */
+    .decode{margin:10px 0 30px;padding:18px 20px;background:#f8f9fa;border:1px solid #eee;border-radius:10px}
+    .decode h3{margin:0 0 12px;color:#2c3e50;font-size:1.1em;text-align:center}
+    .dc-code{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:3px 2px;margin-bottom:16px}
+    .dc-seg{display:flex;flex-direction:column;align-items:center;padding:4px 5px 2px;border-radius:6px;cursor:default;transition:background .15s}
+    .dc-seg b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;color:#2c3e50;border-bottom:2px solid #c9d3df;padding:0 1px 2px;white-space:nowrap}
+    .dc-seg i{font-style:normal;font-size:11px;color:#6b7a90;margin-top:3px}
+    .dc-sep{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;color:#9aa6b5;padding:4px 1px 0;font-weight:700}
+    .dc-seg.hl{background:#e3edff}.dc-seg.hl b{border-bottom-color:#1f6feb;color:#1f6feb}
+    .dc-table{width:100%;border-collapse:collapse;font-size:14px;background:#fff}
+    .dc-table th,.dc-table td{border:1px solid #e6ecf5;padding:7px 9px;text-align:left;vertical-align:top}
+    .dc-table th{background:#f3f6fb;color:#2c3e50;font-weight:600}
+    .dc-table td:first-child{width:28px;text-align:center;color:#6b7a90}
+    .dc-table td.dc-c{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;color:#2c3e50;white-space:nowrap}
+    .dc-table .dc-v{display:block;font-size:12px;color:#8391a5;margin-top:3px}
+    .dc-table tr.hl,.dc-table tr.hl td{background:#eef4ff}
+    @media (max-width:768px){
+      .decode{padding:12px 8px}
+      .dc-seg b,.dc-sep{font-size:15px}
+      .dc-table{font-size:13px}
+      .dc-table thead{display:none}
+      .dc-table,.dc-table tbody{display:block}
+      .dc-table tr{display:grid;grid-template-columns:24px 76px 1fr;border:1px solid #e6ecf5;border-top:none;background:#fff}
+      .dc-table tr:first-child{border-top:1px solid #e6ecf5}
+      .dc-table td{border:none;padding:6px 5px 2px}
+      .dc-table td:first-child{width:auto}
+      .dc-table td.dc-c{white-space:normal}
+      .dc-table td:nth-child(3){font-weight:600;color:#2c3e50}
+      .dc-table td:nth-child(4){grid-column:2 / 4;padding:0 5px 7px}
+    }
+    .ft-link{color:inherit;text-decoration:none;cursor:default}
+    .tz-banner{margin:0 0 15px;padding:12px 15px;background:#fff7e6;border:1px solid #f5c26b;border-radius:10px;color:#2c3e50;font-size:14px}
+    .tz-banner span{color:#6b7a90;font-size:13px}
+    .configurator,.footer{box-sizing:border-box}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>Конфигуратор УПП</h1>
+  <div class="configurator">
+    <h1>Конфигуратор устройства плавного пуска<br><span class="title-sub">ESQ F HVS</span></h1>
 
-    <div class="row">
-      <label for="voltage">Напряжение:</label>
+    <div class="param">
+      <label>1. Напряжение:</label>
       <select id="voltage">
         <option value="06">6 кВ</option>
         <option value="10">10 кВ</option>
       </select>
     </div>
 
-    <div class="row">
-      <label for="power">Мощность УПП (кВт):</label>
+    <div class="param">
+      <label>2. Мощность двигателя (кВт):</label>
       <select id="power"></select>
     </div>
 
-    <div class="row">
-      <label for="current">Номинальный ток УПП (А):</label>
-      <input id="current" type="text" readonly />
+    <div class="param">
+      <label>3. Номинальный ток УПП (А):</label>
+      <input type="text" id="current" readonly>
+      <div class="note" id="sizeNote"></div>
     </div>
 
-    <div class="row">
-      <label for="ip">Степень защиты:</label>
+    <div class="param">
+      <label>4. Комплектация:</label>
+      <select id="package">
+        <option value="STD">Стандартная</option>
+        <option value="E">С вакуумным выключателем</option>
+        <option value="S">С выкатными тиристорными блоками</option>
+        <option value="IK">С вводным разъединителем</option>
+      </select>
+    </div>
+
+    <div class="param">
+      <label>5. Тип двигателя:</label>
+      <select id="motor">
+        <option value="A">Асинхронный</option>
+        <option value="S">Синхронный</option>
+      </select>
+    </div>
+
+    <div class="param">
+      <label>6. Степень защиты:</label>
       <select id="ip">
         <option value="IP41">IP41</option>
         <option value="IP54">IP54</option>
       </select>
     </div>
 
-    <div class="row">
-      <label for="package">Комплектация:</label>
-      <select id="package">
-        <option value="STD">Обычная</option>
-        <option value="E">С вакуумным выключателем</option>
-        <option value="S">С выкатными тиристорными блоками</option>
-      </select>
-    </div>
-
-    <div class="row">
-      <label for="ctl">Питание цепей управления:</label>
+    <div class="param">
+      <label>7. Питание цепей управления:</label>
       <select id="ctl">
-        <option value="AC">220В AC</option>
-        <option value="DC">220В DC</option>
+        <option value="AC220">~220 В AC</option>
+        <option value="DC220">=220 В DC</option>
+        <option value="AC110">~110 В AC</option>
+        <option value="DC110">=110 В DC</option>
       </select>
     </div>
 
-    <div class="row">
-      <label for="cable">Вводы/выводы кабелей:</label>
+    <div class="param">
+      <label>8. Вводы/выводы кабелей:</label>
       <select id="cable">
-        <option value="TOP">Сверху</option>
-        <option value="BOT">Снизу</option>
+        <option value="D">Снизу</option>
+        <option value="T">Сверху</option>
       </select>
     </div>
 
-    <div class="row">
-      <label for="proto">Протокол связи:</label>
-      <select id="proto">
+    <div class="param">
+      <label>9. Вид обслуживания:</label>
+      <select id="service">
+        <option value="2">Двухстороннее</option>
+        <option value="1">Одностороннее</option>
+      </select>
+    </div>
+
+    <div class="param">
+      <label>10. Протокол связи:</label>
+      <select id="protocol">
         <option value="MR">Modbus RTU</option>
         <option value="MT">Modbus TCP</option>
         <option value="PB">ProfibusDP</option>
@@ -83,99 +183,267 @@
       </select>
     </div>
 
-    <div class="result" id="resultLine"></div>
-    <a href="index.html" class="back-btn">Вернуться на главную</a>
+    <div class="param">
+      <label>Составил (ФИО):</label>
+      <input type="text" id="tkpAuthor" placeholder="Для обложки ТКП">
+    </div>
+    <div class="param">
+      <label>Количество, шт:</label>
+      <input type="number" id="tkpQty" value="1" min="1">
+    </div>
+    <div class="param">
+      <label>Цена за ед., руб. (с НДС 22%):</label>
+      <input type="text" id="tkpPrice" placeholder="Необязательно">
+    </div>
+
+    <div class="result-title">Итог</div>
+    <div id="result">ESQ F HVS</div>
+    <div id="summary"></div>
+
+    <div class="decode">
+      <h3>Расшифровка маркировки</h3>
+      <div class="dc-code" id="dc-code"></div>
+      <table class="dc-table">
+        <thead><tr><th>№</th><th>Код</th><th>Что означает</th><th>Выбрано</th></tr></thead>
+        <tbody id="dc-body"></tbody>
+      </table>
+    </div>
+
+    <a href="index.html" class="home-button">Вернуться на главную</a>
+    <a href="#" class="techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
+    <a href="#" class="copy-btn" onclick="copyTechDesc(event)">Копировать описание</a>
+    <a href="#" class="copy-btn" style="background:#e8631a" onclick="downloadTKP(event)">Скачать ТКП (PDF)</a>
+
+    <div id="techdesc" class="techdesc"></div>
   </div>
 
+  <div class="footer"><p><a href="tz.html?p=upp" class="ft-link" tabindex="-1" aria-hidden="true">©</a> 2025 ESQ</p></div>
+
   <script>
-    // Мощность (кВт) → номинальный ток (А)
-    const data = {
-      "06": {
-        220: 25, 280: 35, 315: 40, 400: 45, 450: 55, 560: 65, 630: 75, 710: 90,
-        800: 100, 1000: 120, 1120: 135, 1250: 150, 1400: 180, 1600: 200,
-        1800: 220, 2000: 240, 2500: 320, 4000: 490, 5000: 600, 6000: 700, 7000: 800
-      },
-      "10": {
-        315: 25, 450: 35, 500: 40, 630: 45, 710: 55, 800: 65, 1000: 75, 1250: 90,
-        1400: 100, 1600: 120, 1800: 140, 2000: 150, 2400: 185, 2800: 200, 3000: 220,
-        3400: 240, 4000: 300, 5600: 410, 6500: 480, 8000: 580, 11500: 800
-      }
+    /* ===== МОДЕЛИ (техническое описание ESQ F HVS, лист 13): ток УПП, А → мощность двигателя, кВт ===== */
+    // ряд и габариты — по каталогу завода RSE1000 V2025.01
+    const MODELS = {
+      '06': [[50,420],[75,630],[120,1000],[150,1250],[200,1600],[300,2500],[400,3300],[500,4150],[600,5000]],
+      '10': [[30,420],[45,630],[60,800],[73,1000],[90,1250],[110,1500],[130,1800],[160,2250],[180,2500],[200,2800],
+             [250,3500],[280,4000],[320,4500],[400,5500],[430,6000],[500,7000],[600,8500],[720,10000]]
+    };
+    const DIMS = '1000×1500×2300';          // этот шкаф — на эскизе шаблона ТКП
+    const MASS_KG = 800;
+    const PKG = { STD:'стандартная', E:'с вакуумным выключателем', S:'с выкатными тиристорными блоками', IK:'с вводным разъединителем' };
+    const CTL = { AC220:'~220 В AC ±15%', DC220:'=220 В DC ±15%', AC110:'~110 В AC ±15%', DC110:'=110 В DC ±15%' };
+    const PROTO = { MR:'Modbus RTU', MT:'Modbus TCP', PB:'ProfibusDP', PN:'ProfiNet', CO:'CanOpen', EI:'Ethernet/IP' };
+    function noDrawingMsg(){
+      return dims()
+        ? '⚠ Шкаф ' + dims() + ' мм — его габаритного эскиза нет: в ТКП страница эскиза останется пустой (габариты в таблице указаны). Приложите эскиз к ТКП отдельно.'
+        : '⚠ Габариты этой модели уточняются у завода: в ТКП страница эскиза и строка «Габариты» останутся пустыми. Приложите эскиз к ТКП отдельно.';
+    }
+
+    const $ = id => document.getElementById(id);
+    const val = id => $(id).value;
+    function esc(str){ return String(str ?? '').replace(/[&<>"]/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])); }
+
+    function model(){ const v = val('voltage'), I = Number(val('power')); return MODELS[v].find(m => m[0] === I); }
+    // габариты 6 кВ от 300 А в техописании не приведены — эскиза нет
+    // габариты (Ш×Г×В) по каталогу: до 320 А — 1000×1500×2300, 400–500 А — 1200×1700×2300, от 600 А — по заказу (null);
+    // исполнение E (со встроенным выключателем) стандартное только до 150 А при 6 кВ и до 130 А при 10 кВ
+    function dims(){
+      const I = Number(val('power')), v = val('voltage');
+      if (I >= 600) return null;
+      if (val('package') === 'E' && I > (v === '06' ? 150 : 130)) return null;
+      return I >= 400 ? '1200×1700×2300' : DIMS;
+    }
+    function noDrawing(){ return dims() !== DIMS; }
+    // частота пусков (РЭ): 6 кВ до 2500 кВт и 10 кВ до 4000 кВт — 1–6 в час, выше — 1–3
+    function startsPerHour(){ const m = model(); return m[1] > (val('voltage') === '06' ? 2500 : 4000) ? 3 : 6; }
+
+    function buildMark(){
+      const m = model(), pkg = val('package');
+      return 'ESQ F HVS' + val('voltage') + '-' + String(m[0]).padStart(3,'0') + (pkg === 'STD' ? '' : '-' + pkg);
+    }
+
+    function updatePowerOptions(){
+      const sel = $('power'), keep = sel.value;
+      sel.innerHTML = MODELS[val('voltage')].map(([I,P]) => `<option value="${I}">${P} кВт</option>`).join('');
+      if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+      update();
+    }
+
+    function summaryText(){
+      const m = model(), kv = val('voltage') === '06' ? 6 : 10;
+      return [kv + ' кВ', m[1] + ' кВт', m[0] + ' А', 'комплектация ' + PKG[val('package')],
+        ($('motor').value === 'S' ? 'синхронный' : 'асинхронный') + ' двигатель', val('ip'),
+        'питание цепей управления ' + CTL[val('ctl')], 'вводы ' + (val('cable') === 'T' ? 'сверху' : 'снизу'),
+        (val('service') === '1' ? 'одностороннее' : 'двухстороннее') + ' обслуживание', PROTO[val('protocol')]].join(', ');
+    }
+
+    function update(){
+      const m = model();
+      $('current').value = m[0];
+      $('result').textContent = buildMark();
+      $('summary').textContent = summaryText();
+      const n = $('sizeNote');
+      if (noDrawing()) { n.textContent = noDrawingMsg(); n.className = 'note warn'; }
+      else { n.textContent = 'Габариты ' + DIMS + ' мм (Ш×Г×В), масса ' + MASS_KG + ' кг. Частота пусков — до ' + startsPerHour() + ' в час.'; n.className = 'note'; }
+      renderDecode();
+    }
+
+    /* ===== Расшифровка маркировки ===== */
+    function renderDecode(){
+      const m = model(), pkg = val('package');
+      const seg = [
+        ['ESQ F HVS', 'Серия УПП', 'Высоковольтное устройство плавного пуска ESQ F HVS', ''],
+        [val('voltage'), 'Номинальное напряжение УПП', val('voltage') === '06' ? '6 кВ' : '10 кВ', '06 — 6 кВ; 10 — 10 кВ'],
+        [String(m[0]).padStart(3,'0'), 'Номинальный ток УПП', m[0] + ' А (двигатель до ' + m[1] + ' кВт)', 'три цифры тока'],
+      ];
+      if (pkg !== 'STD') seg.push([pkg, 'Комплектация', PKG[pkg], 'без букв — стандартная; E — с вакуумным выключателем; S — с выкатными тиристорными блоками; IK — с вводным разъединителем']);
+      const sep = {0:'', 1:'-', 2: pkg !== 'STD' ? '-' : ''};
+      $('dc-code').innerHTML = seg.map((s, i) => `<span class="dc-seg" data-i="${i}"><b>${esc(s[0])}</b><i>${i + 1}</i></span>` + (sep[i] ? '<span class="dc-sep">-</span>' : '')).join('');
+      $('dc-body').innerHTML = seg.map((s, i) =>
+        `<tr data-i="${i}"><td>${i + 1}</td><td class="dc-c">${esc(s[0])}</td><td>${esc(s[1])}</td><td>${esc(s[2])}${s[3] ? `<span class="dc-v">${esc(s[3])}</span>` : ''}</td></tr>`).join('');
+    }
+    ['dc-code','dc-body'].forEach(id => {
+      const box = $(id);
+      box.addEventListener('mouseover', e => { const el = e.target.closest('[data-i]'); if (el) dcHighlight(el.dataset.i); });
+      box.addEventListener('mouseleave', () => dcHighlight(null));
+    });
+    function dcHighlight(i){ document.querySelectorAll('.dc-seg, #dc-body tr').forEach(el => el.classList.toggle('hl', el.dataset.i === i)); }
+
+    window.isDrawingMissing = noDrawing;   // для страницы разбора ТЗ
+
+    /* ===== Состояние для ТКП (tkp_upp.js) ===== */
+    window.uppState = function(){
+      const m = model(), mark = buildMark(), kv = val('voltage') === '06' ? 6 : 10;
+      return {
+        mark, kv, I: m[0], P: m[1], pkg: val('package'), motor: val('motor'), ip: val('ip'), ctl: val('ctl'),
+        cable: val('cable'), srv: val('service'), proto: val('protocol'), noDrawing: noDrawing(), dims: dims(), startsH: startsPerHour(), massKg: MASS_KG,
+        who: val('tkpAuthor').trim(), qty: Math.max(1, parseInt(val('tkpQty'), 10) || 1),
+        price: parseFloat(String(val('tkpPrice')).replace(/\s/g, '').replace(',', '.')) || 0,
+        name: 'Устройство плавного пуска ' + mark + ', ' + kv + ' кВ, ' + m[1] + ' кВт, ' + m[0] + ' А' +
+          (val('package') === 'STD' ? '' : ', ' + PKG[val('package')])
+      };
     };
 
-    const els = {
-      voltage: document.getElementById('voltage'),
-      power: document.getElementById('power'),
-      current: document.getElementById('current'),
-      ip: document.getElementById('ip'),
-      pkg: document.getElementById('package'),
-      ctl: document.getElementById('ctl'),
-      cable: document.getElementById('cable'),
-      proto: document.getElementById('proto'),
-      result: document.getElementById('resultLine')
-    };
+    /* ===== ТЕХОПИСАНИЕ ===== */
+    function buildTechDescriptionHtml(){
+      const m = model(), kv = val('voltage') === '06' ? 6 : 10;
+      const rows = (list) => list.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
+      return `
+        <h2>Техническое описание конфигурации</h2>
+        <div class="meta">Дата формирования: ${esc(new Date().toLocaleString())}</div>
+        <div class="sku">${esc(buildMark())}</div>
+        <p class="muted">Высоковольтное устройство плавного пуска ESQ F HVS предназначено для плавного безударного пуска и останова
+          высоковольтных асинхронных и синхронных электродвигателей там, где не требуется регулирование скорости:
+          насосы, вентиляторы, компрессоры, дробилки, мешалки, конвейеры. Снижает пусковые токи и провалы напряжения сети,
+          после разгона двигатель переводится на сеть встроенным вакуумным байпасным контактором.</p>
 
-    function updatePowerOptions() {
-      const v = els.voltage.value;
-      const powers = Object.keys(data[v]).map(Number).sort((a,b)=>a-b);
-      els.power.innerHTML = '';
-      for (const p of powers) {
-        const opt = document.createElement('option');
-        opt.value = String(p);
-        opt.textContent = `${p} кВт`;
-        els.power.appendChild(opt);
+        <h3>Выбранные параметры</h3>
+        <table>
+          <tr><th>Параметр</th><th>Значение</th></tr>
+          ${rows([
+            ['Напряжение питающей сети', (kv === 6 ? '6000' : '10000') + ' В ±15%'],
+            ['Мощность подключаемого двигателя', m[1] + ' кВт'],
+            ['Номинальный ток УПП', m[0] + ' А'],
+            ['Комплектация', PKG[val('package')]],
+            ['Тип двигателя', val('motor') === 'S' ? 'Синхронный' : 'Асинхронный с короткозамкнутым ротором'],
+            ['Степень защиты', val('ip')],
+            ['Питание цепей управления', CTL[val('ctl')]],
+            ['Ввод и вывод кабелей', val('cable') === 'T' ? 'Сверху' : 'Снизу'],
+            ['Вид обслуживания', val('service') === '1' ? 'Одностороннее' : 'Двухстороннее'],
+            ['Протокол связи', val('protocol') === 'MR' ? 'Modbus RTU (RS-485)' : 'Modbus RTU (RS-485); ' + PROTO[val('protocol')]],
+          ])}
+        </table>
+
+        <h3>Технические характеристики (постоянные)</h3>
+        <table>
+          <tr><th>Параметр</th><th>Значение</th></tr>
+          ${rows([
+            ['Частота питающей сети', '50/60 Гц ±2 Гц'],
+            ['Последовательность фаз', 'любая (задаётся параметром)'],
+            ['Силовая цепь', '12, 18, 24 или 30 тиристорных модулей (зависит от модели), оптоволоконное управление'],
+            ['Байпасный контактор', 'встроенный вакуумный, способен обеспечить прямой пуск'],
+            ['Частота пусков', '1–' + startsPerHour() + ' пуска в час с перерывом 10 мин'],
+            ['Режимы пуска', 'линейная или ускоренная кривая напряжения; ограничение тока; толчковый пуск (20–100% Uе, 0–5 с); постоянное напряжение (30–80% Uе, до 30 с)'],
+            ['Время нарастания / задержка пуска', '0–60 с / 0–60 с'],
+            ['Ограничение пускового тока', '100–500% Iе'],
+            ['Режимы останова', 'выбег, плавный останов, торможение'],
+            ['Защиты', 'обрыв фазы; перегрузка по току в работе 100–500% Iе (0–10 с); небаланс токов 20–100%; электронная тепловая перегрузка, классы 10A/10/20/30; недогрузка 50–100% Iе (0–10 с); заклинивание ротора 5–10 Iе; затянутый пуск 10–120 с; повышенное (120%) и пониженное (70%) напряжение; чередование фаз; замыкание на землю; ошибка частоты сети'],
+            ['Входы/выходы', 'дискретные входы пуск/стоп/аварийный стоп; аналоговый выход 4–20 мА (ток 0–2 Iе или 0–4 Iе); 3 релейных выхода: авария, байпас, программируемое'],
+            ['Управление', 'местное, дистанционное (сухие контакты), DCS/ПЛК, по сети; режимы «плавный пуск / прямой пуск»'],
+            ['Панель управления', 'сенсорный ЖК-дисплей; индикация трёхфазного напряжения и тока, состояния, аварий'],
+            ['Журнал', 'до 1000 аварий, счётчик наработки'],
+            ['Охлаждение', 'естественное воздушное'],
+            ['Тепловыделение', 'при пуске 0,8–1% мощности УПП, после пуска 300–500 Вт'],
+            ['Условия эксплуатации', '−10…+50 °С, влажность 5–95% без конденсата, высота до 1500 м (выше — со снижением характеристик)'],
+          ])}
+        </table>
+
+        <h3>Габариты и масса</h3>
+        <table>
+          <tr><th>Параметр</th><th>Значение</th></tr>
+          ${rows((dims() ? [['Габариты (Ш×Г×В), мм', dims()]] : []).concat([['Масса', MASS_KG + ' кг']]))}
+        </table>
+        ${noDrawing()
+          ? '<div class="drawing-empty">' + noDrawingMsg() + '</div>'
+          : '<h3>Габаритный эскиз</h3><img class="drawing-img" src="assets/upp/drawing.png" alt="Габаритный эскиз ESQ F HVS">'}
+      `;
+    }
+
+    function toggleTechDesc(e){
+      e.preventDefault();
+      const box = $('techdesc');
+      box.innerHTML = buildTechDescriptionHtml();
+      box.style.display = (box.style.display === 'none' || box.style.display === '') ? 'block' : 'none';
+      if (box.style.display === 'block') box.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
+    async function copyTechDesc(e){
+      e.preventDefault();
+      const box = $('techdesc');
+      const src = (box && box.style.display !== 'none' && box.innerText.trim())
+        ? box : (() => { const t=document.createElement('div'); t.style.position='fixed'; t.style.left='-99999px'; t.innerHTML=buildTechDescriptionHtml(); document.body.appendChild(t); return t; })();
+      const text = src.innerText.replace(/\n{3,}/g, '\n\n').trim();
+      try{ await navigator.clipboard.writeText(text); alert('Описание скопировано в буфер обмена.'); }
+      catch(err){
+        const ta=document.createElement('textarea'); ta.value=text; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); alert('Описание скопировано (fallback).');
       }
-      updateFromPower(); // сразу выставляем ток по первой мощности
+      if (src !== box) document.body.removeChild(src);
     }
 
-    function updateFromPower() {
-      const v = els.voltage.value;
-      const p = Number(els.power.value);
-      const I = data[v][p];
-      els.current.value = I != null ? I : '';
-      render();
-    }
-
-    function buildSku() {
-      const v = els.voltage.value;           // '06' | '10'
-      const I = els.current.value || '000';  // ток
-      const pkg = els.pkg.value;             // 'STD' | 'E' | 'S'
-      const suffix = (pkg === 'E' || pkg === 'S') ? `-${pkg}` : '';
-      return `ESQ-HVS${v}-${I}${suffix}`;
-    }
-
-    function render() {
-      const sku = buildSku();
-
-      const vText = els.voltage.value === '06' ? '6 кВ' : '10 кВ';
-      const pText = els.power.options[els.power.selectedIndex]?.textContent || '';
-      const ipText = els.ip.value;
-      const ctlText = els.ctl.value === 'AC' ? '220В AC' : '220В DC';
-      const cableText = els.cable.value === 'TOP' ? 'Вводы/выводы сверху' : 'Вводы/выводы снизу';
-      const protoMap = {MR:'Modbus RTU', MT:'Modbus TCP', PB:'ProfibusDP', PN:'ProfiNet', CO:'CanOpen', EI:'Ethernet/IP'};
-      const protoText = protoMap[els.proto.value];
-
-      els.result.textContent = `${sku} — ${vText}, ${pText}, ${els.current.value} А, ${ipText}, питание ${ctlText}, ${cableText}, протокол ${protoText}`;
+    /* ===== Конфигурация из разбора ТЗ (параметры в адресе страницы) =====
+       ?from=tz&v=06&kw=630&a=75&pkg=STD&mot=A&ip=IP41&ctl=AC220&cab=D&srv=2&pr=MR&qty=2&tz=...
+       Подбирается наименьшая модель, у которой мощность ≥ kw и ток ≥ a. */
+    function applyUrlParams(){
+      let q; try { q = new URLSearchParams(location.search); } catch(e){ return; }
+      if (q.get('from') !== 'tz') return;
+      const set = (id, v) => { const el = $(id); if (!el || v == null || v === '') return false;
+        if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === v)) return false; el.value = v; return true; };
+      const notes = [];
+      if (set('voltage', q.get('v'))) updatePowerOptions();
+      const kw = Number(q.get('kw')) || 0, a = Number(q.get('a')) || 0;
+      const fit = MODELS[val('voltage')].find(([I, P]) => P >= kw && I >= a);
+      if (fit) set('power', String(fit[0]));
+      else if (kw || a) notes.push('нет модели под ' + (kw ? kw + ' кВт' : '') + (a ? ' / ' + a + ' А' : '') + ' — выбрана вручную');
+      [['pkg','package'],['mot','motor'],['ip','ip'],['ctl','ctl'],['cab','cable'],['srv','service'],['pr','protocol']].forEach(([k, id]) => {
+        if (q.get(k) && !set(id, q.get(k))) notes.push(k + '=' + q.get(k) + ' недоступно');
+      });
+      if (q.get('qty')) $('tkpQty').value = q.get('qty');
+      update();
+      const box = document.createElement('div');
+      box.className = 'tz-banner';
+      box.innerHTML = '<b>Конфигурация из разбора ТЗ</b>' + (q.get('tz') ? ': ' + esc(q.get('tz')) : '') +
+        '<br><span>Проверьте параметры перед скачиванием ТКП.' + (notes.length ? ' Внимание: ' + esc(notes.join('; ')) + '.' : '') + '</span>';
+      const host = document.querySelector('.configurator');
+      host.insertBefore(box, host.querySelector('.param'));
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      // Значения по умолчанию
-      els.voltage.value = '06';
-      els.ip.value = 'IP41';
-      els.pkg.value = 'STD';
-      els.ctl.value = 'AC';
-      els.cable.value = 'BOT';   // по умолчанию "Снизу"
-      els.proto.value = 'MR';
-
-      // Инициализация
       updatePowerOptions();
-
-      // Обработчики: важно — для мощности вызываем updateFromPower()
-      els.voltage.addEventListener('change', updatePowerOptions);
-      els.power.addEventListener('change', updateFromPower);
-      [els.ip, els.pkg, els.ctl, els.cable, els.proto].forEach(el => {
-        el.addEventListener('change', render);
-      });
+      $('power').value = '75'; update();          // по умолчанию — модель образца ТКП
+      applyUrlParams();
+      document.querySelectorAll('select').forEach(el => el.addEventListener('change', el.id === 'voltage' ? updatePowerOptions : update));
     });
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="tkp_upp.js"></script>
 </body>
 </html>

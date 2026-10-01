@@ -6,11 +6,17 @@
   // ===== НАСТРОЙКИ =====
   const FUNCTION_URL = window.TZ_FUNCTION_URL || 'https://functions.yandexcloud.net/d4eplvhu1pvut5be24vd';   // адрес облачной функции, https://functions.yandexcloud.net/…
   const PDFJS_BASE = new URL(window.PDFJS_BASE || 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/legacy/build/', document.baseURI).href;
-  const CONFIGURATOR = 'configurator_vv_pch.html';
+  // Продукт: ВВ ПЧ ESQ F ME800 (по умолчанию) или ВВ УПП ESQ F HVS (tz.html?p=upp)
+  const PRODUCT = (() => { try { return new URLSearchParams(location.search).get('p') === 'upp' ? 'upp' : 'pch'; } catch (e) { return 'pch'; } })();
+  const UPP = PRODUCT === 'upp';
+  const CONFIGURATOR = UPP ? 'vv_upp.html' : 'configurator_vv_pch.html';
+  const PROD = UPP
+    ? { model: 'ESQ F HVS', short: 'УПП', equipment: 'Высоковольтное устройство плавного пуска', pick: 'Исходные данные и подбор УПП' }
+    : { model: 'ESQ F ME800', short: 'ПЧ', equipment: 'Высоковольтный преобразователь частоты', pick: 'Исходные данные и подбор ПЧ' };
   const OCR_MAX_SIDE = 2000;         // px по длинной стороне страницы для распознавания
   const OCR_PARALLEL = 3;
 
-  const ST = { OK: 'Соответствует', OPT: 'Соответствует (опция)', DEV: 'Отклонение', CHECK: 'Проверить', CTR: 'Договорное', NA: 'Не относится к ПЧ' };
+  const ST = { OK: 'Соответствует', OPT: 'Соответствует (опция)', DEV: 'Отклонение', CHECK: 'Проверить', CTR: 'Договорное', NA: 'Не относится к ' + (UPP ? 'УПП' : 'ПЧ') };
   const ST_ORDER = ['DEV', 'CHECK', 'OPT', 'OK', 'CTR', 'NA'];
   const SEV = { OK: 0, OPT: 1, CHECK: 2, DEV: 3 };
 
@@ -20,13 +26,18 @@
 
   const state = { files: [], ocrPages: 0, result: null, rows: [], filter: null, sku: '', model: '', usage: null };
 
+  // подписи страницы под выбранный продукт
+  $('subModel').textContent = PROD.model; $('pickTitle').textContent = PROD.pick; $('backLink').href = CONFIGURATOR;
+  document.title = 'Разбор ТЗ — ' + PROD.model;
+  document.querySelectorAll('#prodSwitch [data-p]').forEach(a => a.classList.toggle('on', a.dataset.p === PRODUCT));
+
   // ===== СВЯЗЬ С ФУНКЦИЕЙ =====
   async function api(action, payload) {
     if (!FUNCTION_URL) throw new Error('Адрес облачной функции ещё не задан в tz.js (FUNCTION_URL)');
     const r = await fetch(FUNCTION_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },   // простой запрос — без preflight
-      body: JSON.stringify(Object.assign({ password: $('pw').value || store.get('tzpw') || '', action }, payload || {})),
+      body: JSON.stringify(Object.assign({ password: $('pw').value || store.get('tzpw') || '', action, product: PRODUCT }, payload || {})),
     });
     const raw = await r.text(); let j = null; try { j = JSON.parse(raw); } catch (e) {}
     if (!r.ok || !j || !j.ok) {
@@ -35,6 +46,8 @@
         : r.status === 502 ? ' — функция упала при запуске: проверьте точку входа index.handler и что в архиве есть index.js и prompt.js' : '';
       throw new Error('Ошибка функции: HTTP ' + r.status + hint + (raw ? ' [' + raw.slice(0, 200) + ']' : ''));
     }
+    // функция без поддержки УПП разобрала бы ТЗ по правилам ПЧ — такой результат не принимаем
+    if (UPP && action === 'extract' && j.product !== 'upp') throw new Error('Облачная функция ещё не обновлена для разбора ТЗ на УПП — загрузите в неё новую версию (index.js + prompt_upp.js)');
     return j;
   }
 
@@ -391,7 +404,7 @@
   const str = v => v == null ? '' : String(v);
 
   // ===== ИСХОДНЫЕ ДАННЫЕ =====
-  const P = [
+  const P_PCH = [
     ['voltage_kv', 'Напряжение, кВ', [['', '—'], ['6', '6'], ['10', '10']]],
     ['motor_power_kw', 'Мощность ЭД, кВт'], ['motor_current_a', 'Ток ЭД, А'],
     ['vfd_power_kw', 'Мощность ПЧ по ТЗ, кВт'], ['vfd_current_a', 'Ток ПЧ по ТЗ, А'], ['vfd_kva', 'Полная мощность ПЧ по ТЗ, кВА'],
@@ -410,6 +423,20 @@
     ['sync_transfer', 'Синхронный перевод на сеть', [['', '—'], ['false', 'Нет'], ['true', 'Да']]],
     ['di_do_needed', 'Нужно DI/DO, шт'],
   ];
+  const P_UPP = [
+    ['voltage_kv', 'Напряжение, кВ', [['', '—'], ['6', '6'], ['10', '10']]],
+    ['motor_power_kw', 'Мощность ЭД, кВт'], ['motor_current_a', 'Ток ЭД, А'], ['starter_current_a', 'Ток УПП по ТЗ, А'],
+    ['quantity', 'Количество, шт'],
+    ['motor_type', 'Тип ЭД', [['', '—'], ['A', 'Асинхронный'], ['S', 'Синхронный']]],
+    ['package', 'Комплектация', [['', '—'], ['STD', 'Стандартная'], ['E', 'С вакуумным выключателем'], ['S', 'С выкатными тиристорными блоками'], ['IK', 'С вводным разъединителем']]],
+    ['ip_required', 'Требуемая IP (число)'],
+    ['control_power', 'Питание цепей управления', [['', '—'], ['AC220', '~220 В AC'], ['DC220', '=220 В DC'], ['AC110', '~110 В AC'], ['DC110', '=110 В DC']]],
+    ['cable_entry', 'Ввод кабелей', [['', '—'], ['D', 'Снизу'], ['T', 'Сверху']]],
+    ['service', 'Обслуживание', [['', '—'], ['2', 'Двухстороннее'], ['1', 'Одностороннее']]],
+    ['protocol', 'Протокол', [['', '—'], ['MR', 'Modbus RTU'], ['MT', 'Modbus TCP'], ['PB', 'ProfibusDP'], ['PN', 'ProfiNet'], ['CO', 'CanOpen'], ['EI', 'Ethernet/IP']]],
+    ['starts_per_hour', 'Пусков в час по ТЗ'],
+  ];
+  const P = UPP ? P_UPP : P_PCH;
   function renderParams() {
     const p = state.params;
     $('paramGrid').innerHTML = P.map(([k, label, opts]) => {
@@ -428,7 +455,26 @@
     n.classList.toggle('hidden', !notes); n.textContent = notes ? 'Заметки: ' + notes : '';
   }
 
-  function configParams() {
+  function configParams() { return UPP ? configParamsUpp() : configParamsPch(); }
+  function configParamsUpp() {
+    const p = state.params, q = new URLSearchParams();
+    const v = Number(p.voltage_kv) >= 8 ? 10 : 6;
+    const kw = Number(p.motor_power_kw) || 0;
+    const a = Math.max(Number(p.motor_current_a) || 0, Number(p.starter_current_a) || 0);
+    q.set('from', 'tz'); q.set('v', v === 10 ? '10' : '06');
+    if (kw) q.set('kw', String(kw)); if (a) q.set('a', String(a));
+    q.set('pkg', p.package || 'STD');
+    q.set('mot', p.motor_type || 'A');
+    q.set('ip', Number(p.ip_required) > 41 ? 'IP54' : 'IP41');
+    q.set('ctl', p.control_power || 'AC220');
+    q.set('cab', p.cable_entry || 'D');
+    q.set('srv', p.service || '2');
+    q.set('pr', p.protocol || 'MR');
+    if (p.quantity) q.set('qty', String(p.quantity));
+    const t = $('docTitle').value.trim(); if (t) q.set('tz', t.slice(0, 120));
+    return { q, v, kw };
+  }
+  function configParamsPch() {
     const p = state.params, q = new URLSearchParams();
     const v = Number(p.voltage_kv) >= 8 ? 10 : 6;
     let kw = Math.max(Number(p.motor_power_kw) || 0, Number(p.vfd_power_kw) || 0);
@@ -467,9 +513,11 @@
     $('sku').textContent = 'подбор…';
     fr.onload = () => {
       try { const d = fr.contentDocument; const sku = d.getElementById('result').textContent.trim(); state.sku = sku; $('sku').textContent = sku;
-        const cap = d.getElementById('capacitorType').value; state.cap = cap; runChecks(); renderRows();
-        const big = fr.contentWindow.isFilmBig && fr.contentWindow.isFilmBig();
-        const note = 'Плёночный ПЧ этой мощности: габаритный чертёж в ТКП не вставляется — приложите его отдельно.';
+        const capEl = d.getElementById('capacitorType'); if (capEl) state.cap = capEl.value; runChecks(); renderRows();
+        const w = fr.contentWindow;
+        const big = UPP ? !!(w.isDrawingMissing && w.isDrawingMissing()) : !!(w.isFilmBig && w.isFilmBig());
+        const note = UPP ? 'Для этой модели УПП габаритный эскиз в ТКП не вставляется — приложите его отдельно.'
+          : 'Плёночный ПЧ этой мощности: габаритный чертёж в ТКП не вставляется — приложите его отдельно.';
         $('skuMsg').textContent = $('skuMsg').textContent.replace(note, '').trim() + (big ? (' ' + note) : ''); }
       catch (e) { $('sku').textContent = 'маркировку покажет конфигуратор'; }
     };
@@ -477,7 +525,42 @@
   }
 
   // ===== ПЕРЕПРОВЕРКА ЧИСЕЛ ПО ПРАВИЛАМ (код главнее модели, но не главнее человека) =====
-  function codeVerdict(key, val, ctx) {
+  function codeVerdict(key, val, ctx) { return UPP ? codeVerdictUpp(key, val, ctx) : codeVerdictPch(key, val, ctx); }
+  // УПП ESQ F HVS: пределы по техописанию, РЭ и шаблону ТКП
+  function codeVerdictUpp(key, val, ctx) {
+    const x = Number(String(val).replace(',', '.').replace('−', '-'));
+    if (!isFinite(x)) return null;
+    switch (key) {
+      case 'ip': return x > 54 ? ['DEV', 'IP41 стандартно, IP54 — опция'] : x > 41 ? ['OPT', 'IP54 — опция'] : ['OK'];
+      case 'starts_per_hour': return x > ctx.startsH ? ['DEV', 'до ' + ctx.startsH + ' пусков в час с перерывом 10 мин'] : ['OK'];
+      case 'ambient_min_c': return x < -10 ? ['DEV', 'эксплуатация от −10 °С'] : ['OK'];
+      case 'ambient_max_c': return x > 50 ? ['DEV', 'эксплуатация до +50 °С'] : ['OK'];
+      case 'storage_min_c': return x < -45 ? ['DEV', 'хранение от −45 °С'] : x < -20 ? ['CHECK', 'хранение: в ТКП −20 °С (стр. 6) и −45 °С (стр. 10)'] : ['OK'];
+      case 'storage_max_c': return x > 50 ? ['DEV', 'хранение до +50 °С'] : ['OK'];
+      case 'humidity_pct': return x > 95 ? ['DEV', 'влажность до 95% без конденсата'] : ['OK'];
+      case 'altitude_m': return x > 1500 ? ['DEV', 'высота до 1500 м'] : ['OK'];
+      case 'vibration_g': return x > 0.6 ? ['DEV', 'вибрация менее 0,6g'] : ['OK'];
+      case 'voltage_tol_pct': return Math.abs(x) > 15 ? ['DEV', 'напряжение сети ±15%'] : ['OK'];
+      case 'freq_hz': return x !== 50 && x !== 60 ? ['DEV', 'частота сети 50/60 Гц'] : ['OK'];
+      case 'current_limit_pct': return x < 100 || x > 500 ? ['DEV', 'ограничение тока 100–500% Iе'] : ['OK'];
+      case 'start_time_s': return x > 120 ? ['DEV', 'время пуска до 120 с'] : ['OK'];
+      case 'ramp_time_s': return x > 60 ? ['DEV', 'время нарастания до 60 с'] : ['OK'];
+      case 'soft_stop_s': return x > 60 ? ['DEV', 'плавный останов до 60 с'] : ['OK'];
+      case 'kick_time_s': return x > 5 ? ['DEV', 'толчковый пуск до 5 с'] : ['OK'];
+      case 'di_needed': return x > 4 ? ['CHECK', 'входы: пуск, стоп, аварийный стоп, сигнал ячейки'] : ['OK'];
+      case 'do_needed': return x > 3 ? ['DEV', '3 релейных выхода'] : ['OK'];
+      case 'ao_needed': return x > 1 ? ['DEV', '1 аналоговый выход 4–20 мА'] : ['OK'];
+      case 'error_log': return x > 1000 ? ['DEV', 'журнал до 1000 аварий'] : ['OK'];
+      case 'network_nodes': return x > 32 ? ['DEV', 'до 32 устройств в сети'] : ['OK'];
+      case 'control_voltage_v': return x < 187 || x > 253 ? ['CHECK', 'стандартно ~220 В ±15%, другое — по согласованию с заводом'] : ['OK'];
+      case 'freq_tol_hz': return x > 2 ? ['DEV', 'частота сети ±2 Гц'] : ['OK'];
+      case 'overcurrent_pct': return x < 100 || x > 500 ? ['DEV', 'токовая защита 100–500% Iе'] : ['OK'];
+      case 'warranty_months_commissioning': return x > 24 ? ['CHECK', 'гарантия стандартно 24 мес. с ввода'] : ['OK'];
+      case 'warranty_months_delivery': return x > 36 ? ['CHECK', 'гарантия стандартно 36 мес. с продажи'] : ['OK'];
+      default: return null;
+    }
+  }
+  function codeVerdictPch(key, val, ctx) {
     const x = Number(String(val).replace(',', '.').replace('−', '-'));
     if (!isFinite(x)) return null;
     const pct = x <= 1 ? x * 100 : x;
@@ -513,7 +596,7 @@
   function runChecks() {
     const v = Number(state.params && state.params.voltage_kv) >= 8 ? 10 : 6;
     const kw = Math.max(Number(state.params && state.params.motor_power_kw) || 0, Number(state.params && state.params.vfd_power_kw) || 0);
-    const ctx = { cap: state.cap || (state.params && state.params.capacitors) || 'PF' };
+    const ctx = { cap: state.cap || (state.params && state.params.capacitors) || 'PF', startsH: kw > (v === 10 ? 4000 : 2500) ? 3 : 6 };
     for (const r of state.rows) {
       if (r.userSet) continue;
       r.status = r.modelStatus; r.auto = '';
@@ -593,7 +676,7 @@
     children.push(para(isDev ? 'ЛИСТ НЕСООТВЕТСТВИЙ' : 'ЛИСТ СООТВЕТСТВИЯ ТРЕБОВАНИЯМ ТЗ', { alignment: AlignmentType.CENTER, spacing: { after: 60 } }, { bold: true, size: 28 }));
     if (m.title) children.push(para((isDev ? 'к техническому заданию: ' : '') + m.title, { alignment: AlignmentType.CENTER, spacing: { after: 200 } }, { size: 20 }));
     const info = [['Заказчик', m.customer], ['Объект', m.object],
-      ['Оборудование', 'Высоковольтный преобразователь частоты ' + (m.sku || 'ESQ F ME800') + ', ' + m.qty + ' шт.'],
+      ['Оборудование', PROD.equipment + ' ' + (m.sku || PROD.model) + ', ' + m.qty + ' шт.'],
       ['Поставщик', 'ООО «Элком»']];
     info.filter(x => x[1]).forEach(([k, v]) => children.push(para([run(k + ': ', { bold: true }), run(v)])));
 
@@ -618,7 +701,7 @@
       }
       children.push(para('Остальные требования технического задания выполняются. Договорные условия (документация, услуги, ЗИП, испытания, сроки, гарантия) — согласно ТКП и договору поставки.', { spacing: { before: 240 } }));
     } else {
-      const c6 = [['№', 600], ['Пункт ТЗ', 1200], ['Требование ТЗ', 4600], ['Предложение ESQ F ME800', 3800], ['Статус', 1500], ['Примечание', 2870]];
+      const c6 = [['№', 600], ['Пункт ТЗ', 1200], ['Требование ТЗ', 4600], ['Предложение ' + PROD.model, 3800], ['Статус', 1500], ['Примечание', 2870]];
       const all = state.rows.filter(r => r.requirement || r.proposal);
       const fill = { OK: 'E2F0D9', OPT: 'DDEBF7', DEV: 'F8CBAD', CHECK: 'FFF2CC', CTR: 'EDEDED', NA: 'F7F7F7' };
       children.push(new Table({
@@ -660,7 +743,7 @@
   // ===== СОХРАНЕНИЕ / ЗАГРУЗКА РАЗБОРА =====
   $('btnSave').onclick = () => {
     const data = {
-      _format: 'esq-tz-1', _saved: new Date().toISOString(), _model: state.model,
+      _format: 'esq-tz-1', _product: PRODUCT, _saved: new Date().toISOString(), _model: state.model,
       document: { title: $('docTitle').value, customer: $('docCustomer').value, object: $('docObject').value },
       params: state.params, params_src: state.paramsSrc,
       requirements: state.rows.map(r => ({ clause: r.clause, requirement: r.requirement, proposal: r.proposal, status: r.status, modelStatus: r.modelStatus, rule: r.rule, comment: r.comment, client_note: r.client, check: r.check, userSet: r.userSet })),
@@ -673,6 +756,7 @@
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     try {
       const d = JSON.parse(await f.text());
+      if ((d._product || 'pch') !== PRODUCT) throw new Error('это разбор ТЗ на ' + ((d._product || 'pch') === 'upp' ? 'УПП' : 'ПЧ') + ' — откройте его на соответствующей вкладке вверху страницы');
       if (d._text) { $('tzText').value = d._text; $('textBox').classList.remove('hidden'); updateTextStat(); updateAnalyzeBtn(); }
       loadResult(d);
     } catch (err) { $('readMsg').className = 'msg err'; $('readMsg').textContent = 'Не удалось открыть разбор: ' + err.message; }
