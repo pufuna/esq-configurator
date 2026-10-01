@@ -430,12 +430,10 @@
     };
 
     /* ===== Плёночные конденсаторы ===== */
-    function isFilmAllowed(voltage, power){
-      const p = Number(power);
-      if (voltage==='T060') return p <= 710;
-      if (voltage==='T100') return p <= 1250;
-      return false;
-    }
+    function isFilmAllowed(voltage, power){ return true; }   // плёночные — на любой мощности
+    // компактный шкаф G4 (1800×1425×2431, свой чертёж PFN) есть только для мощностей из таблицы PFN;
+    // на остальных мощностях плёночный ПЧ — в обычных шкафах (габариты и чертёж — как у стандартных моделей)
+    function isPFNCabinet(voltage, power){ return !!(mechanicalPFN[voltage] && mechanicalPFN[voltage].weights[String(power)]); }
 
     /* ===== UI ===== */
     function updatePowerOptions(){
@@ -474,7 +472,7 @@
       const data = modelData[v][p];
       const cap = document.getElementById('capacitorType').value;
       const cell = document.getElementById('cellSize');
-      if (cap==='PF' && isFilmAllowed(v,p)) cell.value='PF';
+      if (cap==='PF') cell.value='PF';
       else cell.value=data.size;
     }
 
@@ -621,7 +619,7 @@
     function getMechanicalFor(v, p){
       // PF: использовать PFN-таблицу — но показываем размеры/массу только когда байпаса нет
       const isPF = document.getElementById('capacitorType').value === 'PF';
-      if (isPF) {
+      if (isPF && isPFNCabinet(v, p)) {
         const tab = mechanicalPFN[v];
         return { size: tab?.size || '—', weight: tab?.weights?.[p] || '—' };
       }
@@ -748,8 +746,8 @@
       const current = Number(document.getElementById('current').value || 0);
       const cap = document.getElementById('capacitorType').value;
 
-      // Если плёночные — ВСЕГДА использовать PFN чертёж, независимо от байпаса
-      if (cap === 'PF') {
+      // Плёночные в компактном шкафу G4 — чертёж PFN, независимо от байпаса
+      if (cap === 'PF' && isPFNCabinet(v, p)) {
         const pfUrl6 = 'assets/drawings1/PFN 6 kV.png';
         const pfUrl10 = 'assets/drawings1/PFN 10 kV.png';
         return [ encodeURI(v==='T060' ? pfUrl6 : pfUrl10) ];
@@ -885,8 +883,7 @@
       else if (kw || a) notes.push('нет модели под ' + (kw ? kw + ' кВт' : '') + (a ? ' / ' + a + ' А' : '') + ' — выбрана вручную');
       const cap = document.getElementById('capacitorType'), p = document.getElementById('power').value;
       const want = q.get('cap') || 'auto';
-      cap.value = (want === 'EL' || !isFilmAllowed(v, p)) ? 'EL' : 'PF';
-      if (want === 'PF' && cap.value !== 'PF') notes.push('плёночные недоступны для этой мощности — выбраны электролитические');
+      cap.value = want === 'EL' ? 'EL' : 'PF';
       onCapacitorTypeChange();
       if (q.get('puls') && !set('pulsation', q.get('puls'))) notes.push('пульсность ' + q.get('puls') + ' недоступна');
       [['mat','material'],['byp','bypass'],['react','reactor'],['ip','ip'],['exp','expansion'],['ups','ups'],['cab','cable'],

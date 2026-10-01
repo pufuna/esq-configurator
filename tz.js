@@ -384,7 +384,6 @@
       modelStatus: ST[r.modelStatus] ? r.modelStatus : ST[r.status] ? r.status : 'CHECK', status: ST[r.status] ? r.status : 'CHECK', check: Array.isArray(r.check) ? r.check : [], userSet: !!r.userSet, auto: '',
     }));
     $('extraPos').value = (d.extra_positions || []).join('\n');
-    if (d._ui) { if (d._ui.author) $('author').value = d._ui.author; }
     ['secResult', 'secReq', 'secOut'].forEach(id => $(id).classList.remove('hidden'));
     renderParams(); runChecks(); renderRows(); updateConfig();
     $('secResult').scrollIntoView({ behavior: 'smooth' });
@@ -398,7 +397,7 @@
     ['vfd_power_kw', 'Мощность ПЧ по ТЗ, кВт'], ['vfd_current_a', 'Ток ПЧ по ТЗ, А'], ['vfd_kva', 'Полная мощность ПЧ по ТЗ, кВА'],
     ['quantity', 'Количество, шт'],
     ['motor_type', 'Тип ЭД', [['', '—'], ['A', 'Асинхронный'], ['S', 'Синхронный']]],
-    ['capacitors', 'Конденсаторы', [['', 'Авто (плёнка, если возможно)'], ['PF', 'Плёночные'], ['EL', 'Электролитические']]],
+    ['capacitors', 'Конденсаторы', [['', 'Авто (плёночные)'], ['PF', 'Плёночные'], ['EL', 'Электролитические']]],
     ['winding', 'Обмотки трансформатора', [['', '—'], ['AL', 'Алюминий'], ['CU', 'Медь']]],
     ['cells_per_phase', 'Ячеек на фазу', [['', 'По умолчанию (6 кВ — 5, 10 кВ — 8)'], ['5', '5'], ['6', '6'], ['8', '8'], ['9', '9']]],
     ['bypass', 'Шкаф байпаса', [['', '—'], ['X', 'Нет'], ['A', 'Автоматический'], ['M', 'Ручной']]],
@@ -429,7 +428,6 @@
     n.classList.toggle('hidden', !notes); n.textContent = notes ? 'Заметки: ' + notes : '';
   }
 
-  function filmAllowed(v, kw) { return v === 10 ? kw <= 1250 : kw <= 710; }
   function configParams() {
     const p = state.params, q = new URLSearchParams();
     const v = Number(p.voltage_kv) >= 8 ? 10 : 6;
@@ -512,7 +510,7 @@
   function runChecks() {
     const v = Number(state.params && state.params.voltage_kv) >= 8 ? 10 : 6;
     const kw = Math.max(Number(state.params && state.params.motor_power_kw) || 0, Number(state.params && state.params.vfd_power_kw) || 0);
-    const ctx = { cap: state.cap || (state.params && state.params.capacitors) || (filmAllowed(v, kw) ? 'PF' : 'EL') };
+    const ctx = { cap: state.cap || (state.params && state.params.capacitors) || 'PF' };
     for (const r of state.rows) {
       if (r.userSet) continue;
       r.status = r.modelStatus; r.auto = '';
@@ -559,7 +557,7 @@
     const { q } = configParams();
     return {
       title: $('docTitle').value.trim(), customer: $('docCustomer').value.trim(), object: $('docObject').value.trim(),
-      sku: state.sku, qty: q.get('qty') || '1', author: $('author').value.trim(),
+      sku: state.sku, qty: q.get('qty') || '1',
       extras: $('extraPos').value.split('\n').map(s => s.trim()).filter(Boolean),
     };
   }
@@ -629,8 +627,6 @@
       }));
       if (m.extras.length) { children.push(para('Отдельные позиции ТКП:', { spacing: { before: 200 } }, { bold: true })); m.extras.forEach(e => children.push(para('• ' + e))); }
     }
-    children.push(para([run('Составил: ', { bold: true }), run((m.author || '____________________') + '          Дата: ' + dateRu())], { spacing: { before: 360 } }));
-    children.push(para('Подпись: ____________________'));
 
     const doc = new Document({
       creator: 'ООО «Элком»', title: isDev ? 'Лист несоответствий' : 'Лист соответствия',
@@ -666,7 +662,7 @@
       params: state.params, params_src: state.paramsSrc,
       requirements: state.rows.map(r => ({ clause: r.clause, requirement: r.requirement, proposal: r.proposal, status: r.status, modelStatus: r.modelStatus, rule: r.rule, comment: r.comment, client_note: r.client, check: r.check, userSet: r.userSet })),
       extra_positions: $('extraPos').value.split('\n').map(s => s.trim()).filter(Boolean),
-      _ui: { author: $('author').value }, _text: $('tzText').value,
+      _text: $('tzText').value,
     };
     download(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), 'Разбор — ' + baseName() + '.json');
   };

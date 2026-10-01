@@ -74,6 +74,7 @@
     s.kv = KV[s.v];
     s.mark = $('result').textContent;                                     // полная маркировка из конфигуратора
     s.m = /^ESQ F ME800-(\d{4,5})P(\d{3})[AА](T\d{3})(AL|CU)(\d{2})([SX])([AMX])([RX])(\d{2})(2E|E|X)([UX])([DT])(MR|MT|PB|PN|CO|EI)([AS])([XB])-(P[A-F])([BN])$/.exec(s.mark);
+    s.g4 = s.film && (!window.isPFNCabinet || window.isPFNCabinet(s.v, s.P));   // компактный шкаф G4 — в шаблоне уже его чертёж
     s.eff = s.film ? 97 : 96;
     s.life = s.film ? '200 000' : '100 000';                              // ресурс конденсаторов, ч
     s.sec = s.film ? 710 : 690;                                           // вторичная обмотка, В
@@ -185,7 +186,7 @@
       const F = makeFonts(GL, await doc.embedFont(StandardFonts.Helvetica));
       const pg = doc.getPages();
       const M = prepareMasks(doc, pg);
-      if (!s.film) OLD_DRAWING_ZONES.forEach(z => M.add(10, ...z));   // для электролитов старого чертежа на стр. 10 нет совсем
+      if (!s.g4) OLD_DRAWING_ZONES.forEach(z => M.add(10, ...z));   // кроме шкафа G4 старого чертежа на стр. 10 нет совсем
 
       /* ---------- помощники ---------- */
       const rot = p => p.getRotation().angle;
@@ -284,7 +285,7 @@
       edit('p10_w1', kg, { size: 8.8, skew: .27 });
       edit('p10_w2', kg, { size: 8.8, skew: .27 });
       stamp('p10_stamp', true);
-      if (!s.film) await drawDrawing(doc, pg[10]);    // для плёнки остаётся чертёж шаблона: 1800×1425×2431 общий для 6 и 10 кВ
+      if (!s.g4) await drawDrawing(doc, pg[10]);    // для шкафа G4 остаётся чертёж шаблона: 1800×1425×2431 общий для 6 и 10 кВ
 
       /* ---------- стр. 13 ---------- */
       edit('p13_name', s.mark, { cx: 406, maxW: 296 });
