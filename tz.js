@@ -134,8 +134,10 @@
     for (let i = 1; i <= n; i++) {
       const page = await pdf.getPage(i);
       const tc = await page.getTextContent();
+      let marks = new Map();
+      try { marks = await findCheckboxes(pdfjs, page, tc.items); } catch (e) { console.warn('checkboxes', e); }
       let s = '';
-      for (const it of tc.items) { if (it.str !== undefined) { s += it.str; s += it.hasEOL ? '\n' : (it.str && !/\s$/.test(it.str) ? ' ' : ''); } }
+      tc.items.forEach((it, k) => { if (it.str !== undefined) { if (marks.has(k)) s += marks.get(k); s += it.str; s += it.hasEOL ? '\n' : (it.str && !/\s$/.test(it.str) ? ' ' : ''); } });
       s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
       if (s.replace(/\s/g, '').length < 30) scans.push(i); else out[i - 1] = s;
       onPage(i, n, false);
@@ -157,6 +159,68 @@
     };
     if (scans.length) await Promise.all(Array.from({ length: Math.min(OCR_PARALLEL, scans.length) }, work));
     return out.map((t, i) => '[стр. ' + (i + 1) + ']\n' + t).join('\n\n');
+  }
+
+  // --- Галочки в PDF-формах: маленькие квадратные картинки (Word рисует флажки картинками).
+  // Отмеченный флажок темнее пустого. Значок ☑/☐ ставим перед ближайшей подписью справа (или ниже).
+  async function findCheckboxes(pdfjs, page, items) {
+    const ops = await page.getOperatorList(), O = pdfjs.OPS;
+    const mul = (m, n) => [m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1], m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3], m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5]];
+    let ctm = [1, 0, 0, 1, 0, 0]; const stack = [], boxes = [];
+    for (let k = 0; k < ops.fnArray.length; k++) {
+      const fn = ops.fnArray[k], args = ops.argsArray[k];
+      if (fn === O.save) stack.push(ctm);
+      else if (fn === O.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.transform) ctm = mul(ctm, args);
+      else if (fn === O.paintFormXObjectBegin && args && args[0]) { stack.push(ctm); ctm = mul(ctm, args[0]); }
+      else if (fn === O.paintFormXObjectEnd) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.paintImageXObject || fn === O.paintInlineImageXObject) {
+        const w = Math.abs(ctm[0]) || Math.hypot(ctm[0], ctm[1]), h = Math.abs(ctm[3]) || Math.hypot(ctm[2], ctm[3]);
+        if (w < 4 || w > 22 || h < 4 || h > 22 || Math.abs(w - h) > 3) continue;   // флажок — квадратик 4–22 pt
+        boxes.push({ x: ctm[4], y: ctm[5], w, h, id: fn === O.paintImageXObject ? args[0] : null, inline: fn === O.paintInlineImageXObject ? args[0] : null });
+      }
+    }
+    if (boxes.length < 2) return new Map();
+    const getObj = id => new Promise(res => { const store = String(id).startsWith('g_') ? page.commonObjs : page.objs;
+      try { store.get(id, res); } catch (e) { res(null); } setTimeout(() => res(null), 3000); });
+    for (const b of boxes) {
+      const img = b.inline || (b.id ? await getObj(b.id) : null);
+      b.dark = img ? darkness(img) : null;
+    }
+    const vals = boxes.map(b => b.dark).filter(v => v != null);
+    if (vals.length < 2) return new Map();
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi - lo < 0.02) return new Map();             // все одинаковые — это не флажки
+    const thr = lo + (hi - lo) / 2;
+    const T = items.map((it, k) => ({ k, x: it.transform[4], y: it.transform[5], s: it.str || '' })).filter(t => t.s.trim());
+    const marks = new Map();
+    for (const b of boxes) {
+      if (b.dark == null) continue;
+      const cy = b.y + b.h / 2, right = b.x + b.w;
+      let best = null, bd = 1e9;
+      for (const t of T) {   // справа на той же строке
+        if (Math.abs(t.y + 3 - cy) > b.h * 0.9 || t.x < right - 2 || t.x - right > 160 || marks.has(t.k)) continue;
+        const d = t.x - right; if (d < bd) { bd = d; best = t; }
+      }
+      if (!best) for (const t of T) {   // или под флажком
+        const dy = b.y - t.y; if (dy < 0 || dy > 30 || Math.abs(t.x - b.x) > 120 || marks.has(t.k)) continue;
+        const d = dy * 3 + Math.abs(t.x - b.x); if (d < bd) { bd = d; best = t; }
+      }
+      if (best) marks.set(best.k, b.dark > thr ? '☑ ' : '☐ ');
+    }
+    return marks;
+  }
+  function darkness(img) {
+    const w = img.width, h = img.height; if (!w || !h) return null;
+    let data = null, ch = 4;
+    if (img.bitmap) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+      x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(img.bitmap, 0, 0); data = x.getImageData(0, 0, w, h).data; }
+    else if (img.data) { data = img.data; ch = img.kind === 2 ? 3 : img.kind === 1 ? 0 : 4; }
+    if (!data) return null;
+    if (ch === 0) { let ones = 0, tot = 0; for (const byte of data) for (let b = 0; b < 8; b++) { tot++; if (!((byte >> b) & 1)) ones++; } return ones / tot; }
+    let sum = 0, n = 0;
+    for (let i = 0; i + 2 < data.length; i += ch) { const a = ch === 4 ? data[i + 3] / 255 : 1; sum += (1 - (data[i] + data[i + 1] + data[i + 2]) / 765) * a; n++; }
+    return n ? sum / n : null;
   }
 
   function fileToImage(f) {
@@ -187,6 +251,8 @@
       let s = '';
       (function walk(n) { for (const c of n.childNodes) {
         if (c.localName === 't') s += c.textContent; else if (c.localName === 'tab') s += '\t';
+        else if (c.localName === 'sym') { const ch = (c.getAttribute('w:char') || '').toUpperCase().replace(/^F0/, '');
+          s += ['FE', 'FD', '78', '52', '54'].includes(ch) ? '☑ ' : ['A8', '6F', '71', '72', '30'].includes(ch) ? '☐ ' : ''; }
         else if (c.localName === 'br' || c.localName === 'cr') s += '\n'; else if (c.childNodes && c.childNodes.length) walk(c);
       } })(p);
       return s;
