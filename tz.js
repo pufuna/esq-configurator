@@ -28,8 +28,13 @@
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },   // простой запрос — без preflight
       body: JSON.stringify(Object.assign({ password: $('pw').value || store.get('tzpw') || '', action }, payload || {})),
     });
-    let j = null; try { j = await r.json(); } catch (e) {}
-    if (!r.ok || !j || !j.ok) throw new Error((j && j.error) || ('Ошибка функции: HTTP ' + r.status));
+    const raw = await r.text(); let j = null; try { j = JSON.parse(raw); } catch (e) {}
+    if (!r.ok || !j || !j.ok) {
+      if (j && j.error) throw new Error(j.error);
+      const hint = r.status === 403 ? ' — функция не публичная или не создана её версия (Cloud Functions → Обзор → «Публичная функция»)'
+        : r.status === 502 ? ' — функция упала при запуске: проверьте точку входа index.handler и что в архиве есть index.js и prompt.js' : '';
+      throw new Error('Ошибка функции: HTTP ' + r.status + hint + (raw ? ' [' + raw.slice(0, 200) + ']' : ''));
+    }
     return j;
   }
 
@@ -41,6 +46,14 @@
     catch (e) { m.className = 'msg err'; m.textContent = e.message; }
   };
   $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnLogin').click(); });
+  $('btnDiag').onclick = async () => {
+    const o = $('diagOut'); o.classList.remove('hidden'); o.textContent = 'Проверяю… (до 30 с)';
+    try {
+      const j = await api('diag');
+      o.textContent = 'Каталог: ' + j.folder + '\nКлюч: ' + j.key + '\n\n' +
+        j.results.map(r => (String(r.status) === '200' ? '✅ ' : '❌ ') + r.test + ' → ' + r.status + (String(r.status) === '200' ? '' : '\n   ' + r.answer)).join('\n');
+    } catch (e) { o.textContent = 'Ошибка: ' + e.message; }
+  };
 
   // ===== 2. ФАЙЛЫ =====
   const drop = $('drop');
