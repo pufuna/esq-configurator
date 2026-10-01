@@ -593,7 +593,7 @@
     if (m.title) children.push(para((isDev ? 'к техническому заданию: ' : '') + m.title, { alignment: AlignmentType.CENTER, spacing: { after: 200 } }, { size: 20 }));
     const info = [['Заказчик', m.customer], ['Объект', m.object],
       ['Оборудование', 'Высоковольтный преобразователь частоты ' + (m.sku || 'ESQ F ME800') + ', ' + m.qty + ' шт.'],
-      ['Изготовитель', 'Shanghai Sigriner STEP Electric Co., Ltd (Китай)'], ['Поставщик', 'ООО «Элком»']];
+      ['Поставщик', 'ООО «Элком»']];
     info.filter(x => x[1]).forEach(([k, v]) => children.push(para([run(k + ': ', { bold: true }), run(v)])));
 
     const rowsOf = s => state.rows.filter(r => r.status === s && (r.requirement || r.proposal));
