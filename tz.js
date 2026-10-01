@@ -88,7 +88,8 @@
     if (ext === 'xlsx' || ext === 'xlsm') return 'xlsx';
     if (['jpg', 'jpeg', 'png'].includes(ext)) return 'img';
     if (ext === 'txt') return 'txt';
-    if (['doc', 'xls', 'rtf'].includes(ext)) return 'old';
+    if (ext === 'doc') return 'doc';
+    if (['xls', 'rtf'].includes(ext)) return 'old';
     return 'unknown';
   }
   function renderFiles() {
@@ -114,8 +115,9 @@
         m.innerHTML = '<span class="spin"></span>Читаю ' + esc(f.name) + '…';
         let t = '';
         if (k === 'pdf') t = await readPdf(f, (d, n, ocr) => { progress(d, n); m.innerHTML = '<span class="spin"></span>' + esc(f.name) + ': страница ' + d + ' из ' + n + (ocr ? ' (распознавание скана)' : ''); });
-        else if (k === 'docx') t = await readDocx(f);
+        else if (k === 'docx') t = await readDocx(f, problems, (d, n) => { m.innerHTML = '<span class="spin"></span>' + esc(f.name) + ': распознавание картинки ' + d + ' из ' + n; });
         else if (k === 'xlsx') t = await readXlsx(f);
+        else if (k === 'doc') t = await readDoc(f);
         else if (k === 'img') { t = await ocrImage(await fileToImage(f)); state.ocrPages++; }
         else if (k === 'txt') t = await f.text();
         parts.push('=== Файл: ' + f.name + ' ===\n' + t.trim());
@@ -143,7 +145,7 @@
   async function readPdf(file, onPage) {
     const pdfjs = await loadPdfjs();
     const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
-    const n = pdf.numPages, out = new Array(n), scans = [];
+    const n = pdf.numPages, out = new Array(n), scans = [], mixed = new Set();
     for (let i = 1; i <= n; i++) {
       const page = await pdf.getPage(i);
       const tc = await page.getTextContent();
@@ -152,7 +154,13 @@
       let s = '';
       tc.items.forEach((it, k) => { if (it.str !== undefined) { if (marks.has(k)) s += marks.get(k); s += it.str; s += it.hasEOL ? '\n' : (it.str && !/\s$/.test(it.str) ? ' ' : ''); } });
       s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-      if (s.replace(/\s/g, '').length < 30) scans.push(i); else out[i - 1] = s;
+      if (s.replace(/\s/g, '').length < 30) scans.push(i);
+      else {
+        out[i - 1] = s;
+        // текст есть, но большая часть листа — картинка (скан таблицы под колонтитулом): распознать и её
+        let cover = 0; try { cover = await imageCoverage(pdfjs, page); } catch (e) {}
+        if (cover > 0.15) { scans.push(i); mixed.add(i); }
+      }
       onPage(i, n, false);
     }
     let done = 0;
@@ -165,13 +173,35 @@
         const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
         const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
         await page.render({ canvasContext: ctx, viewport: vp }).promise;
-        out[i - 1] = (await ocrImage(c)).trim() || '[страница ' + i + ': текст не распознан]';
+        const ocr = (await ocrImage(c)).trim();
+        out[i - 1] = mixed.has(i) ? out[i - 1] + '\n[распознано со скана на этой странице]\n' + (ocr || '—')
+          : ocr || '[страница ' + i + ': текст не распознан]';
         state.ocrPages++; done++;
         onPage(done, done + scans.length, true);
       }
     };
     if (scans.length) await Promise.all(Array.from({ length: Math.min(OCR_PARALLEL, scans.length) }, work));
     return out.map((t, i) => '[стр. ' + (i + 1) + ']\n' + t).join('\n\n');
+  }
+
+  // --- Доля листа, занятая самой большой картинкой (0…1)
+  async function imageCoverage(pdfjs, page) {
+    const ops = await page.getOperatorList(), O = pdfjs.OPS, v = page.getViewport({ scale: 1 });
+    const mul = (m, n) => [m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1], m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3], m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5]];
+    let ctm = [1, 0, 0, 1, 0, 0], best = 0; const stack = [];
+    for (let k = 0; k < ops.fnArray.length; k++) {
+      const fn = ops.fnArray[k], args = ops.argsArray[k];
+      if (fn === O.save) stack.push(ctm);
+      else if (fn === O.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.transform) ctm = mul(ctm, args);
+      else if (fn === O.paintFormXObjectBegin && args && args[0]) { stack.push(ctm); ctm = mul(ctm, args[0]); }
+      else if (fn === O.paintFormXObjectEnd) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.paintImageXObject || fn === O.paintInlineImageXObject || fn === O.paintImageXObjectRepeat) {
+        const a = Math.abs(ctm[0] * ctm[3] - ctm[1] * ctm[2]);
+        best = Math.max(best, a / (v.width * v.height));
+      }
+    }
+    return Math.min(1, best);
   }
 
   // --- Галочки в PDF-формах: маленькие квадратные картинки (Word рисует флажки картинками).
@@ -255,7 +285,7 @@
   // --- DOCX: абзацы и таблицы (ячейки через « | »)
   const xml = s => new DOMParser().parseFromString(s, 'application/xml');
   const kids = (n, name) => Array.from(n.childNodes).filter(c => c.localName === name);
-  async function readDocx(f) {
+  async function readDocx(f, problems, onImg) {
     const zip = await JSZip.loadAsync(await f.arrayBuffer());
     const doc = xml(await zip.file('word/document.xml').async('string'));
     const body = doc.getElementsByTagNameNS('*', 'body')[0];
@@ -280,7 +310,84 @@
       }
     }
     blockWalk(body, lines);
+    // картинки внутри документа (сканы таблиц, вставленные листы): PNG/JPEG — на распознавание
+    const media = Object.values(zip.files).filter(z => /^word\/media\//.test(z.name) && !z.dir);
+    const raster = [], vector = [];
+    for (const z of media) {
+      const ext = z.name.split('.').pop().toLowerCase();
+      if (['png', 'jpg', 'jpeg', 'gif', 'bmp'].includes(ext)) raster.push(z); else if (['wmf', 'emf'].includes(ext)) vector.push(z);
+    }
+    let done = 0;
+    for (const z of raster) {
+      const blob = new Blob([await z.async('uint8array')]);
+      if (blob.size < 40000) continue;                      // логотипы, подписи, печати — пропускаем
+      let bmp; try { bmp = await createImageBitmap(blob); } catch (e) { continue; }
+      if (Math.max(bmp.width, bmp.height) < 600) continue;
+      if (onImg) onImg(++done, raster.length);
+      const t = (await ocrImage(bmp)).trim(); state.ocrPages++;
+      if (t) lines.push('[распознано с картинки в документе]\n' + t);
+    }
+    const bigVector = [];
+    for (const z of vector) if ((await z.async('uint8array')).length > 200000) bigVector.push(z);
+    if (bigVector.length && problems) problems.push(f.name + ': ' + bigVector.length + ' картинок WMF/EMF (похоже на сканы таблиц) не прочитаны — сохраните файл в PDF («Файл → Сохранить как → PDF») и загрузите PDF вместо .docx');
     return lines.join('\n');
+  }
+
+  // --- DOC (Word 97–2003): контейнер OLE2 → поток WordDocument → таблица фрагментов текста (piece table)
+  async function readDoc(f) {
+    const b = new Uint8Array(await f.arrayBuffer()), dv = new DataView(b.buffer);
+    const u16 = o => dv.getUint16(o, true), u32 = o => dv.getUint32(o, true), i32 = o => dv.getInt32(o, true);
+    if (u32(0) !== 0xE011CFD0) throw new Error(f.name + ': это не документ Word 97–2003 — пересохраните в .docx');
+    const ss = 1 << u16(0x1E), mss = 1 << u16(0x20), cutoff = u32(0x38);
+    const sec = n => 512 + n * ss;
+    // таблица размещения (FAT): 109 первых записей DIFAT в заголовке, дальше — цепочка секторов DIFAT
+    const difat = []; for (let i = 0; i < 109; i++) { const v = i32(0x4C + i * 4); if (v >= 0) difat.push(v); }
+    for (let d = i32(0x44), n = u32(0x48); n-- > 0 && d >= 0;) { const o = sec(d); for (let i = 0; i < ss / 4 - 1; i++) { const v = i32(o + i * 4); if (v >= 0) difat.push(v); } d = i32(o + ss - 4); }
+    const fat = []; for (const fs of difat) { const o = sec(fs); for (let i = 0; i < ss / 4; i++) fat.push(i32(o + i * 4)); }
+    const chain = (start, tbl) => { const out = []; for (let x = start, guard = 0; x >= 0 && guard++ < 1e6; x = tbl[x]) out.push(x); return out; };
+    const read = (start, size) => { const out = new Uint8Array(size); let p = 0; for (const x of chain(start, fat)) { const n = Math.min(ss, size - p); if (n <= 0) break; out.set(b.subarray(sec(x), sec(x) + n), p); p += n; } return out; };
+    const dirBytes = read(i32(0x30), chain(i32(0x30), fat).length * ss), ddv = new DataView(dirBytes.buffer);
+    const entries = [];
+    for (let o = 0; o + 128 <= dirBytes.length; o += 128) {
+      const nl = ddv.getUint16(o + 0x40, true); if (!nl) continue;
+      let name = ''; for (let i = 0; i < nl / 2 - 1; i++) name += String.fromCharCode(ddv.getUint16(o + i * 2, true));
+      entries.push({ name, type: dirBytes[o + 0x42], start: ddv.getInt32(o + 0x74, true), size: ddv.getUint32(o + 0x78, true) });
+    }
+    const root = entries.find(e => e.type === 5);
+    const minifat = []; if (u32(0x40)) for (const x of chain(i32(0x3C), fat)) for (let i = 0; i < ss / 4; i++) minifat.push(i32(sec(x) + i * 4));
+    const ministream = root ? read(root.start, root.size) : new Uint8Array(0);
+    const stream = name => {
+      const e = entries.find(x => x.name === name); if (!e) return null;
+      if (e.size >= cutoff) return read(e.start, e.size);
+      const out = new Uint8Array(e.size); let p = 0;
+      for (const x of chain(e.start, minifat)) { const n = Math.min(mss, e.size - p); if (n <= 0) break; out.set(ministream.subarray(x * mss, x * mss + n), p); p += n; }
+      return out;
+    };
+    const wd = stream('WordDocument'); if (!wd) throw new Error(f.name + ': в файле нет текста Word');
+    const w = new DataView(wd.buffer);
+    const table = stream((w.getUint16(0x0A, true) & 0x0200) ? '1Table' : '0Table');
+    let o = 32; const csw = w.getUint16(o, true); o += 2 + csw * 2;
+    const cslw = w.getUint16(o, true); const lw = o + 2; o = lw + cslw * 4;
+    const ccpText = w.getInt32(lw + 12, true);
+    const blob = o + 2, fcClx = w.getUint32(blob + 33 * 8, true), lcbClx = w.getUint32(blob + 33 * 8 + 4, true);
+    const t = new DataView(table.buffer); let c = fcClx;
+    while (c < fcClx + lcbClx && table[c] === 1) c += 3 + t.getUint16(c + 1, true);   // пропустить Prc
+    if (table[c] !== 2) throw new Error(f.name + ': не удалось прочитать текст .doc — пересохраните в .docx');
+    const lcb = t.getUint32(c + 1, true), pl = c + 5, n = (lcb - 4) / 12;
+    const cp1251 = new TextDecoder('windows-1251'), utf16 = new TextDecoder('utf-16le');
+    let text = '';
+    for (let i = 0; i < n && text.length < ccpText; i++) {
+      const cp0 = t.getUint32(pl + i * 4, true), cp1 = t.getUint32(pl + (i + 1) * 4, true);
+      let fc = t.getUint32(pl + (n + 1) * 4 + i * 8 + 2, true); const len = cp1 - cp0;
+      if (fc & 0x40000000) { fc = (fc & ~0x40000000) / 2; text += cp1251.decode(wd.subarray(fc, fc + len)); }
+      else text += utf16.decode(wd.subarray(fc, fc + len * 2));
+    }
+    text = text.slice(0, ccpText)
+      .replace(/\x13[^\x13\x14\x15]*\x14/g, '').replace(/\x13[^\x13\x14\x15]*\x15/g, '').replace(/[\x14\x15]/g, '')   // коды полей
+      .replace(/\x07\r?\x07/g, '\n').replace(/\x07/g, ' | ')                                                   // таблицы
+      .replace(/[\r\x0b\x0c]/g, '\n').replace(/[\x00-\x08\x0e-\x1f]/g, '').replace(/\u00a0/g, ' ')
+      .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+    return text.trim();
   }
 
   // --- XLSX: видимые листы, строки — ячейки через « | »
@@ -435,6 +542,7 @@
     ['service', 'Обслуживание', [['', '—'], ['2', 'Двухстороннее'], ['1', 'Одностороннее']]],
     ['protocol', 'Протокол', [['', '—'], ['MR', 'Modbus RTU'], ['MT', 'Modbus TCP'], ['PB', 'ProfibusDP'], ['PN', 'ProfiNet'], ['CO', 'CanOpen'], ['EI', 'Ethernet/IP']]],
     ['starts_per_hour', 'Пусков в час по ТЗ'],
+    ['motors_count', 'ЭД на один УПП'],
   ];
   const P = UPP ? P_UPP : P_PCH;
   function renderParams() {
@@ -513,7 +621,9 @@
     $('sku').textContent = 'подбор…';
     fr.onload = () => {
       try { const d = fr.contentDocument; const sku = d.getElementById('result').textContent.trim(); state.sku = sku; $('sku').textContent = sku;
-        const capEl = d.getElementById('capacitorType'); if (capEl) state.cap = capEl.value; runChecks(); renderRows();
+        const capEl = d.getElementById('capacitorType'); if (capEl) state.cap = capEl.value;
+        if (UPP && fr.contentWindow.uppState) state.dims = fr.contentWindow.uppState().dims;
+        runChecks(); renderRows();
         const w = fr.contentWindow;
         const big = UPP ? !!(w.isDrawingMissing && w.isDrawingMissing()) : !!(w.isFilmBig && w.isFilmBig());
         const note = UPP ? 'Для этой модели УПП габаритный эскиз в ТКП не вставляется — приложите его отдельно.'
@@ -550,6 +660,14 @@
       case 'di_needed': return x > 4 ? ['CHECK', 'входы: пуск, стоп, аварийный стоп, сигнал ячейки'] : ['OK'];
       case 'do_needed': return x > 3 ? ['DEV', '3 релейных выхода'] : ['OK'];
       case 'ao_needed': return x > 1 ? ['DEV', '1 аналоговый выход 4–20 мА'] : ['OK'];
+      case 'ai_needed': return x > 0 ? ['DEV', 'аналоговых входов нет'] : ['OK'];
+      case 'start_limit_mult': return x > 5 ? ['DEV', 'ограничение пускового тока до 5 Iе'] : ['OK'];
+      case 'max_width_mm': case 'max_depth_mm': case 'max_height_mm': {
+        if (!ctx.dims) return ['CHECK', 'габариты модели уточняются у завода'];
+        const d = ctx.dims.split('×').map(Number), k = { max_width_mm: 0, max_depth_mm: 1, max_height_mm: 2 }[key];
+        return d[k] > x ? ['DEV', 'габариты модели ' + ctx.dims + ' мм (Ш×Г×В)'] : ['OK'];
+      }
+      case 'max_weight_kg': return x < 800 ? ['DEV', 'масса 800 кг'] : ['OK'];
       case 'error_log': return x > 1000 ? ['DEV', 'журнал до 1000 аварий'] : ['OK'];
       case 'network_nodes': return x > 32 ? ['DEV', 'до 32 устройств в сети'] : ['OK'];
       case 'control_voltage_v': return x < 187 || x > 253 ? ['CHECK', 'стандартно ~220 В ±15%, другое — по согласованию с заводом'] : ['OK'];
@@ -596,7 +714,7 @@
   function runChecks() {
     const v = Number(state.params && state.params.voltage_kv) >= 8 ? 10 : 6;
     const kw = Math.max(Number(state.params && state.params.motor_power_kw) || 0, Number(state.params && state.params.vfd_power_kw) || 0);
-    const ctx = { cap: state.cap || (state.params && state.params.capacitors) || 'PF', startsH: kw > (v === 10 ? 4000 : 2500) ? 3 : 6 };
+    const ctx = { cap: state.cap || (state.params && state.params.capacitors) || 'PF', startsH: kw > (v === 10 ? 4000 : 2500) ? 3 : 6, dims: state.dims };
     for (const r of state.rows) {
       if (r.userSet) continue;
       r.status = r.modelStatus; r.auto = '';
@@ -763,5 +881,5 @@
   };
 
   // для тестов
-  window.__tz = { state, loadResult, readDocx, readXlsx, readPdf, codeVerdict, buildDocx, configParams };
+  window.__tz = { state, loadResult, readDocx, readDoc, readXlsx, readPdf, codeVerdict, buildDocx, configParams };
 })();
