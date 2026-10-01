@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Разбор ТЗ — ESQ F ME800</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <style>
     :root{--ink:#2c3e50;--muted:#6b7a90;--line:#e6ecf5;--soft:#f3f6fb;--blue:#1f6feb;--green:#0f6b3f;--orange:#e8631a;--violet:#6f42c1;
       --ok:#e2f0d9;--opt:#ddebf7;--dev:#f8cbad;--check:#fff2cc;--ctr:#ededed;--na:#f7f7f7}
@@ -80,8 +81,8 @@
       <button class="btn" id="btnLogin">Войти</button>
       <span class="msg" id="authMsg"></span>
     </div>
-    <details style="margin-top:8px"><summary>Диагностика подключения к Яндексу</summary>
-      <button class="btn ghost" id="btnDiag" style="margin-top:6px">Проверить модели</button>
+    <details style="margin-top:8px"><summary>Диагностика подключения</summary>
+      <button class="btn ghost" id="btnDiag" style="margin-top:6px">Проверить подключение</button>
       <pre id="diagOut" style="white-space:pre-wrap;font-size:12px;background:var(--soft);padding:10px;border-radius:8px;margin-top:8px" class="hidden"></pre>
     </details>
   </div>
@@ -107,7 +108,7 @@
       <div class="msg" id="textStat"></div>
     </details>
     <div class="actions">
-      <button class="btn violet" id="btnAnalyze" disabled>Разобрать ТЗ (ИИ)</button>
+      <button class="btn violet" id="btnAnalyze" disabled>Разобрать ТЗ</button>
       <span class="msg" id="anMsg"></span>
     </div>
   </div>
@@ -132,7 +133,7 @@
 
   <div class="card hidden" id="secReq">
     <h2><span class="n">4</span>Требования ТЗ — проверьте статусы</h2>
-    <div class="msg" style="margin-bottom:6px">Статусы предложены ИИ по правилам Элком и перепроверены по числам. Пункты «Проверить» решает человек. Всё редактируется прямо в таблице. Серым курсивом — внутренний комментарий, в документы для заказчика он не попадает.</div>
+    <div class="msg" style="margin-bottom:6px">Статусы предложены автоматически по правилам Элком и перепроверены по числам. Пункты «Проверить» решает человек. Всё редактируется прямо в таблице. Серым курсивом — внутренний комментарий, в документы для заказчика он не попадает.</div>
     <div class="chips" id="chips"></div>
     <div class="tablebox"><table class="req"><thead><tr><th>№</th><th>Пункт</th><th style="width:30%">Требование ТЗ</th><th style="width:24%">Предложение ESQ</th><th style="width:150px">Статус</th><th style="width:22%">Примечание для заказчика</th></tr></thead><tbody id="reqBody"></tbody></table></div>
     <div class="actions"><button class="btn ghost" id="btnAddRow">+ Добавить строку</button></div>

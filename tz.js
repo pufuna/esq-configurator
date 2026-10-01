@@ -1,4 +1,4 @@
-/* Разбор ТЗ на ПЧ ESQ F ME800: чтение файлов → ИИ (через облачную функцию) → проверка человеком → документы.
+/* Разбор ТЗ на ПЧ ESQ F ME800: чтение файлов → разбор (через облачную функцию) → проверка человеком → документы.
    Ключ API в браузер не попадает: всё идёт через облачную функцию, доступ к ней — по паролю сотрудника. */
 (function () {
   'use strict';
@@ -237,17 +237,71 @@
     return out.join('\n\n');
   }
 
-  // ===== 3. РАЗБОР ИИ =====
+  // ===== 3. РАЗБОР =====
+  const CHUNK = 14000;        // символов в одной части ТЗ
+  const PARALLEL = 3;         // одновременных запросов
+  function splitText(t) {
+    const parts = []; let i = 0;
+    while (i < t.length) {
+      let end = Math.min(t.length, i + CHUNK);
+      if (end < t.length) { const nl = t.lastIndexOf('\n', end); if (nl > i + CHUNK * 0.6) end = nl; }
+      parts.push(t.slice(i, end)); i = end;
+    }
+    return parts;
+  }
+  async function runPool(tasks, n, onDone) {
+    const res = new Array(tasks.length); let next = 0;
+    const worker = async () => { while (next < tasks.length) { const k = next++; res[k] = await tasks[k](); onDone(); } };
+    await Promise.all(Array.from({ length: Math.min(n, tasks.length) }, worker));
+    return res;
+  }
+  async function tryTwice(fn) {
+    try { return { ok: true, j: await fn() }; }
+    catch (e1) {
+      if (/пароль|не с сайта|ключ/i.test(e1.message)) return { ok: false, err: e1.message };
+      try { return { ok: true, j: await fn() }; } catch (e2) { return { ok: false, err: e2.message }; }
+    }
+  }
+
   $('btnAnalyze').onclick = async () => {
     const btn = $('btnAnalyze'), m = $('anMsg'); btn.disabled = true; m.className = 'msg';
-    const t0 = Date.now(); const tick = setInterval(() => { m.innerHTML = '<span class="spin"></span>ИИ читает ТЗ… ' + Math.round((Date.now() - t0) / 1000) + ' с (обычно 1–3 мин)'; }, 500);
+    const text = $('tzText').value.trim();
+    const parts = text.length <= CHUNK * 1.15 ? [text] : splitText(text);
+    const single = parts.length === 1;
+    let done = 0; const total = single ? 1 : parts.length + 1;
+    const t0 = Date.now();
+    const show = () => { m.innerHTML = '<span class="spin"></span>Идёт разбор ТЗ… ' + (single ? '' : 'готово частей ' + done + ' из ' + total + ' · ') + Math.round((Date.now() - t0) / 1000) + ' с'; };
+    const tick = setInterval(show, 500); show();
     try {
-      const j = await api('extract', { text: $('tzText').value });
+      const tasks = single
+        ? [() => tryTwice(() => api('extract', { text, mode: 'full' }))]
+        : [() => tryTwice(() => api('extract', { text, mode: 'params' }))].concat(
+            parts.map((p, i) => () => tryTwice(() => api('extract', { text: p, mode: 'reqs', part: (i + 1) + '/' + parts.length }))));
+      const res = await runPool(tasks, PARALLEL, () => { done++; });
       clearInterval(tick);
-      state.model = j.model; state.usage = j.usage;
-      loadResult(j.data);
-      m.className = 'msg ok';
-      m.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с · модель ' + j.model + (j.usage && j.usage.total_tokens ? ' · токенов: ' + j.usage.total_tokens.toLocaleString('ru') : '');
+      const failed = [];
+      res.forEach((r, i) => { if (!r.ok) failed.push(single ? 'ТЗ' : i === 0 ? 'исходные данные' : 'часть ' + i + ' из ' + parts.length); });
+      if (failed.length === res.length) throw new Error(res[0].err || 'Разбор не удался');
+      const base = (res[0].ok && res[0].j.data) || {};
+      const data = { document: base.document || {}, params: base.params || {}, params_src: base.params_src || {}, requirements: [], extra_positions: [] };
+      const seen = new Set();
+      res.forEach((r, i) => {
+        if (!r.ok) {
+          if (i > 0 || single) data.requirements.push({ clause: single ? '' : 'часть ' + i, requirement: 'Эта часть ТЗ не разобрана автоматически (' + r.err.slice(0, 160) + ')', proposal: '', status: 'CHECK', rule: '', comment: 'Проверьте эту часть текста вручную или повторите разбор', check: [] });
+          return;
+        }
+        const d = r.j.data || {};
+        for (const q of d.requirements || []) {
+          const key = String(q.clause || '').trim() + '|' + String(q.requirement || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 70);
+          if (seen.has(key)) continue; seen.add(key); data.requirements.push(q);
+        }
+        for (const x of d.extra_positions || []) if (x && !data.extra_positions.includes(x)) data.extra_positions.push(x);
+        if (!single && i > 0 && !data.document.title && d.document && d.document.title) data.document = d.document;
+      });
+      state.model = res.filter(r => r.ok).map(r => r.j.model).filter((v, i, a) => a.indexOf(v) === i).join(', ');
+      loadResult(data);
+      m.className = failed.length ? 'msg err' : 'msg ok';
+      m.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с' + (failed.length ? '. Не разобрано: ' + failed.join(', ') + ' — см. строки «Проверить» в таблице' : '');
     } catch (e) { clearInterval(tick); m.className = 'msg err'; m.textContent = e.message; }
     btn.disabled = false;
   };
@@ -306,7 +360,7 @@
       state.params[k] = v; runChecks(); renderRows(); updateConfig();
     }));
     const n = $('paramNotes'); const notes = state.params.notes;
-    n.classList.toggle('hidden', !notes); n.textContent = notes ? 'Заметки ИИ: ' + notes : '';
+    n.classList.toggle('hidden', !notes); n.textContent = notes ? 'Заметки: ' + notes : '';
   }
 
   function filmAllowed(v, kw) { return v === 10 ? kw <= 1250 : kw <= 710; }
