@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Разбор ТЗ — ESQ F ME800</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{--ink:#2c3e50;--muted:#6b7a90;--line:#e6ecf5;--soft:#f3f6fb;--blue:#1f6feb;--green:#0f6b3f;--orange:#e8631a;--violet:#6f42c1;
+      --ok:#e2f0d9;--opt:#ddebf7;--dev:#f8cbad;--check:#fff2cc;--ctr:#ededed;--na:#f7f7f7}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;color:var(--ink);display:flex;flex-direction:column;align-items:center;
+      background:linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),url('background2.jpg') center/cover fixed #3b4a5a}
+    .wrap{width:94%;max-width:1200px;margin:30px auto;padding:26px;background:rgba(255,255,255,.95);border-radius:15px;box-shadow:0 8px 32px rgba(0,0,0,.12)}
+    h1{margin:0 0 4px;text-align:center;font-size:1.9em}
+    .sub{text-align:center;color:var(--muted);margin-bottom:22px}
+    h2{font-size:1.15em;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+    h2 .n{display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;align-items:center;justify-content:center;font-size:.85em}
+    .card{border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px;background:#fff}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    input[type=password],input[type=text],input[type=number],select,textarea{padding:9px 10px;border:1px solid #d5dbe5;border-radius:8px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
+    textarea{width:100%;resize:vertical}
+    .btn{display:inline-block;padding:10px 20px;border:0;border-radius:22px;background:var(--ink);color:#fff;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;font-size:14px}
+    .btn:hover{filter:brightness(1.12)}.btn:disabled{opacity:.45;cursor:default;filter:none}
+    .btn.blue{background:var(--blue)}.btn.green{background:var(--green)}.btn.orange{background:var(--orange)}.btn.violet{background:var(--violet)}.btn.ghost{background:#fff;color:var(--ink);border:1px solid #c9d3df}
+    .msg{font-size:13px;color:var(--muted)}.msg.err{color:#b42318}.msg.ok{color:var(--green)}
+    .drop{border:2px dashed #c9d3df;border-radius:12px;padding:26px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s}
+    .drop.over{border-color:var(--blue);background:#f2f7ff}
+    .files{margin:12px 0 0;padding:0;list-style:none;font-size:14px}
+    .files li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+    .files li span:last-child{color:var(--muted);white-space:nowrap}
+    .bar{height:6px;background:var(--soft);border-radius:4px;overflow:hidden;margin-top:10px;display:none}.bar i{display:block;height:100%;width:0;background:var(--blue);transition:width .2s}
+    details summary{cursor:pointer;color:var(--blue);font-size:14px;margin:10px 0}
+    .hidden{display:none!important}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 16px}
+    .field{display:flex;flex-direction:column;gap:4px;font-size:13px}
+    .field label{color:var(--muted)}.field .src{font-size:11px;color:#98a4b5}
+    .sku{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:16px;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:14px 0 8px;word-break:break-all}
+    .notes{font-size:13px;background:#fffaf0;border:1px solid #f5dfb0;border-radius:8px;padding:8px 10px;margin-top:10px}
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
+    .chip{border:1px solid #c9d3df;border-radius:16px;padding:5px 12px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+    .chip.on{outline:2px solid var(--ink)}
+    .chip b{margin-left:4px}
+    .s-OK{background:var(--ok)}.s-OPT{background:var(--opt)}.s-DEV{background:var(--dev)}.s-CHECK{background:var(--check)}.s-CTR{background:var(--ctr)}.s-NA{background:var(--na)}
+    table.req{width:100%;border-collapse:collapse;font-size:13px}
+    table.req th{position:sticky;top:0;background:var(--ink);color:#fff;padding:8px 6px;text-align:left;font-weight:600;z-index:1}
+    table.req td{border-bottom:1px solid #fff;padding:6px;vertical-align:top}
+    table.req td.c{white-space:nowrap;font-weight:600}
+    table.req textarea{min-height:52px;font-size:13px;padding:5px 6px;background:rgba(255,255,255,.75)}
+    table.req select{font-size:13px;padding:5px;width:100%}
+    .auto{display:block;margin-top:4px;font-size:11px;color:#8a3b12}
+    .rule{font-size:11px;color:var(--muted)}
+    .inner{display:block;margin-top:4px;font-size:11px;color:#5b6b80;font-style:italic}
+    .inner::before{content:"внутр.: "}
+    .tablebox{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+    .spin{display:inline-block;width:14px;height:14px;border:2px solid #c9d3df;border-top-color:var(--blue);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-2px;margin-right:6px}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    .footer{text-align:center;padding:18px;background:rgba(44,62,80,.9);color:#fff;width:100%;margin-top:auto}
+    @media (max-width:760px){
+      .wrap{width:100%;margin:0;border-radius:0;padding:16px}
+      table.req thead{display:none}
+      table.req,table.req tbody,table.req tr,table.req td{display:block;width:100%}
+      table.req tr{border-bottom:3px solid #fff;padding:6px 0}
+      table.req td{border:0;padding:3px 8px}
+      table.req td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--muted)}
+      .tablebox{max-height:none}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Разбор ТЗ</h1>
+  <div class="sub">ESQ F ME800 · ТЗ → проверка человеком → ТКП и лист несоответствий</div>
+
+  <!-- 1. Доступ -->
+  <div class="card" id="secAuth">
+    <h2><span class="n">1</span>Доступ</h2>
+    <div class="row">
+      <input type="password" id="pw" placeholder="Пароль сотрудника" autocomplete="current-password" style="flex:1 1 220px">
+      <button class="btn" id="btnLogin">Войти</button>
+      <span class="msg" id="authMsg"></span>
+    </div>
+  </div>
+
+  <!-- 2. Файлы -->
+  <div class="card" id="secFiles">
+    <h2><span class="n">2</span>Файлы ТЗ</h2>
+    <div class="drop" id="drop">Перетащите сюда ТЗ, опросный лист и приложения<br>
+      <span class="msg">PDF (в т.ч. сканы), Word .docx, Excel .xlsx, картинки JPG/PNG, .txt — можно несколько файлов</span>
+      <input type="file" id="fileInput" multiple accept=".pdf,.docx,.xlsx,.xlsm,.txt,.jpg,.jpeg,.png" class="hidden">
+    </div>
+    <ul class="files" id="fileList"></ul>
+    <div class="actions">
+      <button class="btn blue" id="btnRead" disabled>Прочитать файлы</button>
+      <button class="btn ghost" id="btnClear" disabled>Очистить</button>
+      <label class="btn ghost" style="font-weight:500">Открыть сохранённый разбор<input type="file" id="loadJson" accept=".json" class="hidden"></label>
+    </div>
+    <div class="bar" id="readBar"><i></i></div>
+    <div class="msg" id="readMsg" style="margin-top:8px"></div>
+    <details id="textBox" class="hidden">
+      <summary>Текст ТЗ, который уйдёт на разбор (можно поправить или удалить лишнее)</summary>
+      <textarea id="tzText" rows="14"></textarea>
+      <div class="msg" id="textStat"></div>
+    </details>
+    <div class="actions">
+      <button class="btn violet" id="btnAnalyze" disabled>Разобрать ТЗ (ИИ)</button>
+      <span class="msg" id="anMsg"></span>
+    </div>
+  </div>
+
+  <!-- 3. Результат -->
+  <div class="card hidden" id="secResult">
+    <h2><span class="n">3</span>Исходные данные и подбор ПЧ</h2>
+    <div class="row" style="margin-bottom:12px">
+      <input type="text" id="docTitle" placeholder="Наименование ТЗ" style="flex:2 1 320px">
+      <input type="text" id="docCustomer" placeholder="Заказчик" style="flex:1 1 180px">
+      <input type="text" id="docObject" placeholder="Объект" style="flex:1 1 180px">
+    </div>
+    <div class="grid" id="paramGrid"></div>
+    <div class="notes hidden" id="paramNotes"></div>
+    <div class="sku" id="sku">—</div>
+    <div class="msg" id="skuMsg"></div>
+    <div class="actions">
+      <a class="btn orange" id="btnConfig" target="_blank" rel="noopener">Открыть в конфигураторе → ТКП (PDF)</a>
+    </div>
+    <iframe id="cfgFrame" class="hidden" title="Конфигуратор"></iframe>
+  </div>
+
+  <div class="card hidden" id="secReq">
+    <h2><span class="n">4</span>Требования ТЗ — проверьте статусы</h2>
+    <div class="msg" style="margin-bottom:6px">Статусы предложены ИИ по правилам Элком и перепроверены по числам. Пункты «Проверить» решает человек. Всё редактируется прямо в таблице. Серым курсивом — внутренний комментарий, в документы для заказчика он не попадает.</div>
+    <div class="chips" id="chips"></div>
+    <div class="tablebox"><table class="req"><thead><tr><th>№</th><th>Пункт</th><th style="width:30%">Требование ТЗ</th><th style="width:24%">Предложение ESQ</th><th style="width:150px">Статус</th><th style="width:22%">Примечание для заказчика</th></tr></thead><tbody id="reqBody"></tbody></table></div>
+    <div class="actions"><button class="btn ghost" id="btnAddRow">+ Добавить строку</button></div>
+    <h2 style="margin-top:20px">Отдельные позиции ТКП</h2>
+    <textarea id="extraPos" rows="4" placeholder="Ячейки КСО, шкаф управления и т.п. — по строке на позицию"></textarea>
+  </div>
+
+  <div class="card hidden" id="secOut">
+    <h2><span class="n">5</span>Документы</h2>
+    <div class="row" style="margin-bottom:10px">
+      <input type="text" id="author" placeholder="Составил (ФИО, должность)" style="flex:1 1 260px">
+      <label class="msg"><input type="checkbox" id="incOpt" checked> включить в лист несоответствий раздел «Выполняется опциями»</label>
+    </div>
+    <div class="actions">
+      <button class="btn green" id="btnDev">Лист несоответствий (.docx)</button>
+      <button class="btn ghost" id="btnFull">Лист соответствия — все пункты (.docx)</button>
+      <button class="btn ghost" id="btnSave">Сохранить разбор (.json)</button>
+    </div>
+    <div class="msg" id="outMsg" style="margin-top:8px"></div>
+  </div>
+
+  <div class="actions" style="justify-content:center"><a href="configurator_vv_pch.html" class="btn ghost">← Конфигуратор</a></div>
+</div>
+<div class="footer">© 2025 ESQ · ООО «Элком»</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@9.6.1/dist/index.iife.js"></script>
+<script src="tz.js"></script>
+</body>
+</html>

@@ -97,6 +97,8 @@
       .dc-table td:nth-child(3){font-weight:600;color:#2c3e50}
       .dc-table td:nth-child(4){grid-column:2 / 4;padding:0 5px 7px}
     }
+    .tz-banner{margin:0 0 15px;padding:12px 15px;background:#fff7e6;border:1px solid #f5c26b;border-radius:10px;color:#2c3e50;font-size:14px}
+    .tz-banner span{color:#6b7a90;font-size:13px}
     /* страница не должна быть шире экрана */
     .configurator,.footer{box-sizing:border-box}
     #result,#old-result{overflow-wrap:anywhere}
@@ -285,6 +287,7 @@
     <a href="#" class="techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
     <a href="#" class="copy-btn" onclick="copyTechDesc(event)">Копировать описание</a>
     <a href="#" class="copy-btn" style="background:#e8631a" onclick="downloadTKP(event)">Скачать ТКП (PDF)</a>
+    <a href="tz.html" class="copy-btn" style="background:#6f42c1">Разбор ТЗ (ИИ)</a>
 
     <!-- Техописание (внутри него появится и чертёж) -->
     <div id="techdesc" class="techdesc"></div>
@@ -720,7 +723,7 @@
         <table>
           <tr><th>Параметр</th><th>Значение</th></tr>
           <tr><td>Частота питающей сети</td><td>50/60 Гц, ±5%</td></tr>
-          <tr><td>Выходная частота</td><td>0.1–300 Гц</td></tr>
+          <tr><td>Выходная частота</td><td>0,1–120 Гц</td></tr>
           <tr><td>КПД (с трансформатором)</td><td>≈96%</td></tr>
           <tr><td>Коэффициент мощности</td><td>≥0.95</td></tr>
           <tr><td>Перегрузочная способность</td><td>120% в течение 60 с; 150% в течение 3 с</td></tr>
@@ -864,10 +867,46 @@
       if (textSource !== box) document.body.removeChild(textSource);
     }
 
+    /* ===== Конфигурация из разбора ТЗ (параметры в адресе страницы) =====
+       ?from=tz&v=T060&kw=1000&a=130&cap=auto&mat=CU&puls=30&byp=A&react=X&ip=42&exp=X&ups=U&cab=T&pr=MR&cb=B&mot=A&sync=B&qty=4&tz=...
+       Мощность подбирается наименьшая, у которой P ≥ kw и I ≥ a. */
+    function applyUrlParams(){
+      let q; try { q = new URLSearchParams(location.search); } catch(e){ return; }
+      if (q.get('from') !== 'tz') return;
+      const set = (id, val) => { const el = document.getElementById(id); if (!el || val == null || val === '') return false;
+        if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === val && !o.disabled)) return false; el.value = val; return true; };
+      const notes = [];
+      if (set('voltage', q.get('v'))) updatePowerOptions();
+      const v = document.getElementById('voltage').value;
+      const kw = Number(q.get('kw')) || 0, a = Number(q.get('a')) || 0;
+      const fit = Object.keys(modelData[v]).map(Number).sort((x, y) => x - y)
+        .find(p => p >= kw && Number(modelData[v][String(p)].current) >= a);
+      if (fit) { set('power', String(fit)); updateDependencies(); }
+      else if (kw || a) notes.push('нет модели под ' + (kw ? kw + ' кВт' : '') + (a ? ' / ' + a + ' А' : '') + ' — выбрана вручную');
+      const cap = document.getElementById('capacitorType'), p = document.getElementById('power').value;
+      const want = q.get('cap') || 'auto';
+      cap.value = (want === 'EL' || !isFilmAllowed(v, p)) ? 'EL' : 'PF';
+      if (want === 'PF' && cap.value !== 'PF') notes.push('плёночные недоступны для этой мощности — выбраны электролитические');
+      onCapacitorTypeChange();
+      if (q.get('puls') && !set('pulsation', q.get('puls'))) notes.push('пульсность ' + q.get('puls') + ' недоступна');
+      [['mat','material'],['byp','bypass'],['react','reactor'],['ip','ip'],['exp','expansion'],['ups','ups'],['cab','cable'],
+       ['pr','protocol'],['cb','cellBypass'],['mot','motor'],['sync','sync']].forEach(([k, id]) => set(id, q.get(k)));
+      if (!document.getElementById('starter').disabled && q.get('st')) set('starter', q.get('st'));
+      if (q.get('qty')) document.getElementById('tkpQty').value = q.get('qty');
+      updateNomenclature();
+      const box = document.createElement('div');
+      box.className = 'tz-banner';
+      box.innerHTML = '<b>Конфигурация из разбора ТЗ</b>' + (q.get('tz') ? ': ' + esc(q.get('tz')) : '') +
+        '<br><span>Проверьте параметры перед скачиванием ТКП.' + (notes.length ? ' Внимание: ' + esc(notes.join('; ')) + '.' : '') + '</span>';
+      const host = document.querySelector('.configurator');
+      host.insertBefore(box, host.querySelector('.param'));
+    }
+
     /* ===== Инициализация ===== */
     document.addEventListener('DOMContentLoaded', ()=>{
       document.getElementById('capacitorType').value='EL';
       updatePowerOptions();
+      applyUrlParams();
       document.querySelectorAll('select').forEach(el=>{
         if (el.id==='voltage') el.addEventListener('change', updatePowerOptions);
         else if (el.id==='power') el.addEventListener('change', updateDependencies);
