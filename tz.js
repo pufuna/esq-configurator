@@ -467,7 +467,10 @@
     $('sku').textContent = 'подбор…';
     fr.onload = () => {
       try { const d = fr.contentDocument; const sku = d.getElementById('result').textContent.trim(); state.sku = sku; $('sku').textContent = sku;
-        const cap = d.getElementById('capacitorType').value; state.cap = cap; runChecks(); renderRows(); }
+        const cap = d.getElementById('capacitorType').value; state.cap = cap; runChecks(); renderRows();
+        const big = fr.contentWindow.isFilmBig && fr.contentWindow.isFilmBig();
+        const note = 'Плёночный ПЧ этой мощности: габаритный чертёж в ТКП не вставляется — приложите его отдельно.';
+        $('skuMsg').textContent = $('skuMsg').textContent.replace(note, '').trim() + (big ? (' ' + note) : ''); }
       catch (e) { $('sku').textContent = 'маркировку покажет конфигуратор'; }
     };
     fr.src = url + '&embed=1';

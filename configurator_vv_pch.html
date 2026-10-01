@@ -147,7 +147,7 @@
         <option value="EL">Электролитические</option>
         <option value="PF">Пленочные</option>
       </select>
-      <div class="note">Плёночные доступны: 6 кВ — до 710 кВт, 10 кВ — до 1250 кВт.</div>
+      <div class="note" id="capNote">Плёночные — на любой мощности. Компактный шкаф G4 с габаритным чертежом: 6 кВ — до 710 кВт, 10 кВ — до 1250 кВт.</div>
     </div>
 
     <div class="param">
@@ -431,6 +431,17 @@
 
     /* ===== Плёночные конденсаторы ===== */
     function isFilmAllowed(voltage, power){ return true; }   // плёночные — на любой мощности
+    const FILM_BIG_MSG = '⚠ Для плёночного ПЧ этой мощности габаритный чертёж не прикладывается (ни на сайте, ни в ТКП) — габариты уточняются, чертёж приложите к ТКП отдельно.';
+    function isFilmBig(){
+      return document.getElementById('capacitorType').value === 'PF' &&
+        !isPFNCabinet(document.getElementById('voltage').value, document.getElementById('power').value);
+    }
+    function updateCapNote(){
+      const n = document.getElementById('capNote'); if (!n) return;
+      const big = isFilmBig();
+      n.textContent = big ? FILM_BIG_MSG : 'Плёночные — на любой мощности. Компактный шкаф G4 с габаритным чертежом: 6 кВ — до 710 кВт, 10 кВ — до 1250 кВт.';
+      n.style.color = big ? '#b54708' : ''; n.style.fontWeight = big ? '600' : '';
+    }
     // компактный шкаф G4 (1800×1425×2431, свой чертёж PFN) есть только для мощностей из таблицы PFN;
     // на остальных мощностях плёночный ПЧ — в обычных шкафах (габариты и чертёж — как у стандартных моделей)
     function isPFNCabinet(voltage, power){ return !!(mechanicalPFN[voltage] && mechanicalPFN[voltage].weights[String(power)]); }
@@ -567,6 +578,7 @@
         document.getElementById('cellBypass').value
       ];
       document.getElementById('result').textContent = `ESQ F ME800-${params.join('')}`;
+      updateCapNote();
       document.getElementById('old-result').textContent = buildOldNomenclatureText();
       renderDecode();
     }
@@ -753,6 +765,9 @@
         return [ encodeURI(v==='T060' ? pfUrl6 : pfUrl10) ];
       }
 
+      // Плёночные больших мощностей (вне шкафа G4) — чертёж не прикладывается
+      if (cap === 'PF') return [];
+
       // Иначе — прежняя логика (обычные чертежи)
       const kvTokens = (v === 'T060') ? ['6KV','6KW'] : ['10KV'];
       const needPS   = Boolean(data?.starter) || current > 200;
@@ -814,6 +829,10 @@
       const box = document.getElementById('drawing-block');
       if (!box) return;
 
+      if (isFilmBig()){
+        box.innerHTML = `<div class="drawing-empty">${FILM_BIG_MSG}</div>`;
+        return;
+      }
       const candidates = buildDrawingCandidates();
       const found = await findFirstExisting(candidates);
 
