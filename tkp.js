@@ -10,6 +10,14 @@
    Таблица FIELDS снята с шаблона: границы надписи, базовая линия, кегль и цвет. */
 (function () {
   'use strict';
+  // Safari (iPad/iPhone, старые Mac) не умеет перебирать ReadableStream через for await — а pdf.js так читает текст страниц
+  if (typeof ReadableStream !== 'undefined' && !ReadableStream.prototype[Symbol.asyncIterator]) {
+    ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
+      const reader = this.getReader();
+      try { for (;;) { const { done, value } = await reader.read(); if (done) return; yield value; } }
+      finally { reader.releaseLock(); }
+    };
+  }
   const { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix,
     rectangle, clipEvenOdd, endPath, decodePDFRawStream } = window.PDFLib;
   const $ = id => document.getElementById(id);

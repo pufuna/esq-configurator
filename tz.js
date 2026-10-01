@@ -1,0 +1,893 @@
+/* Разбор ТЗ на ПЧ ESQ F ME800: чтение файлов → разбор (через облачную функцию) → проверка человеком → документы.
+   Ключ API в браузер не попадает: всё идёт через облачную функцию, доступ к ней — по паролю сотрудника. */
+(function () {
+  'use strict';
+  // Safari (iPad/iPhone, старые Mac) не умеет перебирать ReadableStream через for await — а pdf.js так читает текст страниц
+  if (typeof ReadableStream !== 'undefined' && !ReadableStream.prototype[Symbol.asyncIterator]) {
+    ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
+      const reader = this.getReader();
+      try { for (;;) { const { done, value } = await reader.read(); if (done) return; yield value; } }
+      finally { reader.releaseLock(); }
+    };
+  }
+
+  // ===== НАСТРОЙКИ =====
+  const FUNCTION_URL = window.TZ_FUNCTION_URL || 'https://functions.yandexcloud.net/d4eplvhu1pvut5be24vd';   // адрес облачной функции, https://functions.yandexcloud.net/…
+  const PDFJS_BASE = new URL(window.PDFJS_BASE || 'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.7.284/legacy/build/', document.baseURI).href;
+  // Продукт: ВВ ПЧ ESQ F ME800 (по умолчанию) или ВВ УПП ESQ F HVS (tz.html?p=upp)
+  const PRODUCT = (() => { try { return new URLSearchParams(location.search).get('p') === 'upp' ? 'upp' : 'pch'; } catch (e) { return 'pch'; } })();
+  const UPP = PRODUCT === 'upp';
+  const CONFIGURATOR = UPP ? 'vv_upp.html' : 'configurator_vv_pch.html';
+  const PROD = UPP
+    ? { model: 'ESQ F HVS', short: 'УПП', equipment: 'Высоковольтное устройство плавного пуска', pick: 'Исходные данные и подбор УПП' }
+    : { model: 'ESQ F ME800', short: 'ПЧ', equipment: 'Высоковольтный преобразователь частоты', pick: 'Исходные данные и подбор ПЧ' };
+  const OCR_MAX_SIDE = 2000;         // px по длинной стороне страницы для распознавания
+  const OCR_PARALLEL = 3;
+
+  const ST = { OK: 'Соответствует', OPT: 'Соответствует (опция)', DEV: 'Отклонение', CHECK: 'Проверить', CTR: 'Договорное', NA: 'Не относится к ' + (UPP ? 'УПП' : 'ПЧ') };
+  const ST_ORDER = ['DEV', 'CHECK', 'OPT', 'OK', 'CTR', 'NA'];
+  const SEV = { OK: 0, OPT: 1, CHECK: 2, DEV: 3 };
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const store = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} } };
+
+  const state = { files: [], ocrPages: 0, result: null, rows: [], filter: null, sku: '', model: '', usage: null };
+
+  // подписи страницы под выбранный продукт
+  $('subModel').textContent = PROD.model; $('pickTitle').textContent = PROD.pick; $('backLink').href = CONFIGURATOR;
+  document.title = 'Разбор ТЗ — ' + PROD.model;
+  document.querySelectorAll('#prodSwitch [data-p]').forEach(a => a.classList.toggle('on', a.dataset.p === PRODUCT));
+
+  // ===== СВЯЗЬ С ФУНКЦИЕЙ =====
+  async function api(action, payload) {
+    if (!FUNCTION_URL) throw new Error('Адрес облачной функции ещё не задан в tz.js (FUNCTION_URL)');
+    const r = await fetch(FUNCTION_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },   // простой запрос — без preflight
+      body: JSON.stringify(Object.assign({ password: $('pw').value || store.get('tzpw') || '', action, product: PRODUCT }, payload || {})),
+    });
+    const raw = await r.text(); let j = null; try { j = JSON.parse(raw); } catch (e) {}
+    if (!r.ok || !j || !j.ok) {
+      if (j && j.error) throw new Error(j.error);
+      const hint = r.status === 403 ? ' — функция не публичная или не создана её версия (Cloud Functions → Обзор → «Публичная функция»)'
+        : r.status === 502 ? ' — функция упала при запуске: проверьте точку входа index.handler и что в архиве есть index.js и prompt.js' : '';
+      throw new Error('Ошибка функции: HTTP ' + r.status + hint + (raw ? ' [' + raw.slice(0, 200) + ']' : ''));
+    }
+    // функция без поддержки УПП разобрала бы ТЗ по правилам ПЧ — такой результат не принимаем
+    if (UPP && action === 'extract' && j.product !== 'upp') throw new Error('Облачная функция ещё не обновлена для разбора ТЗ на УПП — загрузите в неё новую версию (index.js + prompt_upp.js)');
+    return j;
+  }
+
+  // ===== 1. ДОСТУП =====
+  if (store.get('tzpw')) { $('pw').value = store.get('tzpw'); $('authMsg').textContent = 'Пароль сохранён до закрытия браузера'; }
+  $('btnLogin').onclick = async () => {
+    const m = $('authMsg'); m.className = 'msg'; m.innerHTML = '<span class="spin"></span>Проверяю…';
+    try { await api('ping'); store.set('tzpw', $('pw').value); m.className = 'msg ok'; m.textContent = 'Доступ есть'; }
+    catch (e) { m.className = 'msg err'; m.textContent = e.message; }
+  };
+  $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnLogin').click(); });
+  $('btnDiag').onclick = async () => {
+    const o = $('diagOut'); o.classList.remove('hidden'); o.textContent = 'Проверяю… (до 30 с)';
+    try {
+      const j = await api('diag');
+      o.textContent = 'Каталог: ' + j.folder + '\nКлюч: ' + j.key + '\n\n' +
+        j.results.map(r => (String(r.status) === '200' ? '✅ ' : '❌ ') + r.test + ' → ' + r.status + (String(r.status) === '200' ? '' : '\n   ' + r.answer)).join('\n');
+    } catch (e) { o.textContent = 'Ошибка: ' + e.message; }
+  };
+
+  // ===== 2. ФАЙЛЫ =====
+  const drop = $('drop');
+  drop.onclick = () => $('fileInput').click();
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); addFiles(e.dataTransfer.files); });
+  $('fileInput').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+  $('btnClear').onclick = () => { state.files = []; renderFiles(); $('textBox').classList.add('hidden'); $('tzText').value = ''; $('readMsg').textContent = ''; updateAnalyzeBtn(); };
+
+  function addFiles(list) {
+    for (const f of list) if (!state.files.some(x => x.name === f.name && x.size === f.size)) state.files.push(f);
+    renderFiles();
+  }
+  function kind(f) {
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (ext === 'pdf') return 'pdf';
+    if (ext === 'docx') return 'docx';
+    if (ext === 'xlsx' || ext === 'xlsm') return 'xlsx';
+    if (['jpg', 'jpeg', 'png'].includes(ext)) return 'img';
+    if (ext === 'txt') return 'txt';
+    if (ext === 'doc') return 'doc';
+    if (['xls', 'rtf'].includes(ext)) return 'old';
+    return 'unknown';
+  }
+  function renderFiles() {
+    $('fileList').innerHTML = state.files.map((f, i) => {
+      const k = kind(f), warn = k === 'old' ? 'старый формат — пересохраните в .docx / .xlsx' : k === 'unknown' ? 'формат не поддерживается' : (f.size / 1024 / 1024).toFixed(1) + ' МБ';
+      return `<li><span>${esc(f.name)}</span><span>${esc(warn)} <a href="#" data-del="${i}">✕</a></span></li>`;
+    }).join('');
+    $('fileList').querySelectorAll('[data-del]').forEach(a => a.onclick = e => { e.preventDefault(); state.files.splice(+a.dataset.del, 1); renderFiles(); });
+    $('btnRead').disabled = !state.files.some(f => !['old', 'unknown'].includes(kind(f)));
+    $('btnClear').disabled = !state.files.length;
+  }
+
+  function progress(done, total) { const b = $('readBar'); b.style.display = total ? 'block' : 'none'; b.firstElementChild.style.width = (total ? Math.round(done / total * 100) : 0) + '%'; }
+
+  $('btnRead').onclick = async () => {
+    const btn = $('btnRead'); btn.disabled = true; state.ocrPages = 0;
+    const m = $('readMsg'); m.className = 'msg';
+    const parts = [], problems = [];
+    try {
+      for (const f of state.files) {
+        const k = kind(f);
+        if (k === 'old' || k === 'unknown') { problems.push(f.name + ': пропущен (' + (k === 'old' ? 'пересохраните в .docx/.xlsx' : 'формат не поддерживается') + ')'); continue; }
+        m.innerHTML = '<span class="spin"></span>Читаю ' + esc(f.name) + '…';
+        let t = '';
+        if (k === 'pdf') t = await readPdf(f, (d, n, ocr) => { progress(d, n); m.innerHTML = '<span class="spin"></span>' + esc(f.name) + ': страница ' + d + ' из ' + n + (ocr ? ' (распознавание скана)' : ''); });
+        else if (k === 'docx') t = await readDocx(f, problems, (d, n) => { m.innerHTML = '<span class="spin"></span>' + esc(f.name) + ': распознавание картинки ' + d + ' из ' + n; });
+        else if (k === 'xlsx') t = await readXlsx(f);
+        else if (k === 'doc') t = await readDoc(f);
+        else if (k === 'img') { t = await ocrImage(await fileToImage(f)); state.ocrPages++; }
+        else if (k === 'txt') t = await f.text();
+        parts.push('=== Файл: ' + f.name + ' ===\n' + t.trim());
+      }
+      progress(0, 0);
+      $('tzText').value = parts.join('\n\n');
+      $('textBox').classList.remove('hidden'); $('textBox').open = false;
+      updateTextStat();
+      m.className = problems.length ? 'msg err' : 'msg ok';
+      m.textContent = 'Готово: ' + $('tzText').value.length.toLocaleString('ru') + ' символов' +
+        (state.ocrPages ? ', распознано страниц-сканов: ' + state.ocrPages + ' — сверьте цифры внимательнее' : '') +
+        (problems.length ? '. ' + problems.join('; ') : '');
+    } catch (e) { progress(0, 0); m.className = 'msg err'; m.textContent = 'Ошибка чтения: ' + e.message; }
+    btn.disabled = false; updateAnalyzeBtn();
+  };
+  $('tzText').addEventListener('input', () => { updateTextStat(); updateAnalyzeBtn(); });
+  function updateTextStat() { const n = $('tzText').value.length; $('textStat').textContent = n.toLocaleString('ru') + ' символов, ≈' + Math.round(n / 3).toLocaleString('ru') + ' токенов'; }
+  function updateAnalyzeBtn() { $('btnAnalyze').disabled = $('tzText').value.trim().length < 200; }
+
+  // --- PDF: текстовый слой, страницы без текста — на распознавание
+  let pdfjsP = null;
+  const loadPdfjs = () => pdfjsP || (pdfjsP = import(PDFJS_BASE + 'pdf.min.mjs').then(m => {
+    m.GlobalWorkerOptions.workerSrc = PDFJS_BASE + 'pdf.worker.min.mjs'; return m;
+  }));
+  async function readPdf(file, onPage) {
+    const pdfjs = await loadPdfjs();
+    const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const n = pdf.numPages, out = new Array(n), scans = [], mixed = new Set();
+    for (let i = 1; i <= n; i++) {
+      const page = await pdf.getPage(i);
+      const tc = await page.getTextContent();
+      let marks = new Map();
+      try { marks = await findCheckboxes(pdfjs, page, tc.items); } catch (e) { console.warn('checkboxes', e); }
+      let s = '';
+      tc.items.forEach((it, k) => { if (it.str !== undefined) { if (marks.has(k)) s += marks.get(k); s += it.str; s += it.hasEOL ? '\n' : (it.str && !/\s$/.test(it.str) ? ' ' : ''); } });
+      s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+      if (s.replace(/\s/g, '').length < 30) scans.push(i);
+      else {
+        out[i - 1] = s;
+        // текст есть, но большая часть листа — картинка (скан таблицы под колонтитулом): распознать и её
+        let cover = 0; try { cover = await imageCoverage(pdfjs, page); } catch (e) {}
+        if (cover > 0.15) { scans.push(i); mixed.add(i); }
+      }
+      onPage(i, n, false);
+    }
+    let done = 0;
+    const work = async () => {
+      while (scans.length) {
+        const i = scans.shift();
+        const page = await pdf.getPage(i);
+        const v1 = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: Math.min(4, OCR_MAX_SIDE / Math.max(v1.width, v1.height)) });
+        const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        const ocr = (await ocrImage(c)).trim();
+        out[i - 1] = mixed.has(i) ? out[i - 1] + '\n[распознано со скана на этой странице]\n' + (ocr || '—')
+          : ocr || '[страница ' + i + ': текст не распознан]';
+        state.ocrPages++; done++;
+        onPage(done, done + scans.length, true);
+      }
+    };
+    if (scans.length) await Promise.all(Array.from({ length: Math.min(OCR_PARALLEL, scans.length) }, work));
+    return out.map((t, i) => '[стр. ' + (i + 1) + ']\n' + t).join('\n\n');
+  }
+
+  // --- Доля листа, занятая самой большой картинкой (0…1)
+  async function imageCoverage(pdfjs, page) {
+    const ops = await page.getOperatorList(), O = pdfjs.OPS, v = page.getViewport({ scale: 1 });
+    const mul = (m, n) => [m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1], m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3], m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5]];
+    let ctm = [1, 0, 0, 1, 0, 0], best = 0; const stack = [];
+    for (let k = 0; k < ops.fnArray.length; k++) {
+      const fn = ops.fnArray[k], args = ops.argsArray[k];
+      if (fn === O.save) stack.push(ctm);
+      else if (fn === O.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.transform) ctm = mul(ctm, args);
+      else if (fn === O.paintFormXObjectBegin && args && args[0]) { stack.push(ctm); ctm = mul(ctm, args[0]); }
+      else if (fn === O.paintFormXObjectEnd) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.paintImageXObject || fn === O.paintInlineImageXObject || fn === O.paintImageXObjectRepeat) {
+        const a = Math.abs(ctm[0] * ctm[3] - ctm[1] * ctm[2]);
+        best = Math.max(best, a / (v.width * v.height));
+      }
+    }
+    return Math.min(1, best);
+  }
+
+  // --- Галочки в PDF-формах: маленькие квадратные картинки (Word рисует флажки картинками).
+  // Отмеченный флажок темнее пустого. Значок ☑/☐ ставим перед ближайшей подписью справа (или ниже).
+  async function findCheckboxes(pdfjs, page, items) {
+    const ops = await page.getOperatorList(), O = pdfjs.OPS;
+    const mul = (m, n) => [m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1], m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3], m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5]];
+    let ctm = [1, 0, 0, 1, 0, 0]; const stack = [], boxes = [];
+    for (let k = 0; k < ops.fnArray.length; k++) {
+      const fn = ops.fnArray[k], args = ops.argsArray[k];
+      if (fn === O.save) stack.push(ctm);
+      else if (fn === O.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.transform) ctm = mul(ctm, args);
+      else if (fn === O.paintFormXObjectBegin && args && args[0]) { stack.push(ctm); ctm = mul(ctm, args[0]); }
+      else if (fn === O.paintFormXObjectEnd) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === O.paintImageXObject || fn === O.paintInlineImageXObject) {
+        const w = Math.abs(ctm[0]) || Math.hypot(ctm[0], ctm[1]), h = Math.abs(ctm[3]) || Math.hypot(ctm[2], ctm[3]);
+        if (w < 4 || w > 22 || h < 4 || h > 22 || Math.abs(w - h) > 3) continue;   // флажок — квадратик 4–22 pt
+        boxes.push({ x: ctm[4], y: ctm[5], w, h, id: fn === O.paintImageXObject ? args[0] : null, inline: fn === O.paintInlineImageXObject ? args[0] : null });
+      }
+    }
+    if (boxes.length < 2) return new Map();
+    const getObj = id => new Promise(res => { const store = String(id).startsWith('g_') ? page.commonObjs : page.objs;
+      try { store.get(id, res); } catch (e) { res(null); } setTimeout(() => res(null), 3000); });
+    for (const b of boxes) {
+      const img = b.inline || (b.id ? await getObj(b.id) : null);
+      b.dark = img ? darkness(img) : null;
+    }
+    const vals = boxes.map(b => b.dark).filter(v => v != null);
+    if (vals.length < 2) return new Map();
+    const lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi - lo < 0.02) return new Map();             // все одинаковые — это не флажки
+    const thr = lo + (hi - lo) / 2;
+    const T = items.map((it, k) => ({ k, x: it.transform[4], y: it.transform[5], s: it.str || '' })).filter(t => t.s.trim());
+    const marks = new Map();
+    for (const b of boxes) {
+      if (b.dark == null) continue;
+      const cy = b.y + b.h / 2, right = b.x + b.w;
+      let best = null, bd = 1e9;
+      for (const t of T) {   // справа на той же строке
+        if (Math.abs(t.y + 3 - cy) > b.h * 0.9 || t.x < right - 2 || t.x - right > 160 || marks.has(t.k)) continue;
+        const d = t.x - right; if (d < bd) { bd = d; best = t; }
+      }
+      if (!best) for (const t of T) {   // или под флажком
+        const dy = b.y - t.y; if (dy < 0 || dy > 30 || Math.abs(t.x - b.x) > 120 || marks.has(t.k)) continue;
+        const d = dy * 3 + Math.abs(t.x - b.x); if (d < bd) { bd = d; best = t; }
+      }
+      if (best) marks.set(best.k, b.dark > thr ? '☑ ' : '☐ ');
+    }
+    return marks;
+  }
+  function darkness(img) {
+    const w = img.width, h = img.height; if (!w || !h) return null;
+    let data = null, ch = 4;
+    if (img.bitmap) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+      x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(img.bitmap, 0, 0); data = x.getImageData(0, 0, w, h).data; }
+    else if (img.data) { data = img.data; ch = img.kind === 2 ? 3 : img.kind === 1 ? 0 : 4; }
+    if (!data) return null;
+    if (ch === 0) { let ones = 0, tot = 0; for (const byte of data) for (let b = 0; b < 8; b++) { tot++; if (!((byte >> b) & 1)) ones++; } return ones / tot; }
+    let sum = 0, n = 0;
+    for (let i = 0; i + 2 < data.length; i += ch) { const a = ch === 4 ? data[i + 3] / 255 : 1; sum += (1 - (data[i] + data[i + 1] + data[i + 2]) / 765) * a; n++; }
+    return n ? sum / n : null;
+  }
+
+  function fileToImage(f) {
+    return new Promise((res, rej) => { const img = new Image(); img.onload = () => res(img); img.onerror = () => rej(new Error('Картинка не читается: ' + f.name)); img.src = URL.createObjectURL(f); });
+  }
+  async function ocrImage(src) {
+    let c = src;
+    const w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
+    const k = Math.min(1, OCR_MAX_SIDE / Math.max(w, h));
+    if (!(src instanceof HTMLCanvasElement) || k < 1) {
+      c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+      const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(src, 0, 0, c.width, c.height);
+    }
+    let q = 0.85, b64 = '';
+    do { b64 = c.toDataURL('image/jpeg', q).split(',')[1]; q -= 0.15; } while (b64.length > 3000000 && q > 0.3);
+    return (await api('ocr', { image: b64, mime: 'JPEG' })).text || '';
+  }
+
+  // --- DOCX: абзацы и таблицы (ячейки через « | »)
+  const xml = s => new DOMParser().parseFromString(s, 'application/xml');
+  const kids = (n, name) => Array.from(n.childNodes).filter(c => c.localName === name);
+  async function readDocx(f, problems, onImg) {
+    const zip = await JSZip.loadAsync(await f.arrayBuffer());
+    const doc = xml(await zip.file('word/document.xml').async('string'));
+    const body = doc.getElementsByTagNameNS('*', 'body')[0];
+    const lines = [];
+    const paraText = p => {
+      let s = '';
+      (function walk(n) { for (const c of n.childNodes) {
+        if (c.localName === 't') s += c.textContent; else if (c.localName === 'tab') s += '\t';
+        else if (c.localName === 'sym') { const ch = (c.getAttribute('w:char') || '').toUpperCase().replace(/^F0/, '');
+          s += ['FE', 'FD', '78', '52', '54'].includes(ch) ? '☑ ' : ['A8', '6F', '71', '72', '30'].includes(ch) ? '☐ ' : ''; }
+        else if (c.localName === 'br' || c.localName === 'cr') s += '\n'; else if (c.childNodes && c.childNodes.length) walk(c);
+      } })(p);
+      return s;
+    };
+    const cellText = tc => { const a = []; blockWalk(tc, a); return a.join(' / ').replace(/\s+/g, ' ').trim(); };
+    function blockWalk(n, acc) {
+      for (const c of n.childNodes) {
+        if (c.localName === 'p') { const t = paraText(c).trim(); if (t) acc.push(t); }
+        else if (c.localName === 'tbl') {
+          for (const tr of kids(c, 'tr')) { const cells = kids(tr, 'tc').map(cellText); if (cells.some(Boolean)) acc.push(cells.join(' | ')); }
+        } else if (c.localName === 'sdt' || c.localName === 'sdtContent' || c.localName === 'customXml') blockWalk(c, acc);
+      }
+    }
+    blockWalk(body, lines);
+    // картинки внутри документа (сканы таблиц, вставленные листы): PNG/JPEG — на распознавание
+    const media = Object.values(zip.files).filter(z => /^word\/media\//.test(z.name) && !z.dir);
+    const raster = [], vector = [];
+    for (const z of media) {
+      const ext = z.name.split('.').pop().toLowerCase();
+      if (['png', 'jpg', 'jpeg', 'gif', 'bmp'].includes(ext)) raster.push(z); else if (['wmf', 'emf'].includes(ext)) vector.push(z);
+    }
+    let done = 0;
+    for (const z of raster) {
+      const blob = new Blob([await z.async('uint8array')]);
+      if (blob.size < 40000) continue;                      // логотипы, подписи, печати — пропускаем
+      let bmp; try { bmp = await createImageBitmap(blob); } catch (e) { continue; }
+      if (Math.max(bmp.width, bmp.height) < 600) continue;
+      if (onImg) onImg(++done, raster.length);
+      const t = (await ocrImage(bmp)).trim(); state.ocrPages++;
+      if (t) lines.push('[распознано с картинки в документе]\n' + t);
+    }
+    const bigVector = [];
+    for (const z of vector) if ((await z.async('uint8array')).length > 200000) bigVector.push(z);
+    if (bigVector.length && problems) problems.push(f.name + ': ' + bigVector.length + ' картинок WMF/EMF (похоже на сканы таблиц) не прочитаны — сохраните файл в PDF («Файл → Сохранить как → PDF») и загрузите PDF вместо .docx');
+    return lines.join('\n');
+  }
+
+  // --- DOC (Word 97–2003): контейнер OLE2 → поток WordDocument → таблица фрагментов текста (piece table)
+  async function readDoc(f) {
+    const b = new Uint8Array(await f.arrayBuffer()), dv = new DataView(b.buffer);
+    const u16 = o => dv.getUint16(o, true), u32 = o => dv.getUint32(o, true), i32 = o => dv.getInt32(o, true);
+    if (u32(0) !== 0xE011CFD0) throw new Error(f.name + ': это не документ Word 97–2003 — пересохраните в .docx');
+    const ss = 1 << u16(0x1E), mss = 1 << u16(0x20), cutoff = u32(0x38);
+    const sec = n => 512 + n * ss;
+    // таблица размещения (FAT): 109 первых записей DIFAT в заголовке, дальше — цепочка секторов DIFAT
+    const difat = []; for (let i = 0; i < 109; i++) { const v = i32(0x4C + i * 4); if (v >= 0) difat.push(v); }
+    for (let d = i32(0x44), n = u32(0x48); n-- > 0 && d >= 0;) { const o = sec(d); for (let i = 0; i < ss / 4 - 1; i++) { const v = i32(o + i * 4); if (v >= 0) difat.push(v); } d = i32(o + ss - 4); }
+    const fat = []; for (const fs of difat) { const o = sec(fs); for (let i = 0; i < ss / 4; i++) fat.push(i32(o + i * 4)); }
+    const chain = (start, tbl) => { const out = []; for (let x = start, guard = 0; x >= 0 && guard++ < 1e6; x = tbl[x]) out.push(x); return out; };
+    const read = (start, size) => { const out = new Uint8Array(size); let p = 0; for (const x of chain(start, fat)) { const n = Math.min(ss, size - p); if (n <= 0) break; out.set(b.subarray(sec(x), sec(x) + n), p); p += n; } return out; };
+    const dirBytes = read(i32(0x30), chain(i32(0x30), fat).length * ss), ddv = new DataView(dirBytes.buffer);
+    const entries = [];
+    for (let o = 0; o + 128 <= dirBytes.length; o += 128) {
+      const nl = ddv.getUint16(o + 0x40, true); if (!nl) continue;
+      let name = ''; for (let i = 0; i < nl / 2 - 1; i++) name += String.fromCharCode(ddv.getUint16(o + i * 2, true));
+      entries.push({ name, type: dirBytes[o + 0x42], start: ddv.getInt32(o + 0x74, true), size: ddv.getUint32(o + 0x78, true) });
+    }
+    const root = entries.find(e => e.type === 5);
+    const minifat = []; if (u32(0x40)) for (const x of chain(i32(0x3C), fat)) for (let i = 0; i < ss / 4; i++) minifat.push(i32(sec(x) + i * 4));
+    const ministream = root ? read(root.start, root.size) : new Uint8Array(0);
+    const stream = name => {
+      const e = entries.find(x => x.name === name); if (!e) return null;
+      if (e.size >= cutoff) return read(e.start, e.size);
+      const out = new Uint8Array(e.size); let p = 0;
+      for (const x of chain(e.start, minifat)) { const n = Math.min(mss, e.size - p); if (n <= 0) break; out.set(ministream.subarray(x * mss, x * mss + n), p); p += n; }
+      return out;
+    };
+    const wd = stream('WordDocument'); if (!wd) throw new Error(f.name + ': в файле нет текста Word');
+    const w = new DataView(wd.buffer);
+    const table = stream((w.getUint16(0x0A, true) & 0x0200) ? '1Table' : '0Table');
+    let o = 32; const csw = w.getUint16(o, true); o += 2 + csw * 2;
+    const cslw = w.getUint16(o, true); const lw = o + 2; o = lw + cslw * 4;
+    const ccpText = w.getInt32(lw + 12, true);
+    const blob = o + 2, fcClx = w.getUint32(blob + 33 * 8, true), lcbClx = w.getUint32(blob + 33 * 8 + 4, true);
+    const t = new DataView(table.buffer); let c = fcClx;
+    while (c < fcClx + lcbClx && table[c] === 1) c += 3 + t.getUint16(c + 1, true);   // пропустить Prc
+    if (table[c] !== 2) throw new Error(f.name + ': не удалось прочитать текст .doc — пересохраните в .docx');
+    const lcb = t.getUint32(c + 1, true), pl = c + 5, n = (lcb - 4) / 12;
+    const cp1251 = new TextDecoder('windows-1251'), utf16 = new TextDecoder('utf-16le');
+    let text = '';
+    for (let i = 0; i < n && text.length < ccpText; i++) {
+      const cp0 = t.getUint32(pl + i * 4, true), cp1 = t.getUint32(pl + (i + 1) * 4, true);
+      let fc = t.getUint32(pl + (n + 1) * 4 + i * 8 + 2, true); const len = cp1 - cp0;
+      if (fc & 0x40000000) { fc = (fc & ~0x40000000) / 2; text += cp1251.decode(wd.subarray(fc, fc + len)); }
+      else text += utf16.decode(wd.subarray(fc, fc + len * 2));
+    }
+    text = text.slice(0, ccpText)
+      .replace(/\x13[^\x13\x14\x15]*\x14/g, '').replace(/\x13[^\x13\x14\x15]*\x15/g, '').replace(/[\x14\x15]/g, '')   // коды полей
+      .replace(/\x07\r?\x07/g, '\n').replace(/\x07/g, ' | ')                                                   // таблицы
+      .replace(/[\r\x0b\x0c]/g, '\n').replace(/[\x00-\x08\x0e-\x1f]/g, '').replace(/\u00a0/g, ' ')
+      .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+    return text.trim();
+  }
+
+  // --- XLSX: видимые листы, строки — ячейки через « | »
+  async function readXlsx(f) {
+    const zip = await JSZip.loadAsync(await f.arrayBuffer());
+    const wb = xml(await zip.file('xl/workbook.xml').async('string'));
+    const rels = xml(await zip.file('xl/_rels/workbook.xml.rels').async('string'));
+    const relMap = {}; Array.from(rels.getElementsByTagNameNS('*', 'Relationship')).forEach(r => relMap[r.getAttribute('Id')] = r.getAttribute('Target'));
+    let shared = [];
+    const ss = zip.file('xl/sharedStrings.xml');
+    if (ss) shared = Array.from(xml(await ss.async('string')).getElementsByTagNameNS('*', 'si')).map(si =>
+      Array.from(si.getElementsByTagNameNS('*', 't')).map(t => t.textContent).join(''));
+    const out = [];
+    for (const sh of Array.from(wb.getElementsByTagNameNS('*', 'sheet'))) {
+      if ((sh.getAttribute('state') || '') !== '' && sh.getAttribute('state') !== 'visible') continue;
+      const rid = sh.getAttribute('r:id') || sh.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+      let target = relMap[rid] || ''; target = target.replace(/^\/?xl\//, '').replace(/^\//, '');
+      const file = zip.file('xl/' + target); if (!file) continue;
+      const sx = xml(await file.async('string'));
+      const rows = [];
+      for (const row of Array.from(sx.getElementsByTagNameNS('*', 'row'))) {
+        const cells = [];
+        for (const c of kids(row, 'c')) {
+          const t = c.getAttribute('t'); let v = '';
+          if (t === 'inlineStr') v = Array.from(c.getElementsByTagNameNS('*', 't')).map(x => x.textContent).join('');
+          else { const ve = kids(c, 'v')[0]; v = ve ? ve.textContent : ''; if (t === 's') v = shared[+v] || ''; else if (t === 'b') v = v === '1' ? 'да' : 'нет'; }
+          v = String(v).replace(/\s+/g, ' ').trim(); if (v) cells.push(v);
+        }
+        if (cells.length) rows.push(cells.join(' | '));
+      }
+      if (rows.length) out.push('--- Лист: ' + sh.getAttribute('name') + ' ---\n' + rows.join('\n'));
+    }
+    return out.join('\n\n');
+  }
+
+  // ===== 3. РАЗБОР =====
+  const CHUNK = 14000;        // символов в одной части ТЗ
+  const PARALLEL = 3;         // одновременных запросов
+  function splitText(t) {
+    const parts = []; let i = 0;
+    while (i < t.length) {
+      let end = Math.min(t.length, i + CHUNK);
+      if (end < t.length) { const nl = t.lastIndexOf('\n', end); if (nl > i + CHUNK * 0.6) end = nl; }
+      parts.push(t.slice(i, end)); i = end;
+    }
+    return parts;
+  }
+  async function runPool(tasks, n, onDone) {
+    const res = new Array(tasks.length); let next = 0;
+    const worker = async () => { while (next < tasks.length) { const k = next++; res[k] = await tasks[k](); onDone(); } };
+    await Promise.all(Array.from({ length: Math.min(n, tasks.length) }, worker));
+    return res;
+  }
+  async function tryTwice(fn) {
+    try { return { ok: true, j: await fn() }; }
+    catch (e1) {
+      if (/пароль|не с сайта|ключ/i.test(e1.message)) return { ok: false, err: e1.message };
+      try { return { ok: true, j: await fn() }; } catch (e2) { return { ok: false, err: e2.message }; }
+    }
+  }
+
+  $('btnAnalyze').onclick = async () => {
+    const btn = $('btnAnalyze'), m = $('anMsg'); btn.disabled = true; m.className = 'msg';
+    const text = $('tzText').value.trim();
+    const parts = text.length <= CHUNK * 1.15 ? [text] : splitText(text);
+    const single = parts.length === 1;
+    let done = 0; const total = single ? 1 : parts.length + 1;
+    const t0 = Date.now();
+    const show = () => { m.innerHTML = '<span class="spin"></span>Идёт разбор ТЗ… ' + (single ? '' : 'готово частей ' + done + ' из ' + total + ' · ') + Math.round((Date.now() - t0) / 1000) + ' с'; };
+    const tick = setInterval(show, 500); show();
+    try {
+      const tasks = single
+        ? [() => tryTwice(() => api('extract', { text, mode: 'full' }))]
+        : [() => tryTwice(() => api('extract', { text, mode: 'params' }))].concat(
+            parts.map((p, i) => () => tryTwice(() => api('extract', { text: p, mode: 'reqs', part: (i + 1) + '/' + parts.length }))));
+      const res = await runPool(tasks, PARALLEL, () => { done++; });
+      clearInterval(tick);
+      const failed = [];
+      res.forEach((r, i) => { if (!r.ok) failed.push(single ? 'ТЗ' : i === 0 ? 'исходные данные' : 'часть ' + i + ' из ' + parts.length); });
+      if (failed.length === res.length) throw new Error(res[0].err || 'Разбор не удался');
+      const base = (res[0].ok && res[0].j.data) || {};
+      const data = { document: base.document || {}, params: base.params || {}, params_src: base.params_src || {}, requirements: [], extra_positions: [] };
+      const seen = new Set();
+      res.forEach((r, i) => {
+        if (!r.ok) {
+          if (i > 0 || single) data.requirements.push({ clause: single ? '' : 'часть ' + i, requirement: 'Эта часть ТЗ не разобрана автоматически (' + r.err.slice(0, 160) + ')', proposal: '', status: 'CHECK', rule: '', comment: 'Проверьте эту часть текста вручную или повторите разбор', check: [] });
+          return;
+        }
+        const d = r.j.data || {};
+        for (const q of d.requirements || []) {
+          const key = String(q.clause || '').trim() + '|' + String(q.requirement || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 70);
+          if (seen.has(key)) continue; seen.add(key); data.requirements.push(q);
+        }
+        for (const x of d.extra_positions || []) if (x && !data.extra_positions.includes(x)) data.extra_positions.push(x);
+        if (!single && i > 0 && !data.document.title && d.document && d.document.title) data.document = d.document;
+      });
+      state.model = res.filter(r => r.ok).map(r => r.j.model).filter((v, i, a) => a.indexOf(v) === i).join(', ');
+      loadResult(data);
+      m.className = failed.length ? 'msg err' : 'msg ok';
+      m.textContent = 'Готово за ' + Math.round((Date.now() - t0) / 1000) + ' с' + (failed.length ? '. Не разобрано: ' + failed.join(', ') + ' — см. строки «Проверить» в таблице' : '');
+    } catch (e) { clearInterval(tick); m.className = 'msg err'; m.textContent = e.message; }
+    btn.disabled = false;
+  };
+
+  function loadResult(data) {
+    const d = data || {};
+    state.result = d;
+    const doc = d.document || {};
+    $('docTitle').value = doc.title || ''; $('docCustomer').value = doc.customer || ''; $('docObject').value = doc.object || '';
+    state.params = Object.assign({}, d.params || {});
+    state.paramsSrc = d.params_src || {};
+    state.rows = (d.requirements || []).map(r => ({
+      clause: str(r.clause), requirement: str(r.requirement), proposal: str(r.proposal), comment: str(r.comment), client: str(r.client_note), rule: str(r.rule),
+      modelStatus: ST[r.modelStatus] ? r.modelStatus : ST[r.status] ? r.status : 'CHECK', status: ST[r.status] ? r.status : 'CHECK', check: Array.isArray(r.check) ? r.check : [], userSet: !!r.userSet, auto: '',
+    }));
+    $('extraPos').value = (d.extra_positions || []).join('\n');
+    ['secResult', 'secReq', 'secOut'].forEach(id => $(id).classList.remove('hidden'));
+    renderParams(); runChecks(); renderRows(); updateConfig();
+    $('secResult').scrollIntoView({ behavior: 'smooth' });
+  }
+  const str = v => v == null ? '' : String(v);
+
+  // ===== ИСХОДНЫЕ ДАННЫЕ =====
+  const P_PCH = [
+    ['voltage_kv', 'Напряжение, кВ', [['', '—'], ['6', '6'], ['10', '10']]],
+    ['motor_power_kw', 'Мощность ЭД, кВт'], ['motor_current_a', 'Ток ЭД, А'],
+    ['vfd_power_kw', 'Мощность ПЧ по ТЗ, кВт'], ['vfd_current_a', 'Ток ПЧ по ТЗ, А'], ['vfd_kva', 'Полная мощность ПЧ по ТЗ, кВА'],
+    ['quantity', 'Количество, шт'],
+    ['motor_type', 'Тип ЭД', [['', '—'], ['A', 'Асинхронный'], ['S', 'Синхронный']]],
+    ['capacitors', 'Конденсаторы', [['', 'Авто (плёночные)'], ['PF', 'Плёночные'], ['EL', 'Электролитические']]],
+    ['winding', 'Обмотки трансформатора', [['', '—'], ['AL', 'Алюминий'], ['CU', 'Медь']]],
+    ['cells_per_phase', 'Ячеек на фазу', [['', 'По умолчанию (6 кВ — 5, 10 кВ — 8)'], ['5', '5'], ['6', '6'], ['8', '8'], ['9', '9']]],
+    ['bypass', 'Шкаф байпаса', [['', '—'], ['X', 'Нет'], ['A', 'Автоматический'], ['M', 'Ручной']]],
+    ['reactor', 'Шкаф реактора', [['', '—'], ['false', 'Нет'], ['true', 'Да']]],
+    ['ip_required', 'Требуемая IP (число)'],
+    ['ups', 'ИБП', [['', '—'], ['false', 'Нет'], ['true', 'Да']]],
+    ['cable_entry', 'Ввод кабелей', [['', '—'], ['D', 'Снизу'], ['T', 'Сверху']]],
+    ['protocol', 'Протокол', [['', '—'], ['MR', 'Modbus RTU'], ['MT', 'Modbus TCP'], ['PB', 'ProfibusDP'], ['PN', 'ProfiNet'], ['CO', 'CanOpen'], ['EI', 'Ethernet/IP']]],
+    ['cell_bypass', 'Байпас ячеек', [['', '—'], ['false', 'Нет'], ['true', 'Да']]],
+    ['sync_transfer', 'Синхронный перевод на сеть', [['', '—'], ['false', 'Нет'], ['true', 'Да']]],
+    ['di_do_needed', 'Нужно DI/DO, шт'],
+  ];
+  const P_UPP = [
+    ['voltage_kv', 'Напряжение, кВ', [['', '—'], ['6', '6'], ['10', '10']]],
+    ['motor_power_kw', 'Мощность ЭД, кВт'], ['motor_current_a', 'Ток ЭД, А'], ['starter_current_a', 'Ток УПП по ТЗ, А'],
+    ['quantity', 'Количество, шт'],
+    ['motor_type', 'Тип ЭД', [['', '—'], ['A', 'Асинхронный'], ['S', 'Синхронный']]],
+    ['package', 'Комплектация', [['', '—'], ['STD', 'Стандартная'], ['E', 'С вакуумным выключателем'], ['S', 'С выкатными тиристорными блоками'], ['IK', 'С вводным разъединителем']]],
+    ['ip_required', 'Требуемая IP (число)'],
+    ['control_power', 'Питание цепей управления', [['', '—'], ['AC220', '~220 В AC'], ['DC220', '=220 В DC'], ['AC110', '~110 В AC'], ['DC110', '=110 В DC']]],
+    ['cable_entry', 'Ввод кабелей', [['', '—'], ['D', 'Снизу'], ['T', 'Сверху']]],
+    ['service', 'Обслуживание', [['', '—'], ['2', 'Двухстороннее'], ['1', 'Одностороннее']]],
+    ['protocol', 'Протокол', [['', '—'], ['MR', 'Modbus RTU'], ['MT', 'Modbus TCP'], ['PB', 'ProfibusDP'], ['PN', 'ProfiNet'], ['CO', 'CanOpen'], ['EI', 'Ethernet/IP']]],
+    ['starts_per_hour', 'Пусков в час по ТЗ'],
+    ['motors_count', 'ЭД на один УПП'],
+  ];
+  const P = UPP ? P_UPP : P_PCH;
+  function renderParams() {
+    const p = state.params;
+    $('paramGrid').innerHTML = P.map(([k, label, opts]) => {
+      const v = p[k] == null ? '' : String(p[k]);
+      const src = state.paramsSrc[k] ? '<span class="src">п. ' + esc(state.paramsSrc[k]) + '</span>' : '';
+      const ctl = opts ? `<select data-k="${k}">${opts.map(([ov, ot]) => `<option value="${ov}"${ov === v ? ' selected' : ''}>${esc(ot)}</option>`).join('')}</select>`
+        : `<input type="number" step="any" data-k="${k}" value="${esc(v)}">`;
+      return `<div class="field"><label>${esc(label)}</label>${ctl}${src}</div>`;
+    }).join('');
+    $('paramGrid').querySelectorAll('[data-k]').forEach(el => el.addEventListener('change', () => {
+      const k = el.dataset.k; let v = el.value;
+      if (v === '') v = null; else if (v === 'true') v = true; else if (v === 'false') v = false; else if (el.type === 'number' || ['voltage_kv', 'cells_per_phase'].includes(k)) v = Number(v);
+      state.params[k] = v; runChecks(); renderRows(); updateConfig();
+    }));
+    const n = $('paramNotes'); const notes = state.params.notes;
+    n.classList.toggle('hidden', !notes); n.textContent = notes ? 'Заметки: ' + notes : '';
+  }
+
+  function configParams() { return UPP ? configParamsUpp() : configParamsPch(); }
+  function configParamsUpp() {
+    const p = state.params, q = new URLSearchParams();
+    const v = Number(p.voltage_kv) >= 8 ? 10 : 6;
+    const kw = Number(p.motor_power_kw) || 0;
+    const a = Math.max(Number(p.motor_current_a) || 0, Number(p.starter_current_a) || 0);
+    q.set('from', 'tz'); q.set('v', v === 10 ? '10' : '06');
+    if (kw) q.set('kw', String(kw)); if (a) q.set('a', String(a));
+    q.set('pkg', p.package || 'STD');
+    q.set('mot', p.motor_type || 'A');
+    q.set('ip', Number(p.ip_required) > 41 ? 'IP54' : 'IP41');
+    q.set('ctl', p.control_power || 'AC220');
+    q.set('cab', p.cable_entry || 'D');
+    q.set('srv', p.service || '2');
+    q.set('pr', p.protocol || 'MR');
+    if (p.quantity) q.set('qty', String(p.quantity));
+    const t = $('docTitle').value.trim(); if (t) q.set('tz', t.slice(0, 120));
+    return { q, v, kw };
+  }
+  function configParamsPch() {
+    const p = state.params, q = new URLSearchParams();
+    const v = Number(p.voltage_kv) >= 8 ? 10 : 6;
+    let kw = Math.max(Number(p.motor_power_kw) || 0, Number(p.vfd_power_kw) || 0);
+    let a = Math.max(Number(p.motor_current_a) || 0, Number(p.vfd_current_a) || 0);
+    if (p.vfd_kva) a = Math.max(a, Math.ceil(Number(p.vfd_kva) / (Math.sqrt(3) * v)));
+    q.set('from', 'tz'); q.set('v', v === 10 ? 'T100' : 'T060');
+    if (kw) q.set('kw', String(kw)); if (a) q.set('a', String(a));
+    q.set('cap', p.capacitors || 'auto');
+    const cells = Number(p.cells_per_phase) || (v === 10 ? 8 : 5);
+    q.set('puls', String({ 5: 30, 6: 36, 8: 48, 9: 54 }[cells] || (v === 10 ? 48 : 30)));
+    q.set('mat', p.winding || 'AL');
+    q.set('byp', p.bypass || 'X');
+    q.set('react', p.reactor ? 'R' : 'X');
+    q.set('ip', Number(p.ip_required) > 31 ? '42' : '31');
+    const io = Number(p.di_do_needed) || 0;
+    q.set('exp', io > 20 ? '2E' : io > 12 ? 'E' : 'X');
+    q.set('ups', p.ups ? 'U' : 'X');
+    q.set('cab', p.cable_entry || 'D');
+    q.set('pr', p.protocol || 'MR');
+    q.set('cb', p.cell_bypass ? 'B' : 'N');
+    q.set('mot', p.motor_type || 'A');
+    q.set('sync', p.sync_transfer ? 'B' : 'X');
+    if (p.quantity) q.set('qty', String(p.quantity));
+    const t = $('docTitle').value.trim(); if (t) q.set('tz', t.slice(0, 120));
+    return { q, v, kw };
+  }
+  function updateConfig() {
+    const { q, v, kw } = configParams();
+    const url = CONFIGURATOR + '?' + q.toString();
+    $('btnConfig').href = url;
+    const p = state.params;
+    $('skuMsg').textContent = (Number(p.voltage_kv) && ![6, 10].includes(Math.round(Number(p.voltage_kv))) ? 'Напряжение ' + p.voltage_kv + ' кВ: подобрано на ' + v + ' кВ — проверьте. ' : '') +
+      (!kw && !Number(p.motor_current_a) ? 'Мощность и ток ЭД не найдены — выберите модель в конфигураторе вручную.' : '');
+    const fr = $('cfgFrame');
+    state.sku = '';
+    $('sku').textContent = 'подбор…';
+    fr.onload = () => {
+      try { const d = fr.contentDocument; const sku = d.getElementById('result').textContent.trim(); state.sku = sku; $('sku').textContent = sku;
+        const capEl = d.getElementById('capacitorType'); if (capEl) state.cap = capEl.value;
+        if (UPP && fr.contentWindow.uppState) state.dims = fr.contentWindow.uppState().dims;
+        runChecks(); renderRows();
+        const w = fr.contentWindow;
+        const big = UPP ? !!(w.isDrawingMissing && w.isDrawingMissing()) : !!(w.isFilmBig && w.isFilmBig());
+        const note = UPP ? 'Для этой модели УПП габаритный эскиз в ТКП не вставляется — приложите его отдельно.'
+          : 'Плёночный ПЧ этой мощности: габаритный чертёж в ТКП не вставляется — приложите его отдельно.';
+        $('skuMsg').textContent = $('skuMsg').textContent.replace(note, '').trim() + (big ? (' ' + note) : ''); }
+      catch (e) { $('sku').textContent = 'маркировку покажет конфигуратор'; }
+    };
+    fr.src = url + '&embed=1';
+  }
+
+  // ===== ПЕРЕПРОВЕРКА ЧИСЕЛ ПО ПРАВИЛАМ (код главнее модели, но не главнее человека) =====
+  function codeVerdict(key, val, ctx) { return UPP ? codeVerdictUpp(key, val, ctx) : codeVerdictPch(key, val, ctx); }
+  // УПП ESQ F HVS: пределы по техописанию, РЭ и шаблону ТКП
+  function codeVerdictUpp(key, val, ctx) {
+    const x = Number(String(val).replace(',', '.').replace('−', '-'));
+    if (!isFinite(x)) return null;
+    switch (key) {
+      case 'ip': return x > 54 ? ['DEV', 'IP41 стандартно, IP54 — опция'] : x > 41 ? ['OPT', 'IP54 — опция'] : ['OK'];
+      case 'starts_per_hour': return x > ctx.startsH ? ['DEV', 'до ' + ctx.startsH + ' пусков в час с перерывом 10 мин'] : ['OK'];
+      case 'ambient_min_c': return x < -10 ? ['DEV', 'эксплуатация от −10 °С'] : ['OK'];
+      case 'ambient_max_c': return x > 50 ? ['DEV', 'эксплуатация до +50 °С'] : ['OK'];
+      case 'storage_min_c': return x < -45 ? ['DEV', 'хранение от −45 °С'] : x < -20 ? ['CHECK', 'хранение: в ТКП −20 °С (стр. 6) и −45 °С (стр. 10)'] : ['OK'];
+      case 'storage_max_c': return x > 50 ? ['DEV', 'хранение до +50 °С'] : ['OK'];
+      case 'humidity_pct': return x > 95 ? ['DEV', 'влажность до 95% без конденсата'] : ['OK'];
+      case 'altitude_m': return x > 1500 ? ['DEV', 'высота до 1500 м'] : ['OK'];
+      case 'vibration_g': return x > 0.6 ? ['DEV', 'вибрация менее 0,6g'] : ['OK'];
+      case 'voltage_tol_pct': return Math.abs(x) > 15 ? ['DEV', 'напряжение сети ±15%'] : ['OK'];
+      case 'freq_hz': return x !== 50 && x !== 60 ? ['DEV', 'частота сети 50/60 Гц'] : ['OK'];
+      case 'current_limit_pct': return x < 100 || x > 500 ? ['DEV', 'ограничение тока 100–500% Iе'] : ['OK'];
+      case 'start_time_s': return x > 120 ? ['DEV', 'время пуска до 120 с'] : ['OK'];
+      case 'ramp_time_s': return x > 60 ? ['DEV', 'время нарастания до 60 с'] : ['OK'];
+      case 'soft_stop_s': return x > 60 ? ['DEV', 'плавный останов до 60 с'] : ['OK'];
+      case 'kick_time_s': return x > 5 ? ['DEV', 'толчковый пуск до 5 с'] : ['OK'];
+      case 'di_needed': return x > 4 ? ['CHECK', 'входы: пуск, стоп, аварийный стоп, сигнал ячейки'] : ['OK'];
+      case 'do_needed': return x > 3 ? ['DEV', '3 релейных выхода'] : ['OK'];
+      case 'ao_needed': return x > 1 ? ['DEV', '1 аналоговый выход 4–20 мА'] : ['OK'];
+      case 'ai_needed': return x > 0 ? ['DEV', 'аналоговых входов нет'] : ['OK'];
+      case 'start_limit_mult': return x > 5 ? ['DEV', 'ограничение пускового тока до 5 Iе'] : ['OK'];
+      case 'max_width_mm': case 'max_depth_mm': case 'max_height_mm': {
+        if (!ctx.dims) return ['CHECK', 'габариты модели уточняются у завода'];
+        const d = ctx.dims.split('×').map(Number), k = { max_width_mm: 0, max_depth_mm: 1, max_height_mm: 2 }[key];
+        return d[k] > x ? ['DEV', 'габариты модели ' + ctx.dims + ' мм (Ш×Г×В)'] : ['OK'];
+      }
+      case 'max_weight_kg': return x < 800 ? ['DEV', 'масса 800 кг'] : ['OK'];
+      case 'error_log': return x > 1000 ? ['DEV', 'журнал до 1000 аварий'] : ['OK'];
+      case 'network_nodes': return x > 32 ? ['DEV', 'до 32 устройств в сети'] : ['OK'];
+      case 'control_voltage_v': return x < 187 || x > 253 ? ['CHECK', 'стандартно ~220 В ±15%, другое — по согласованию с заводом'] : ['OK'];
+      case 'freq_tol_hz': return x > 2 ? ['DEV', 'частота сети ±2 Гц'] : ['OK'];
+      case 'overcurrent_pct': return x < 100 || x > 500 ? ['DEV', 'токовая защита 100–500% Iе'] : ['OK'];
+      case 'warranty_months_commissioning': return x > 24 ? ['CHECK', 'гарантия стандартно 24 мес. с ввода'] : ['OK'];
+      case 'warranty_months_delivery': return x > 36 ? ['CHECK', 'гарантия стандартно 36 мес. с продажи'] : ['OK'];
+      default: return null;
+    }
+  }
+  function codeVerdictPch(key, val, ctx) {
+    const x = Number(String(val).replace(',', '.').replace('−', '-'));
+    if (!isFinite(x)) return null;
+    const pct = x <= 1 ? x * 100 : x;
+    switch (key) {
+      case 'power_factor': { const pf = x > 1 ? x / 100 : x; return pf > 0.95 ? ['DEV', 'коэффициент мощности 0,95 (П1)'] : ['OK']; }
+      case 'speed_accuracy_pct': return x < 0.5 ? ['DEV', 'точность скорости 0,5% (П12)'] : ['OK'];
+      case 'thdi_pct': case 'thdu_pct': return x < 5 ? ['DEV', 'гармоники не более 5% (П13)'] : ['OK'];
+      case 'ip': return x > 42 ? ['DEV', 'только IP31/IP42 (П22)'] : ['OK'];
+      case 'freq_tol_pct': return Math.abs(x) > 5 ? ['DEV', 'частота сети ±5%'] : ['OK'];
+      case 'efficiency_pct': { const lim = ctx.cap === 'EL' ? 96 : 97; return pct > lim ? ['DEV', 'КПД ' + lim + '% (П32)'] : ['OK']; }
+      case 'overload_120_s': return x > 60 ? ['DEV', 'перегрузка 120% — 60 с (П23)'] : ['OK'];
+      case 'overload_150_s': return x > 3 ? ['DEV', 'перегрузка 150% — 3 с (П23)'] : ['OK'];
+      case 'cable_m': return x > 1000 ? ['DEV', 'кабель до 1000 м (П7)'] : ['OK'];
+      case 'storage_min_c': return x < -20 ? ['DEV', 'хранение от −20 °С (П8)'] : ['OK'];
+      case 'storage_max_c': return x > 70 ? ['DEV', 'хранение до +70 °С (П8)'] : ['OK'];
+      case 'ambient_min_c': return x < 0 ? ['DEV', 'эксплуатация от 0 °С'] : ['OK'];
+      case 'ambient_max_c': return x > 40 ? ['DEV', 'эксплуатация до +40 °С'] : ['OK'];
+      case 'humidity_pct': return x > 95 ? ['DEV', 'влажность до 95%'] : ['OK'];
+      case 'altitude_m': return x > 1000 ? ['DEV', 'высота до 1000 м без снижения характеристик'] : ['OK'];
+      case 'fout_max_hz': return x > 120 ? ['DEV', 'выходная частота до 120 Гц (П2)'] : ['OK'];
+      case 'seismic_msk': return x > 9 ? ['DEV', 'сейсмостойкость 9 баллов'] : ['OK'];
+      case 'noise_db': return x < 79 ? ['DEV', 'шум 79 дБ (П21)'] : ['OK'];
+      case 'warranty_months_commissioning': return x > 24 ? ['CHECK', 'гарантия стандартно 24 мес. с ввода (П9)'] : ['OK'];
+      case 'warranty_months_delivery': return x > 36 ? ['CHECK', 'гарантия стандартно 36 мес. с поставки (П9)'] : ['OK'];
+      case 'mtbf_h': return x > 100000 ? ['DEV', 'наработка на отказ 100 000 ч (П10)'] : ['OK'];
+      case 'overhaul_h': return x > 150000 ? ['DEV', 'ресурс до КР 150 000 ч (П10)'] : ['OK'];
+      case 'recovery_min': return x < 30 ? ['DEV', 'восстановление 30 мин (П10)'] : ['OK'];
+      case 'ups_min': return x > 120 ? ['DEV', 'ИБП до 2 ч'] : ['OK'];
+      case 'panel_inch': return x > 10 ? ['OPT', 'панель 12" — опция (П16)'] : ['OK'];
+      default: return null;
+    }
+  }
+  function runChecks() {
+    const v = Number(state.params && state.params.voltage_kv) >= 8 ? 10 : 6;
+    const kw = Math.max(Number(state.params && state.params.motor_power_kw) || 0, Number(state.params && state.params.vfd_power_kw) || 0);
+    const ctx = { cap: state.cap || (state.params && state.params.capacitors) || 'PF', startsH: kw > (v === 10 ? 4000 : 2500) ? 3 : 6, dims: state.dims };
+    for (const r of state.rows) {
+      if (r.userSet) continue;
+      r.status = r.modelStatus; r.auto = '';
+      if (!(r.status in SEV)) continue;
+      let worst = null;
+      for (const c of r.check || []) {
+        const res = c && codeVerdict(c.key, c.value, ctx);
+        if (res && res[0] !== 'OK' && (!worst || SEV[res[0]] > SEV[worst[0]])) worst = res;
+      }
+      if (worst && SEV[worst[0]] > SEV[r.status]) { r.status = worst[0]; r.auto = 'Проверка по числам: ' + worst[1]; }
+    }
+  }
+
+  // ===== ТАБЛИЦА ТРЕБОВАНИЙ =====
+  function counts() { const c = {}; ST_ORDER.forEach(s => c[s] = 0); state.rows.forEach(r => c[r.status]++); return c; }
+  function renderChips() {
+    const c = counts();
+    $('chips').innerHTML = `<span class="chip${state.filter ? '' : ' on'}" data-f="">Все<b>${state.rows.length}</b></span>` +
+      ST_ORDER.map(s => `<span class="chip s-${s}${state.filter === s ? ' on' : ''}" data-f="${s}">${ST[s]}<b>${c[s]}</b></span>`).join('');
+    $('chips').querySelectorAll('.chip').forEach(ch => ch.onclick = () => { state.filter = ch.dataset.f || null; renderRows(); });
+  }
+  function renderRows() {
+    renderChips();
+    const opts = s => ST_ORDER.map(k => `<option value="${k}"${k === s ? ' selected' : ''}>${ST[k]}</option>`).join('');
+    $('reqBody').innerHTML = state.rows.map((r, i) => (state.filter && r.status !== state.filter) ? '' : `
+      <tr class="s-${r.status}" data-i="${i}">
+        <td data-l="№">${i + 1}</td>
+        <td class="c" data-l="Пункт ТЗ"><textarea data-f="clause" rows="1" style="min-height:30px;width:70px">${esc(r.clause)}</textarea></td>
+        <td data-l="Требование ТЗ"><textarea data-f="requirement">${esc(r.requirement)}</textarea>${r.comment ? `<span class="inner" title="Внутренний комментарий — заказчик его не видит">${esc(r.comment)}</span>` : ''}</td>
+        <td data-l="Предложение ESQ"><textarea data-f="proposal">${esc(r.proposal)}</textarea></td>
+        <td data-l="Статус"><select data-f="status">${opts(r.status)}</select>${r.rule ? `<span class="rule">${esc(r.rule)}</span>` : ''}${r.auto ? `<span class="auto">${esc(r.auto)}</span>` : ''}${r.userSet ? '<span class="rule">изменено вручную</span>' : ''}</td>
+        <td data-l="Примечание для заказчика"><textarea data-f="client">${esc(r.client)}</textarea></td>
+      </tr>`).join('');
+    $('reqBody').querySelectorAll('[data-f]').forEach(el => el.addEventListener('change', () => {
+      const r = state.rows[+el.closest('tr').dataset.i], f = el.dataset.f;
+      r[f] = el.value;
+      if (f === 'status') { r.userSet = true; r.auto = ''; renderRows(); }
+    }));
+  }
+  $('btnAddRow').onclick = () => { state.rows.push({ clause: '', requirement: '', proposal: '', comment: '', client: '', rule: '', modelStatus: 'DEV', status: 'DEV', check: [], userSet: true, auto: '' }); state.filter = null; renderRows(); };
+
+  // ===== ДОКУМЕНТЫ (.docx) =====
+  function meta() {
+    const { q } = configParams();
+    return {
+      title: $('docTitle').value.trim(), customer: $('docCustomer').value.trim(), object: $('docObject').value.trim(),
+      sku: state.sku, qty: q.get('qty') || '1',
+      extras: $('extraPos').value.split('\n').map(s => s.trim()).filter(Boolean),
+    };
+  }
+  function dateRu() { return new Date().toLocaleDateString('ru-RU'); }
+
+  function buildDocx(kindDoc, includeCheck) {
+    const D = window.docx; if (!D) throw new Error('Библиотека docx не загрузилась — проверьте интернет');
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, PageOrientation, BorderStyle, ShadingType, VerticalAlign } = D;
+    const m = meta();
+    const FONT = 'Arial';
+    const W = 14570;   // ширина поля A4 альбом при полях 2 см
+    const run = (t, o) => new TextRun(Object.assign({ text: String(t == null ? '' : t), font: FONT, size: 20 }, o || {}));
+    const para = (t, o, ro) => new Paragraph(Object.assign({ spacing: { after: 80 }, children: Array.isArray(t) ? t : [run(t, ro)] }, o || {}));
+    const border = { style: BorderStyle.SINGLE, size: 4, color: '808080' };
+    const borders = { top: border, bottom: border, left: border, right: border };
+    const cell = (t, w, o) => new TableCell({
+      width: { size: w, type: WidthType.DXA }, borders, verticalAlign: VerticalAlign.TOP,
+      shading: o && o.fill ? { type: ShadingType.CLEAR, color: 'auto', fill: o.fill } : undefined,
+      margins: { top: 60, bottom: 60, left: 90, right: 90 },
+      children: String(t == null ? '' : t).split('\n').map(line => new Paragraph({ alignment: o && o.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+        children: [run(line, { bold: !!(o && o.bold), size: o && o.size || 18 })] })),
+    });
+    const table = (cols, rows) => new Table({
+      width: { size: W, type: WidthType.DXA }, columnWidths: cols.map(c => c[1]),
+      rows: [new TableRow({ tableHeader: true, children: cols.map(c => cell(c[0], c[1], { bold: true, fill: 'D9E1F2', center: true })) })]
+        .concat(rows.map((r, i) => new TableRow({ cantSplit: true, children: cols.map((c, j) => cell(j === 0 ? i + 1 : r[j - 1], c[1], { center: j < 2 })) }))),
+    });
+    const children = [];
+    const isDev = kindDoc === 'dev';
+    children.push(para(isDev ? 'ЛИСТ НЕСООТВЕТСТВИЙ' : 'ЛИСТ СООТВЕТСТВИЯ ТРЕБОВАНИЯМ ТЗ', { alignment: AlignmentType.CENTER, spacing: { after: 60 } }, { bold: true, size: 28 }));
+    if (m.title) children.push(para((isDev ? 'к техническому заданию: ' : '') + m.title, { alignment: AlignmentType.CENTER, spacing: { after: 200 } }, { size: 20 }));
+    const info = [['Заказчик', m.customer], ['Объект', m.object],
+      ['Оборудование', PROD.equipment + ' ' + (m.sku || PROD.model) + ', ' + m.qty + ' шт.'],
+      ['Поставщик', 'ООО «Элком»']];
+    info.filter(x => x[1]).forEach(([k, v]) => children.push(para([run(k + ': ', { bold: true }), run(v)])));
+
+    const rowsOf = s => state.rows.filter(r => r.status === s && (r.requirement || r.proposal));
+    const c5 = [['№', 600], ['Пункт ТЗ', 1300], ['Требование ТЗ', 5000], ['Предлагаемый вариант', 4170], ['Примечание', 3500]];
+    const asRow = r => [r.clause, r.requirement, r.proposal, r.client];
+    let sec = 0;
+    const section = (title, rows, empty) => {
+      children.push(para(++sec + '. ' + title, { spacing: { before: 240, after: 120 } }, { bold: true, size: 22 }));
+      if (rows.length) children.push(table(c5, rows.map(asRow))); else children.push(para(empty || '—'));
+    };
+    if (isDev) {
+      section('Отклонения от требований ТЗ', rowsOf('DEV'), 'Отклонений от требований ТЗ нет.');
+      if (includeCheck && rowsOf('CHECK').length) section('Требования, подлежащие уточнению', rowsOf('CHECK'));
+      if ($('incOpt').checked) {
+        const optRows = rowsOf('OPT');
+        if (optRows.length || m.extras.length) {
+          section('Требования, выполняемые опциями и отдельными позициями поставки', optRows);
+          if (m.extras.length) { children.push(para('Отдельные позиции ТКП:', { spacing: { before: 120 } }, { bold: true }));
+            m.extras.forEach(e => children.push(para('• ' + e))); }
+        }
+      }
+      children.push(para('Остальные требования технического задания выполняются. Договорные условия (документация, услуги, ЗИП, испытания, сроки, гарантия) — согласно ТКП и договору поставки.', { spacing: { before: 240 } }));
+    } else {
+      const c6 = [['№', 600], ['Пункт ТЗ', 1200], ['Требование ТЗ', 4600], ['Предложение ' + PROD.model, 3800], ['Статус', 1500], ['Примечание', 2870]];
+      const all = state.rows.filter(r => r.requirement || r.proposal);
+      const fill = { OK: 'E2F0D9', OPT: 'DDEBF7', DEV: 'F8CBAD', CHECK: 'FFF2CC', CTR: 'EDEDED', NA: 'F7F7F7' };
+      children.push(new Table({
+        width: { size: W, type: WidthType.DXA }, columnWidths: c6.map(c => c[1]),
+        rows: [new TableRow({ tableHeader: true, children: c6.map(c => cell(c[0], c[1], { bold: true, fill: 'D9E1F2', center: true })) })]
+          .concat(all.map((r, i) => new TableRow({ cantSplit: true, children: [
+            cell(i + 1, 600, { center: true }), cell(r.clause, 1200, { center: true }), cell(r.requirement, 4600), cell(r.proposal, 3800),
+            cell(ST[r.status], 1500, { fill: fill[r.status], center: true }), cell(r.client, 2870)] }))),
+      }));
+      if (m.extras.length) { children.push(para('Отдельные позиции ТКП:', { spacing: { before: 200 } }, { bold: true })); m.extras.forEach(e => children.push(para('• ' + e))); }
+    }
+
+    const doc = new Document({
+      creator: 'ООО «Элком»', title: isDev ? 'Лист несоответствий' : 'Лист соответствия',
+      styles: { default: { document: { run: { font: FONT, size: 20 } } } },
+      sections: [{ properties: { page: { size: { width: 11906, height: 16838, orientation: PageOrientation.LANDSCAPE }, margin: { top: 1000, bottom: 1000, left: 1134, right: 1134 } } }, children }],
+    });
+    return Packer.toBlob(doc);
+  }
+  function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+  const baseName = () => (($('docTitle').value.trim() || 'ТЗ').replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 60)).trim();
+
+  $('btnDev').onclick = async () => {
+    const m = $('outMsg'); m.className = 'msg';
+    const nCheck = state.rows.filter(r => r.status === 'CHECK').length;
+    let inc = false;
+    if (nCheck) {
+      inc = confirm('Осталось пунктов «Проверить»: ' + nCheck + '.\nЛучше решить их в таблице (Соответствует / Отклонение / …).\n\nOK — всё равно выгрузить, включив их разделом «Требования, подлежащие уточнению».\nОтмена — вернуться к таблице.');
+      if (!inc) { state.filter = 'CHECK'; renderRows(); $('secReq').scrollIntoView({ behavior: 'smooth' }); return; }
+    }
+    try { download(await buildDocx('dev', inc), 'Лист несоответствий — ' + baseName() + '.docx'); m.className = 'msg ok'; m.textContent = 'Лист несоответствий сформирован'; }
+    catch (e) { m.className = 'msg err'; m.textContent = e.message; }
+  };
+  $('btnFull').onclick = async () => {
+    try { download(await buildDocx('full'), 'Лист соответствия — ' + baseName() + '.docx'); }
+    catch (e) { $('outMsg').className = 'msg err'; $('outMsg').textContent = e.message; }
+  };
+
+  // ===== СОХРАНЕНИЕ / ЗАГРУЗКА РАЗБОРА =====
+  $('btnSave').onclick = () => {
+    const data = {
+      _format: 'esq-tz-1', _product: PRODUCT, _saved: new Date().toISOString(), _model: state.model,
+      document: { title: $('docTitle').value, customer: $('docCustomer').value, object: $('docObject').value },
+      params: state.params, params_src: state.paramsSrc,
+      requirements: state.rows.map(r => ({ clause: r.clause, requirement: r.requirement, proposal: r.proposal, status: r.status, modelStatus: r.modelStatus, rule: r.rule, comment: r.comment, client_note: r.client, check: r.check, userSet: r.userSet })),
+      extra_positions: $('extraPos').value.split('\n').map(s => s.trim()).filter(Boolean),
+      _text: $('tzText').value,
+    };
+    download(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }), 'Разбор — ' + baseName() + '.json');
+  };
+  $('loadJson').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const d = JSON.parse(await f.text());
+      if ((d._product || 'pch') !== PRODUCT) throw new Error('это разбор ТЗ на ' + ((d._product || 'pch') === 'upp' ? 'УПП' : 'ПЧ') + ' — откройте его на соответствующей вкладке вверху страницы');
+      if (d._text) { $('tzText').value = d._text; $('textBox').classList.remove('hidden'); updateTextStat(); updateAnalyzeBtn(); }
+      loadResult(d);
+    } catch (err) { $('readMsg').className = 'msg err'; $('readMsg').textContent = 'Не удалось открыть разбор: ' + err.message; }
+  };
+
+  // для тестов
+  window.__tz = { state, loadResult, readDocx, readDoc, readXlsx, readPdf, codeVerdict, buildDocx, configParams };
+})();
