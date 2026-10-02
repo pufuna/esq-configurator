@@ -10,14 +10,6 @@
    Таблица FIELDS снята с шаблона: границы надписи, базовая линия, кегль и цвет. */
 (function () {
   'use strict';
-  // Safari (iPad/iPhone, старые Mac) не умеет перебирать ReadableStream через for await — а pdf.js так читает текст страниц
-  if (typeof ReadableStream !== 'undefined' && !ReadableStream.prototype[Symbol.asyncIterator]) {
-    ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
-      const reader = this.getReader();
-      try { for (;;) { const { done, value } = await reader.read(); if (done) return; yield value; } }
-      finally { reader.releaseLock(); }
-    };
-  }
   const { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix,
     rectangle, clipEvenOdd, endPath, decodePDFRawStream } = window.PDFLib;
   const $ = id => document.getElementById(id);
@@ -83,6 +75,7 @@
     s.mark = $('result').textContent;                                     // полная маркировка из конфигуратора
     s.m = /^ESQ F ME800-(\d{4,5})P(\d{3})[AА](T\d{3})(AL|CU)(\d{2})([SX])([AMX])([RX])(\d{2})(2E|E|X)([UX])([DT])(MR|MT|PB|PN|CO|EI)([AS])([XB])-(P[A-F])([BN])$/.exec(s.mark);
     s.g4 = s.film && (!window.isPFNCabinet || window.isPFNCabinet(s.v, s.P));   // компактный шкаф G4 — в шаблоне уже его чертёж
+    s.g4x = s.g4 && !!(window.pfExtrasCode && window.pfExtrasCode());          // шкаф G4 + доп. шкафы — свой чертёж из assets/drawings_pf/
     s.eff = s.film ? 97 : 96;
     s.life = s.film ? '200 000' : '100 000';                              // ресурс конденсаторов, ч
     s.sec = s.film ? 710 : 690;                                           // вторичная обмотка, В
@@ -194,7 +187,7 @@
       const F = makeFonts(GL, await doc.embedFont(StandardFonts.Helvetica));
       const pg = doc.getPages();
       const M = prepareMasks(doc, pg);
-      if (!s.g4) OLD_DRAWING_ZONES.forEach(z => M.add(10, ...z));   // кроме шкафа G4 старого чертежа на стр. 10 нет совсем
+      if (!s.g4 || s.g4x) OLD_DRAWING_ZONES.forEach(z => M.add(10, ...z));   // чертёж шаблона остаётся только для «голого» шкафа G4
 
       /* ---------- помощники ---------- */
       const rot = p => p.getRotation().angle;
@@ -294,7 +287,7 @@
       edit('p10_w2', kg, { size: 8.8, skew: .27 });
       stamp('p10_stamp', true);
       if (s.film && !s.g4) alert('Напоминание: для плёночного ПЧ этой мощности габаритный чертёж в ТКП не вставляется — страница чертежа останется пустой. Приложите чертёж к ТКП отдельно.');
-      else if (!s.g4) await drawDrawing(doc, pg[10]);    // для шкафа G4 остаётся чертёж шаблона: 1800×1425×2431 общий для 6 и 10 кВ
+      else if (!s.g4 || s.g4x) await drawDrawing(doc, pg[10]);    // для шкафа G4 остаётся чертёж шаблона: 1800×1425×2431 общий для 6 и 10 кВ
 
       /* ---------- стр. 13 ---------- */
       edit('p13_name', s.mark, { cx: 406, maxW: 296 });
