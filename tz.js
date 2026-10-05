@@ -489,15 +489,15 @@
       case 'freq_tol_pct': return Math.abs(x) > 5 ? ['DEV', 'частота сети ±5%'] : ['OK'];
       case 'voltage_tol_plus_pct': return x > 15 ? ['DEV', 'напряжение сети до +15% кратковременно (П3)'] : ['OK'];
       case 'efficiency_pct': { const lim = ctx.cap === 'EL' ? 96 : 97; return pct > lim ? ['DEV', 'КПД ' + lim + '% (П32)'] : ['OK']; }
-      case 'overload_120_s': return x > 60 ? ['DEV', 'перегрузка 120% — 60 с (П23)'] : ['OK'];
-      case 'overload_150_s': return x > 3 ? ['DEV', 'перегрузка 150% — 3 с (П23)'] : ['OK'];
+      case 'overload_120_s': return x > 60 ? ['CHECK', 'стандартно 120% — 60 с; иное исполнение — согласовать с заводом (П23)'] : ['OK'];
+      case 'overload_150_s': return x > 3 ? ['CHECK', 'стандартно 150% — 3 с; иное исполнение — согласовать с заводом (П23)'] : ['OK'];
       case 'cable_m': return x > 1000 ? ['DEV', 'кабель до 1000 м (П7)'] : ['OK'];
       case 'storage_min_c': return x < -20 ? ['DEV', 'хранение от −20 °С (П8)'] : ['OK'];
       case 'storage_max_c': return x > 70 ? ['DEV', 'хранение до +70 °С (П8)'] : ['OK'];
       case 'ambient_min_c': return x < -5 ? ['DEV', 'эксплуатация от −5 °С (П39)'] : ['OK'];
       case 'ambient_max_c': return x > 40 ? ['DEV', 'эксплуатация до +40 °С (П39)'] : ['OK'];
       case 'humidity_pct': return x >= 95 ? ['DEV', 'влажность менее 95% (П39)'] : ['OK'];
-      case 'altitude_m': return x > 2000 ? ['DEV', 'высота до 2000 м (П40)'] : ['OK'];
+      case 'altitude_m': return x > 2000 ? ['CHECK', 'выше 2000 м — по согласованию с поставщиком (П40)'] : ['OK'];
       case 'fout_max_hz': return x > 120 ? ['DEV', 'выходная частота до 120 Гц (П2)'] : ['OK'];
       case 'seismic_msk': return x > 9 ? ['DEV', 'сейсмостойкость 9 баллов'] : ['OK'];
       case 'noise_db': return x < 79 ? ['DEV', 'шум 79 дБ (П21)'] : ['OK'];
