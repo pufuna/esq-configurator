@@ -80,7 +80,8 @@
     s.life = s.film ? '200 000' : '100 000';                              // ресурс конденсаторов, ч
     s.sec = s.film ? 710 : 690;                                           // вторичная обмотка, В
     const m = window.getMechanicalFor(s.v, s.P);
-    s.wT = parseFloat(m.weight);                                          // вес ПЧ, т (шкафы пока не учитываем)
+    s.wT = parseFloat(m.weight);                                          // вес ПЧ, т
+    s.wFull = window.totalWeightT ? window.totalWeightT(m.weight) : s.wT; // полный вес: + 0,7 т на каждый доп. шкаф (байпас, реактор, необязательный пусковой)
     s.name = 'Преобразователь частоты ' + s.mark + ', ' + s.kv + ' кВ, ' + s.P + ' кВт, ' + s.I + ' А, IP' + s.ip + ', ' +
       (s.cu ? 'медный' : 'алюминиевый') + ' трансформатор, ' + s.n + ' ячеек на фазу, ' + (s.cb === 'B' ? 'с' : 'без') + ' байпас силовой ячейки' +
       (s.starter ? ', пусковой шкаф' : '') + (s.reactor ? ', шкаф реактора' : '') +
@@ -120,6 +121,14 @@
 
   /* Старый чертёж шаблона (стр. 10) для электролитов. Зоны сняты с шаблона: рамка 110,7…720,3; заголовок до 102,5;
      таблица веса 472,5…570,1 × 421,6…481,6; штамп от 489,2 — всё это вне зон и остаётся. */
+  // поле рисунка на листах схем (в координатах «как на экране»): всё внутри рамки, кроме заголовка и штампа
+  const SCHEME_ZONES = {
+    7: [82, 150, 522, 692],     // 2.2 Топология преобразователя (лист книжный, /Rotate 90)
+    8: [112, 103, 719, 487],    // 2.3 Топология силовой ячейки (лист альбомный)
+    12: [178, 239, 411, 415],   // 4. Форма выходного напряжения — фото осциллограммы
+    9: [82, 146.5, 522, 692]    // 2.4 Схема цепей управления (вместе с таблицей клемм — как в техописании, только схема)
+  };
+  const SCHEME_FIT = { 12: [70, 234, 525, 416] };   // куда вписывать рисунок, если шире стираемой зоны (рис. 5 техописания)
   const OLD_DRAWING_ZONES = [
     [111.2, 103.3, 719.8, 420.9],   // поле видов
     [111.2, 420.9, 471.9, 488.0],   // слева от таблицы веса («Вид сверху»)
@@ -185,9 +194,18 @@
       const [tpl, GL] = await Promise.all([get('assets/template.pdf').then(r => r.arrayBuffer()), get('assets/glyphs.json').then(r => r.json())]);
       const doc = await PDFDocument.load(tpl);
       const F = makeFonts(GL, await doc.embedFont(StandardFonts.Helvetica));
+      window.__tkpF = F;
       const pg = doc.getPages();
       const M = prepareMasks(doc, pg);
       if (!s.g4 || s.g4x) OLD_DRAWING_ZONES.forEach(z => M.add(10, ...z));   // чертёж шаблона остаётся только для «голого» шкафа G4
+      // схемы из техописания: 2.2 структурная (по числу ячеек), 2.3 силовая ячейка (электролиты / плёнка G4), 2.4 внешние подключения
+      const SCH = new URL(window.SCHEMES_BASE || 'assets/schemes/', document.baseURI).href;
+      const schFiles = { 7: 'struct_' + s.n + '.pdf', 8: (s.film ? 'cell_pf' : 'cell_el') + '.pdf', 9: 'ext.pdf', 12: 'sine.pdf' };
+      const sch = {};
+      for (const [i, f] of Object.entries(schFiles)) {
+        try { const r = await fetch(SCH + f); if (r.ok) sch[i] = await r.arrayBuffer(); } catch (e) { /* нет файла — остаётся схема шаблона */ }
+        if (sch[i]) M.add(+i, ...SCHEME_ZONES[i]);
+      }
 
       /* ---------- помощники ---------- */
       const rot = p => p.getRotation().angle;
@@ -206,7 +224,7 @@
         const cs = Math.cos(th), sn = Math.sin(th), ux = r === 90 ? vy : vx, uy = r === 90 ? vx : H - vy;
         p.pushOperators(pushGraphicsState(), concatTransformationMatrix(cs * hs, sn * hs, cs * k - sn, sn * k + cs, ux, uy));
         if (f.std) p.drawText(str, { x: 0, y: 0, size, font: f.std, color: o.c || BLACK });
-        else p.drawSvgPath(f.path(str), { x: 0, y: 0, scale: size / f.upm, color: o.c || BLACK, borderWidth: 0 });
+        else p.drawSvgPath(f.path(str), { x: 0, y: 0, scale: size / f.upm, color: o.c || BLACK, borderWidth: o.bold || 0, borderColor: o.c || BLACK });
         p.pushOperators(popGraphicsState());
       };
       // заменить надпись из таблицы FIELDS: стереть ровно её глифы и вписать новую на ту же базовую линию, тем же цветом
@@ -245,18 +263,8 @@
         put(pg[3], money(s.price * s.qty), 252.4, 359.6, 12, { f: 'tahoma', a: 'c', c: NAVY });
       }
 
-      /* ---------- стр. 5: маркировка — подчёркивания и выноски шаблона остаются, меняются только буквы ---------- */
-      const m = s.m, SL = [[200.4, 236], [236, 247], [247, 273], [273, 285.3], [285.3, 296.3], [296.3, 325.1], [325.1, 347], [347, 366.1], [366.1, 377.1],
-        [377.1, 389.5], [389.5, 401.8], [401.8, 422.3], [422.3, 431.9], [431.9, 442.9], [442.9, 453.9], [453.9, 477.2], [477.2, 489.5], [489.5, 501.8],
-        [501.8, 511.4], [511.4, 534.7], [534.7, 545.7]];
-      const G = [m[1], 'P', m[2], 'А', 'T', m[3].slice(1), m[4], m[5], m[6], m[7], m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15], '-', m[16], m[17]];
-      const MS = 13.5 * F.iso.upm / F.iso.cap;                 // высота прописных как в шаблоне — 13,5 pt
-      M.add(5, 200.2, 120.4, 546.6, 135.6);
-      G.forEach((t, i) => {
-        const sw = SL[i][1] - SL[i][0] - .6; let sz = MS;
-        if (F.iso.width(t, sz) / sw > 1.45) sz = MS * .62;     // «2E» в узкой ячейке — мельче, а не сплющено
-        put(pg[5], t, (SL[i][0] + SL[i][1]) / 2, 134.7, sz, { a: 'c', maxW: sw });
-      });
+      /* ---------- стр. 5: расшифровка обозначения — как рис. 10 и таблица п. 5.1 техописания ---------- */
+      if (s.m) drawDecode(pg[5], s, put, M);
 
       /* ---------- стр. 6: схема коммутации ---------- */
       if (!s.film) edit('p6_v', s.sec + 'V', { a: 'l' });
@@ -265,26 +273,28 @@
       stamp('p6_stamp', true);
 
       /* ---------- стр. 7: топология ---------- */
-      if (s.n !== 6) {
+      if (!sch[7] && s.n !== 6) {
         const ph = ['A', 'B', 'C'];
         const X = [235.05, 264.38, 293.82];                    // левый край подписи, как в шаблоне; стирается только внутренность рамки ячейки
         ['A5', 'B5', 'C5'].forEach((k, i) => edit('p7_' + k, ph[i] + (s.n - 1), { size: 9.13, a: 'l', ax: X[i] }));
         ['A6', 'B6', 'C6'].forEach((k, i) => edit('p7_' + k, ph[i] + s.n, { size: 9.13, a: 'l', ax: X[i] }));
       }
-      board('p7_b7', String(s.n - 1));                         // номера двух последних плат приёмопередатчиков
-      board('p7_b8', String(s.n));
-      if (s.kv === 10) edit('p7_motor', '10 кВ', { a: 'l' });
+      if (!sch[7]) {
+        board('p7_b7', String(s.n - 1));                       // номера двух последних плат приёмопередатчиков
+        board('p7_b8', String(s.n));
+        if (s.kv === 10) edit('p7_motor', '10 кВ', { a: 'l' });
+      }
       stamp('p7_stamp', false);
 
       /* ---------- стр. 8, 9 ---------- */
       stamp('p8_stamp', true);
-      if (s.kv === 10) edit('p9_v', '10 кВ.', { a: 'l' });
+      if (!sch[9] && s.kv === 10) edit('p9_v', '10 кВ.', { a: 'l' });
       stamp('p9_stamp', false);
 
       /* ---------- стр. 10: вес (курсив, как в таблице), штамп, чертёж ---------- */
-      const kg = isNaN(s.wT) ? '—' : String(Math.round(s.wT * 1000));
-      edit('p10_w1', kg, { size: 8.8, skew: .27 });
-      edit('p10_w2', kg, { size: 8.8, skew: .27 });
+      const kgOf = t => isNaN(t) ? '—' : String(Math.round(t * 1000));
+      edit('p10_w1', kgOf(s.wT), { size: 8.8, skew: .27 });     // вес преобразователя частоты
+      edit('p10_w2', kgOf(s.wFull), { size: 8.8, skew: .27 });  // полный вес — с доп. шкафами
       stamp('p10_stamp', true);
       if (s.film && !s.g4) alert('Напоминание: для плёночного ПЧ этой мощности габаритный чертёж в ТКП не вставляется — страница чертежа останется пустой. Приложите чертёж к ТКП отдельно.');
       else if (!s.g4 || s.g4x) await drawDrawing(doc, pg[10]);    // для шкафа G4 остаётся чертёж шаблона: 1800×1425×2431 общий для 6 и 10 кВ
@@ -308,13 +318,14 @@
       if (!s.film) edit('p14_cap', 'Электролитические', { cx: 409.5 });
       edit('p14_ups', s.ups ? 'Присутствует' : 'Отсутствует', { cx: 410 });
       if (s.proto !== 'Modbus RTU') edit('p14_proto', s.proto, { cx: 409.9 });
-      edit('p14_w', isNaN(s.wT) ? '—' : String(s.wT).replace('.', ','), { a: 'r', ax: 412.8 });
+      edit('p14_w', isNaN(s.wFull) ? '—' : String(s.wFull).replace('.', ','), { a: 'r', ax: 412.8 });
       edit('p14_cable', s.cable === 'T' ? 'Сверху' : 'Снизу', { cx: 410 });
       if (s.reactor) edit('p14_reactor', 'Присутствует', { cx: 410 });
 
       /* ---------- стр. 15: отпайки первичной обмотки для 10 кВ ---------- */
       if (s.kv === 10) edit('p15_taps', '9,5 и 10,5 кВ', { a: 'l', maxW: 51.5 });
 
+      for (const i of Object.keys(sch)) await drawScheme(doc, pg[+i], sch[i], SCHEME_FIT[i] || SCHEME_ZONES[i]);
       M.apply();
       const out = await doc.save();
       const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
@@ -385,6 +396,88 @@
     const pad = Math.round(.012 * Math.max(W, H));
     const box = [Math.max(L + 2, x0 - pad), Math.max(T + 2, y0 - pad), Math.min(R - 2, x1 + pad), Math.min(B - 2, y1 + pad)];
     return { box, tb };
+  }
+
+  /* Расшифровка обозначения на стр. 5: цветные сегменты маркировки с номерами позиций и таблица «Поз. / Параметр / Обозначение».
+     Цвета и пропорции — как в техописании (рис. 10). Шрифт — рубленый из шаблона (arial), полужирный — обводкой контура. */
+  function drawDecode(p, s, put, M) {
+    const TEAL = rgb(3 / 255, 91 / 255, 110 / 255), ORANGE = rgb(243 / 255, 95 / 255, 39 / 255), DARK = rgb(35 / 255, 31 / 255, 32 / 255), HEAD = rgb(212 / 255, 212 / 255, 212 / 255);
+    const H = p.getHeight(), m = s.m, A = 'arial';
+    M.add(5, 50, 95, 562, 735);                                        // всё внутри рамки листа
+    const X0 = 58, X1 = 554;
+    put(p, 'Расшифровка обозначения', X0, 122, 13, { f: A, c: DARK, bold: 60 });
+
+    // ---- маркировка
+    const seg = [['ESQ F ME800', 1], ['–'], [String(m[1]) + 'P', 2], [m[2] + 'А', 3], [m[3], 4], [m[4], 5], [m[5], 6], [m[6], 7], [m[7], 8], [m[8], 9],
+      [m[9], 10], [m[10], 11], [m[11], 12], [m[12], 13], [m[13], 14], [m[14], 15], [m[15], 16], ['–'], [m[16], 17], [m[17], 18]];
+    const fw = (t, z) => window.__tkpF.arial.width(t, z);
+    const gap = .3, w1 = seg.reduce((a, [t]) => a + fw(t, 1), 0) + gap * (seg.length - 1);
+    const z = Math.min(19, (X1 - X0 - 8) / w1), base = 168;     // запас на обводку полужирного
+    let x = X0 + ((X1 - X0) - w1 * z) / 2, k = 0;
+    for (const [t, n] of seg) {
+      const w = fw(t, z);
+      if (!n) { put(p, t, x, base, z, { f: A, c: DARK, bold: 50 }); x += w + gap * z; continue; }
+      const c = k++ % 2 ? ORANGE : TEAL;
+      put(p, t, x, base, z, { f: A, c, bold: 50 });
+      const uy = base + z * .2, cx = x + w / 2;
+      p.drawRectangle({ x, y: H - uy - z * .12, width: w, height: z * .12, color: c, borderWidth: 0 });
+      p.drawLine({ start: { x: cx, y: H - uy - z * .12 }, end: { x: cx, y: H - uy - z * .62 }, thickness: .6, color: DARK });
+      put(p, String(n), cx, uy + z * 1.18, z * .48, { f: A, c: DARK, a: 'c' });
+      x += w + gap * z;
+    }
+    put(p, 'Маркировка преобразователя', (X0 + X1) / 2, base + z * 2.35, 8.5, { f: A, c: DARK, a: 'c' });
+
+    // ---- таблица
+    const kv = { T030: 3, T060: 6, T100: 10 }[m[3]] || '', cells = { 30: 5, 36: 6, 48: 8, 54: 9 }[m[5]] || '';
+    const yes = (on, code, off) => on ? code + ' — включен в комплект' : off + ' — не включен';
+    const rows = [
+      ['Серия высоковольтных преобразователей частоты', 'ESQ F ME800'],
+      ['Мощность ПЧ, кВт (с буквой P)', m[1] + 'P — ' + (+m[1]) + ' кВт'],
+      ['Номинальный выходной ток ПЧ, А (с буквой А)', m[2] + 'А — ' + (+m[2]) + ' А'],
+      ['Номинальное напряжение ПЧ', m[3] + ' — ' + kv + ' кВ'],
+      ['Материал обмоток трансформатора', m[4] === 'CU' ? 'CU — медь' : 'AL — алюминий'],
+      ['Пульсность схемы выпрямления', m[5] + ' — ' + m[5] + '-пульсная (' + kv + ' кВ, ' + cells + ' ячеек в фазе)'],
+      ['Пусковой шкаф', yes(m[6] === 'S', 'S', 'X')],
+      ['Шкаф байпаса', { A: 'A — автоматический', M: 'M — ручной', X: 'X — без шкафа байпаса' }[m[7]]],
+      ['Шкаф реактора', yes(m[8] === 'R', 'R', 'X')],
+      ['Степень защиты ПЧ, IP', m[9] + ' — IP' + m[9]],
+      ['Плата расширения входов/выходов', { E: 'E — +8 DI/DO', '2E': '2E — +16 DI/DO', X: 'X — без плат расширения' }[m[10]]],
+      ['Источник бесперебойного питания (ИБП)', yes(m[11] === 'U', 'U', 'X')],
+      ['Ввод/вывод кабелей', m[12] === 'T' ? 'T — сверху' : 'D — снизу'],
+      ['Протокол связи', { MR: 'MR — Modbus RTU', MT: 'MT — Modbus TCP', PB: 'PB — Profibus DP', PN: 'PN — Profinet', CO: 'CO — CANopen', EI: 'EI — EtherNet/IP' }[m[13]]],
+      ['Тип двигателя', m[14] === 'S' ? 'S — синхронный' : 'A — асинхронный'],
+      ['Синхронизация с сетью', m[15] === 'B' ? 'B — с синхронизацией' : 'X — без синхронизации'],
+      ['Тип силовой ячейки', m[16] === 'PF' ? (s.g4 ? 'PF — сдвоенная силовая ячейка с пленочными конденсаторами звена постоянного тока (корпус G4)'
+        : 'PF — силовая ячейка с пленочными конденсаторами звена постоянного тока') : m[16] + ' — силовая ячейка с электролитическими конденсаторами звена постоянного тока'],
+      ['Байпас силовых ячеек', yes(m[17] === 'B', 'B', 'N')]
+    ];
+    const C = [X0, X0 + 40, X0 + 236, X1], FS = 8.6, LH = 10.6, PAD = 3.6;
+    const wrap = (t, maxW) => { const out = []; let cur = ''; for (const w of String(t).split(' ')) { const nx = cur ? cur + ' ' + w : w; if (fw(nx, FS) > maxW && cur) { out.push(cur); cur = w; } else cur = nx; } out.push(cur); return out; };
+    let y = base + z * 3.3;
+    const line = (x0, y0, x1, y1) => p.drawLine({ start: { x: x0, y: H - y0 }, end: { x: x1, y: H - y1 }, thickness: .6, color: DARK });
+    const hh = 16;
+    p.drawRectangle({ x: C[0], y: H - y - hh, width: C[3] - C[0], height: hh, color: HEAD, borderWidth: 0 });
+    [['Поз.', 0], ['Параметр', 1], ['Обозначение', 2]].forEach(([t, i]) => put(p, t, (C[i] + C[i + 1]) / 2, y + hh / 2 + FS * .36, FS, { f: A, c: DARK, a: 'c', bold: 45 }));
+    const top = y; line(C[0], y, C[3], y); y += hh; line(C[0], y, C[3], y);
+    rows.forEach((r, i) => {
+      const L1 = wrap(r[0], C[2] - C[1] - 2 * PAD), L2 = wrap(r[1], C[3] - C[2] - 2 * PAD), n = Math.max(L1.length, L2.length), h = n * LH + 2 * PAD - 1;
+      put(p, String(i + 1), (C[0] + C[1]) / 2, y + h / 2 + FS * .36, FS, { f: A, c: DARK, a: 'c', bold: 45 });
+      const ty = y + PAD + FS * .82 + (n - L1.length) * LH / 2, vy = y + PAD + FS * .82 + (n - L2.length) * LH / 2;
+      L1.forEach((t, j) => put(p, t, C[1] + PAD, ty + j * LH, FS, { f: A, c: DARK }));
+      L2.forEach((t, j) => put(p, t, C[2] + PAD, vy + j * LH, FS, { f: A, c: DARK }));
+      y += h; line(C[0], y, C[3], y);
+    });
+    C.forEach(cx => line(cx, top, cx, y));
+  }
+
+  /* Векторная схема из assets/schemes/ — вписывается в поле рисунка по центру */
+  async function drawScheme(doc, page, bytes, [x0, y0, x1, y1]) {
+    const sp = (await PDFDocument.load(bytes)).getPage(0), em = await doc.embedPage(sp);
+    const pad = 8, aw = x1 - x0 - 2 * pad, ah = y1 - y0 - 2 * pad, w = sp.getWidth(), h = sp.getHeight();
+    const k = Math.min(aw / w, ah / h, 1.7), dw = w * k, dh = h * k;
+    const vx = x0 + pad + (aw - dw) / 2, vy = y0 + pad + (ah - dh) / 2;     // левый верхний угол «как на экране»
+    if (page.getRotation().angle % 360 === 90) page.drawPage(em, { x: vy + dh, y: vx, width: dw, height: dh, rotate: degrees(90) });
+    else page.drawPage(em, { x: vx, y: page.getHeight() - vy - dh, width: dw, height: dh });
   }
 
   async function drawDrawing(doc, page) {

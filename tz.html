@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Разбор ТЗ — ESQ</title>
+  <title>Разбор ТЗ — ESQ F ME800</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <style>
@@ -40,7 +40,6 @@
     .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
     .chip{border:1px solid #c9d3df;border-radius:16px;padding:5px 12px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
     .chip.on{outline:2px solid var(--ink)}
-    #prodSwitch .chip{text-decoration:none;color:var(--ink)}
     .chip b{margin-left:4px}
     .s-OK{background:var(--ok)}.s-OPT{background:var(--opt)}.s-DEV{background:var(--dev)}.s-CHECK{background:var(--check)}.s-CTR{background:var(--ctr)}.s-NA{background:var(--na)}
     table.req{width:100%;border-collapse:collapse;font-size:13px}
@@ -72,8 +71,7 @@
 <body>
 <div class="wrap">
   <h1>Разбор ТЗ</h1>
-  <div class="sub"><span id="subModel">ESQ F ME800</span> · ТЗ → проверка человеком → ТКП и лист несоответствий</div>
-  <div class="chips" id="prodSwitch" style="justify-content:center;margin-bottom:18px"><a class="chip" data-p="pch" href="tz.html">ВВ ПЧ ESQ F ME800</a><a class="chip" data-p="upp" href="tz.html?p=upp">ВВ УПП ESQ F HVS</a></div>
+  <div class="sub">ESQ F ME800 · ТЗ → проверка человеком → ТКП и лист несоответствий</div>
 
   <!-- 1. Доступ -->
   <div class="card" id="secAuth">
@@ -93,8 +91,8 @@
   <div class="card" id="secFiles">
     <h2><span class="n">2</span>Файлы ТЗ</h2>
     <div class="drop" id="drop">Перетащите сюда ТЗ, опросный лист и приложения<br>
-      <span class="msg">PDF (в т.ч. сканы), Word .docx и .doc, Excel .xlsx, картинки JPG/PNG, .txt — можно несколько файлов</span>
-      <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.xlsx,.xlsm,.txt,.jpg,.jpeg,.png" class="hidden">
+      <span class="msg">PDF (в т.ч. сканы), Word .docx, Excel .xlsx, картинки JPG/PNG, .txt — можно несколько файлов</span>
+      <input type="file" id="fileInput" multiple accept=".pdf,.docx,.xlsx,.xlsm,.txt,.jpg,.jpeg,.png" class="hidden">
     </div>
     <ul class="files" id="fileList"></ul>
     <div class="actions">
@@ -117,7 +115,7 @@
 
   <!-- 3. Результат -->
   <div class="card hidden" id="secResult">
-    <h2><span class="n">3</span><span id="pickTitle">Исходные данные и подбор ПЧ</span></h2>
+    <h2><span class="n">3</span>Исходные данные и подбор ПЧ</h2>
     <div class="row" style="margin-bottom:12px">
       <input type="text" id="docTitle" placeholder="Наименование ТЗ" style="flex:2 1 320px">
       <input type="text" id="docCustomer" placeholder="Заказчик" style="flex:1 1 180px">
@@ -156,7 +154,7 @@
     <div class="msg" id="outMsg" style="margin-top:8px"></div>
   </div>
 
-  <div class="actions" style="justify-content:center"><a href="configurator_vv_pch.html" class="btn ghost" id="backLink">← Конфигуратор</a></div>
+  <div class="actions" style="justify-content:center"><a href="configurator_vv_pch.html" class="btn ghost">← Конфигуратор</a></div>
 </div>
 <div class="footer">© 2025 ESQ · ООО «Элком»</div>
 

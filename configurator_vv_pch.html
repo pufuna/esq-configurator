@@ -431,6 +431,22 @@
 
     /* ===== Плёночные конденсаторы ===== */
     function isFilmAllowed(voltage, power){ return true; }   // плёночные — на любой мощности
+    /* Доп. шкафы рядом с ПЧ: байпас, реактор и пусковой — по 0,7 т каждый.
+       Пусковой не считается, если он обязателен для этой мощности: его масса уже в массе ПЧ. */
+    const EXTRA_CABINET_T = 0.7;
+    // пусковой шкаф обязателен для моделей с током более 200 А
+    function isStarterRequired(v, p){ const d = modelData[v] && modelData[v][p]; return !!d && (Number(d.current) > 200 || !!d.starter); }
+    function extraCabinetsCount(){
+      const v = document.getElementById('voltage').value, p = document.getElementById('power').value;
+      const forcedStarter = isStarterRequired(v, p);
+      return (document.getElementById('bypass').value !== 'X' ? 1 : 0) +
+             (document.getElementById('reactor').value === 'R' ? 1 : 0) +
+             (document.getElementById('starter').value === 'S' && !forcedStarter ? 1 : 0);
+    }
+    function totalWeightT(baseWeight){
+      const b = parseFloat(baseWeight);
+      return isNaN(b) ? NaN : Math.round((b + EXTRA_CABINET_T * extraCabinetsCount()) * 10) / 10;
+    }
     function pfExtrasCode(){                                  // доп. шкафы рядом с ПЧ: B — байпас, S — пусковой, R — реактор
       return (document.getElementById('bypass').value !== 'X' ? 'B' : '') +
              (document.getElementById('starter').value === 'S' ? 'S' : '') +
@@ -504,8 +520,9 @@
         : '<option value="48">48</option><option value="54">54</option>';
 
       const starter = document.getElementById('starter');
-      starter.disabled = data.starter;
-      starter.value = data.starter ? 'S' : 'X';
+      const needStarter = isStarterRequired(v, p);              // ток более 200 А
+      starter.disabled = needStarter;
+      starter.value = needStarter ? 'S' : 'X';
 
       updateCapacitorAvailability();
       applyCellSize();
@@ -698,7 +715,8 @@
             <tr><th>Параметр</th><th>Значение</th></tr>
             <tr><td>Мощность</td><td>${esc(powerVal)} кВт</td></tr>
             <tr><td>Габариты (Ш×Г×В), мм</td><td>${esc(mech.size)}</td></tr>
-            <tr><td>Масса, т</td><td>${esc(mech.weight)}</td></tr>
+            <tr><td>Масса, т</td><td>${(() => { const n = extraCabinetsCount(), t = totalWeightT(mech.weight);
+              return n && !isNaN(t) ? esc(String(t).replace('.', ',')) + ' <span class="muted">(ПЧ ' + esc(String(mech.weight).replace('.', ',')) + ' + доп. шкафы ' + n + ' × 0,7)</span>' : esc(mech.weight); })()}</td></tr>
           </table>
         `;
       }
