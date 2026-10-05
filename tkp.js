@@ -433,7 +433,7 @@
       if (kind === 'km') svg(`M ${x - 2.6} ${y0 + a} A 2.6 2.6 0 0 1 ${x + 2.6} ${y0 + a}`);
       if (kind === 'qf') { ln(x - 2.4, y0 + a - 2.4, x + 2.4, y0 + a + 2.4); ln(x - 2.4, y0 + a + 2.4, x + 2.4, y0 + a - 2.4); }
       if (kind === 'qs') ln(x - 2.8, y0 + a, x + 2.8, y0 + a);
-      if (label) T(label, la === 'r' ? x + 6 : x - 6, y0 + L * .62, { a: la === 'r' ? 'l' : 'r', f: 'S', size: 6.6 });
+      if (label) T(label, la === 'r' ? x + 6 : x - L * .3 - 3, y0 + L * .62, { a: la === 'r' ? 'l' : 'r', f: 'S', size: 6.6 });   // у пары с блокировкой подписи — снаружи
       return [x - L * .3 * .55, (y0 + a + y1 - a * .9) / 2];          // точка на ноже — для механической блокировки
     };
     const interlock = (p1, p2) => { ln(p1[0], p1[1], p2[0], p2[1], { dash: [2, 1.6], w: .7 }); const mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2; poly([[mx - 3, my + 1.5], [mx + 3, my + 1.5], [mx, my + 5.5], [mx - 3, my + 1.5]], { w: .7 }); };
@@ -466,7 +466,7 @@
       ln(X, yNode, XB, yNode);                                                    // ветвь байпаса к KM3 / QS2-2
       ln(X, yNode, X, yNode + 4);
       sw(X, yNode + 4, yNode + 26, man ? 'qs' : 'km', man ? 'QS1' : 'KM1');
-      cabinet(XB - 22, y - 1, X + 56, yNode + 31, bypName);
+      cabinet(XB - 40, y - 1, X + 56, yNode + 31, bypName);
       y = yNode + 26;
     }
     // пусковой шкаф: токоограничивающий резистор, параллельно — вакуумный контактор
@@ -516,10 +516,10 @@
       ln(X, y, X, yB0);
       const a2 = sw(X, yB0, yB1, man ? 'qs' : 'km', man ? 'QS2-1' : 'KM2');
       ln(XB, yNode, XB, yB0);
-      const a3 = sw(XB, yB0, yB1, man ? 'qs' : 'km', man ? 'QS2-2' : 'KM3');
+      const a3 = sw(XB, yB0, yB1, man ? 'qs' : 'km', man ? 'QS2-2' : 'KM3', 'l');
       interlock(a3, a2);
       ln(X, yB1, X, yJoin); ln(XB, yB1, XB, yJoin); ln(XB, yJoin, X, yJoin); dot(X, yJoin);
-      cabinet(XB - 22, yB0 - 5, X + 56, yJoin + 5, bypName);          // те же контакты шкафа байпаса — на выходе ПЧ
+      cabinet(XB - 40, yB0 - 5, X + 56, yJoin + 5, bypName);          // те же контакты шкафа байпаса — на выходе ПЧ
     } else ln(X, y, X, yJoin);
 
     // двигатель
@@ -541,7 +541,7 @@
     // от вспомогательной обмотки трансформатора ПЧ
     ln(PX1, yAux, 500, yAux); ln(500, yAux, 500, 158); ln(500, 158, C2, 158); arrowDown(C2, 172); ln(C2, 158, C2, 166);
     T('от ПЧ, 380 В', 506, 155, { size: 6 });
-    sw(C2, 172, 196, 'qf', 'MCB2'); const k12 = sw(C2, 204, 228, 'km', 'KM12'); ln(C2, 196, C2, 204);
+    sw(C2, 172, 196, 'qf', 'MCB2'); const k12 = sw(C2, 204, 228, 'km', 'KM12', 'l'); ln(C2, 196, C2, 204);
     interlock(k12, k11);
     ln(C1, 228, C1, 240); ln(C2, 228, C2, 240); ln(C2, 240, C1, 240); dot(CB, 240);
     ln(CB, 240, CB, 254); arrowDown(CB, 260);
