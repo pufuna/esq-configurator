@@ -783,10 +783,11 @@
 
       // Плёночные в компактном шкафу G4: чертёж по составу доп. шкафов
       // B — шкаф байпаса (ручной или автоматический), S — пусковой, R — реактора; файлы assets/drawings_pf/PFN_<код>.pdf
+      // На чертеже слева направо: пусковой шкаф — шкаф байпаса — ПЧ — шкаф реактора
       if (cap === 'PF' && isPFNCabinet(v, p)) {
         const pfBase = encodeURI(v==='T060' ? 'assets/drawings1/PFN 6 kV.png' : 'assets/drawings1/PFN 10 kV.png');
         const code = pfExtrasCode();
-        return code ? [ 'assets/drawings_pf/PFN_' + code + '.pdf', pfBase ] : [ pfBase ];
+        return [ 'assets/drawings_pf/PFN_' + (code || '0') + '.pdf', pfBase ];   // PFN_0 — шкаф G4 без доп. шкафов
       }
 
       // Плёночные больших мощностей (вне шкафа G4) — чертёж не прикладывается
