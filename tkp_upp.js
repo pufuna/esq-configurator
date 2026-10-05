@@ -2,7 +2,8 @@
 
    Листы берутся из assets/upp/shell.pdf (собирается tools/build_upp_shell.js):
      0 обложка, 1 письмо, 2 содержание, 3 предложение, 4 лист с заголовком, 5 пустой лист, 6 лист-чертёж с рамкой и штампом,
-     7 «Наши клиенты» — из шаблона ТКП на ПЧ; 8–13 — листы старого ТКП на УПП, из них вырезаются (вектором) чертежи и рисунки.
+     7 «Наши клиенты» — из шаблона ТКП на ПЧ; 8–16 — исходные листы (эскиз E, техописание, рисунки ПЧ, чертежи из DWG), из них вырезаются (вектором) чертежи.
+   Однолинейные схемы и рис. 1, 3 рисуются кодом (drawScheme, figLift, figInstall).
    Всё, что относится к УПП, дописывается здесь шрифтом Inter (контуры из assets/upp/glyphs.json: L, R, S),
    поэтому текст выглядит как в ТКП на ПЧ. ISOCPEUR (iso) — только для правок надписей внутри старых схем.
    Ненужное содержимое листов-заготовок не закрывается белым, а вырезается отсечением (маски).
@@ -309,15 +310,20 @@
       frameTitle(iS, '2.1 Однолинейная схема'); frameTitle(iC, '2.2 Схема внешних подключений'); frameTitle(iD, '2.3 Габаритный эскиз');
       [iS, iC, iD].forEach(stamp);
       const ZONE = [92, 160, 512, 684];
-      // однолинейная: стандартная — со старого листа ТКП, E и IK — свои листы
-      if (s.pkg === 'E' || s.pkg === 'IK') {
-        const src = await PDFDocument.load(await get('assets/upp/scheme_' + s.pkg + '.pdf').then(r => r.arrayBuffer()));
-        await placeCrop(doc, src.getPage(0), s.pkg === 'E' ? [176, 206, 445, 648] : [98, 190, 500, 619], pg[iS], ZONE, { max: 1.2 });
-      } else await placeCrop(doc, shell.getPage(SH.oScheme), [112, 190, 500, 619], pg[iS], ZONE, { max: 1.2 });
+      // однолинейная схема — рисуется кодом по исполнению (стандарт/S, E, IK)
+      { const gs = makeG(pg[iS], putOn, 302 - 217.5 * 1.1, 172, 1.1); gs.setW(W); drawScheme(gs, s); }
       // схема внешних подключений — из технического описания ESQ F HVS (рис. 9)
       // при питании =220 В подпись «Питание AC 220 В (L, N)» на схеме заменяется
       const dc = s.ctl === 'DC220';
-      const mc = await placeCrop(doc, shell.getPage(SH.tdConn), [50, 214, 384, 488], pg[iC], ZONE, { max: 1.3, holes: dc ? [[80, 345, 148, 354.5]] : [] });
+      const mc = await placeCrop(doc, shell.getPage(SH.tdConn), [50, 214, 384, 488], pg[iC], ZONE,
+        { max: 1.3, holes: [[300, 290, 340.6, 326]].concat(dc ? [[80, 345, 148, 354.5]] : []) });
+      { // к двигателю приходят три провода U, V, W (на рисунке техописания они сходились в один)
+        const o = mc(0, 0), gc = makeG(pg[iC], putOn, o[0], o[1], mc.k), cx = 352.8, cy = 308.7, R = 12.6;
+        [[296.2, -30], [308.3, 0], [320.3, 30]].forEach(([yy, a]) => {
+          const ex = cx - R * Math.cos(a * Math.PI / 180), ey = cy + R * Math.sin(a * Math.PI / 180);
+          gc.poly([[299, yy], [a ? ex - 9 : ex, yy], [ex, ey]], { open: true, w: 1.2, c: DARK });
+        });
+      }
       if (dc) { const q = mc(147.0, 351.6); putOn(pg[iC], 'Питание DC 220 В (+, −)', q[0], q[1], 5.6 * mc.k, { f: 'L', a: 'r' }); }
       // габаритный эскиз по исполнению: стандарт и S — шкаф 1000 или 1200, E — свой, IK — свой; нет чертежа — лист пустой, как у ПЧ
       if (s.drawing) {
@@ -412,8 +418,12 @@
      Локальные координаты рисунка (сверху вниз) → лист: X = ox + x*k, Y = oy + y*k. Надписи — Inter, размер в pt листа. */
   const GREY = rgb(.55, .58, .6), FILL = rgb(.93, .95, .96), SOIL = rgb(.45, .45, .45);
   function makeG(p, put, ox, oy, k) {
-    const H = p.getHeight(), X = x => ox + x * k, Y = y => oy + y * k;
-    const path = (d, o = {}) => p.drawSvgPath(d, { x: 0, y: H, borderColor: o.c || (o.fill && !o.stroke ? undefined : DARK), borderWidth: o.fill && !o.stroke ? 0 : (o.w || .8), color: o.fill, borderDashArray: o.dash, borderLineCap: o.cap });
+    const H = p.getHeight(), X = x => ox + x * k, Y = y => oy + y * k, rot = p.getRotation().angle % 360 === 90;
+    const path = (d, o = {}) => {
+      if (rot) p.pushOperators(pushGraphicsState(), concatTransformationMatrix(0, 1, -1, 0, H, 0));   // лист-чертёж повёрнут на 90°
+      p.drawSvgPath(d, { x: 0, y: H, borderColor: o.c || (o.fill && !o.stroke ? undefined : DARK), borderWidth: o.fill && !o.stroke ? 0 : (o.w || .8), color: o.fill, borderDashArray: o.dash, borderLineCap: o.cap });
+      if (rot) p.pushOperators(popGraphicsState());
+    };
     const g = {
       k, X, Y,
       line: (x0, y0, x1, y1, o = {}) => path(`M ${X(x0)} ${Y(y0)} L ${X(x1)} ${Y(y1)}`, o),
@@ -497,8 +507,10 @@
     g.line(44, 34, 44, 28, { c: TEAL, w: .4 }); g.line(c0, 52, c0, 28, { c: TEAL, w: .4, dash: [2, 1.5] });
     g.dim(44, 31, c0, 31, '≥1200');
     if (!oneSide) { g.line(c1, 52, c1, 28, { c: TEAL, w: .4, dash: [2, 1.5] }); g.line(wl, 34, wl, 28, { c: TEAL, w: .4 }); g.dim(c1, 31, wl, 31, '≥1200'); }
-    g.dim(127, fl + 1, 127, fl + tr - 1, '≥1000', { side: 'r' });
-    g.lead(c0 + 2, fl - 3, 96, 128, 'Стальной швеллер', { a: 'r', size: 6.8 });
+    g.dim(112, fl + 1, 112, fl + tr - 1, '≥1000', { side: 'r' });
+    { // подпись в две строки — помещается в проходе при любом масштабе
+      const k = g.k; g.circle(c0 + 2, fl - 3, .9 / k, { fill: DARK }); g.line(c0 + 2, fl - 3, 92, 124, { w: .5 }); g.line(92, 124, 92 - 34 / k, 124, { w: .5 });
+      g.text('Стальной', 91, 124 - 11 / k, 7.2, { f: 'R', a: 'r' }); g.text('швеллер', 91, 124 - 2 / k, 7.2, { f: 'R', a: 'r' }); }
     g.text('Вид сбоку', 125, 212, 8.2, { f: 'S', a: 'c' });
     // вид спереди
     const fx = 262, fw = 40;
@@ -508,6 +520,111 @@
     cabFront(g, fx, 54, fw, fl - 6 - 54);
     g.rect(fx - 2, fl - 6, fw + 4, 6, { fill: rgb(.35, .38, .4) });
     g.text('Вид спереди', fx + fw / 2, 212, 8.2, { f: 'S', a: 'c' });
+  }
+
+
+  /* ================= Однолинейная схема (рисуется кодом) =================
+     Локальная область 420×524 (зона листа-чертежа). Состав по исполнению:
+     стандарт и S — указатель напряжения, TV1–TV2, тиристорный блок, байпас KM, ОПН, TAa/TAc;
+     IK — то же + вводной разъединитель QS; E — выкатной вакуумный выключатель QF, TA 1S/2S, указатель, блок, KM, ОПН, TA0. */
+  function drawScheme(g, s) {
+    const E = s.pkg === 'E', IK = s.pkg === 'IK', X0 = 190, LW = 1.1, kv = s.kv + ' кВ';
+    const ln = (x0, y0, x1, y1, o = {}) => g.line(x0, y0, x1, y1, { w: LW, ...o });
+    const dot = (x, y) => g.circle(x, y, 2.1, { fill: DARK });
+    const lbl = (str, x, y, o = {}) => g.text(str, x, y, o.size || 9.6, { f: o.f || 'S', a: o.a || 'l', c: o.c || DARK });
+    const note = (str, x, y, a = 'l') => g.text(str, x, y, 7.4, { f: 'L', a, c: GREY });
+    const ground = (x, y) => { ln(x, y, x, y + 6); g.line(x - 8, y + 6, x + 8, y + 6, { w: 1.2 }); g.line(x - 5, y + 9, x + 5, y + 9, { w: 1 }); g.line(x - 2.2, y + 12, x + 2.2, y + 12, { w: .9 }); };
+    // коммутационный аппарат: подвижный контакт — наклонная линия; вид неподвижного контакта: QS — черта, QF — крест, KM — полукруг
+    const sw = (x, y0, y1, kind) => {
+      const yb = y1 - 6;
+      ln(x, y0, x, y0 + 6); ln(x, yb, x, y1);
+      g.line(x, yb, x - 11, y0 + (kind === 'KM' ? 12 : 8), { w: 1.3 });
+      if (kind === 'QS') g.line(x - 5, y0 + 6, x + 5, y0 + 6, { w: 1.2 });
+      if (kind === 'QF') { g.line(x - 4, y0 + 2, x + 4, y0 + 10, { w: 1.1 }); g.line(x - 4, y0 + 10, x + 4, y0 + 2, { w: 1.1 }); }
+      if (kind === 'KM') { const r = 4, c = y0 + 6 + r;        // контакт контактора (ГОСТ 2.755) — полуокружность на конце неподвижного контакта
+        g.poly(Array.from({ length: 13 }, (_, i) => { const a = Math.PI + Math.PI * i / 12; return [x + r * Math.cos(a), c + r * Math.sin(a)]; }), { open: true, w: 1.1 }); }
+    };
+    // три фазы — три засечки поперёк линии
+    const tri = (x, y) => { for (const d of [-4, 0, 4]) g.line(x - 5, y + d + 3, x + 5, y + d - 3, { w: .9 }); };
+    const plug = (x, y, up) => { const d = up ? -1 : 1; g.poly([[x - 5, y - 4 * d], [x, y + 1 * d], [x + 5, y - 4 * d]], { open: true, w: 1.1 }); g.poly([[x - 5, y + 1 * d], [x, y + 6 * d], [x + 5, y + 1 * d]], { open: true, w: 1.1 }); };
+    // трансформатор тока на линии: окружность и вывод вторичной обмотки с двумя засечками
+    const ct = (x, y, r = 8) => { g.circle(x, y, r, { w: 1, fill: WHITE, stroke: true }); g.line(x + r, y, x + r + 13, y, { w: .8 });
+      g.line(x + r + 5, y + 3, x + r + 8, y - 3, { w: .8 }); g.line(x + r + 8.5, y + 3, x + r + 11.5, y - 3, { w: .8 }); };
+    const fuse = (x, y) => { g.rect(x - 4.5, y, 9, 22, { w: 1, fill: WHITE, stroke: true }); ln(x, y, x, y + 22, { w: .8 }); };
+    const tv = (x, y) => { g.circle(x, y, 8, { w: 1, fill: WHITE, stroke: true }); g.circle(x, y + 11, 8, { w: 1, fill: WHITE, stroke: true }); g.circle(x, y, 8, { w: 1 }); };
+    const indicator = (x, y) => {                       // ёмкостный указатель напряжения: конденсатор + лампа
+      ln(x, y, x, y + 12); g.line(x - 7, y + 12, x + 7, y + 12, { w: 1.3 }); g.line(x - 7, y + 16, x + 7, y + 16, { w: 1.3 }); ln(x, y + 16, x, y + 24);
+      g.circle(x, y + 31, 7, { w: 1, fill: WHITE, stroke: true }); g.line(x - 5, y + 26, x + 5, y + 36, { w: .8 }); g.line(x - 5, y + 36, x + 5, y + 26, { w: .8 });
+      ln(x, y + 38, x, y + 42); ground(x, y + 42);
+    };
+    const arrester = (x, y) => { ln(x, y, x, y + 8); g.rect(x - 6, y + 8, 12, 26, { w: 1, fill: WHITE, stroke: true }); ln(x, y + 8, x, y + 26, { w: .8 });
+      g.poly([[x - 3.5, y + 22], [x + 3.5, y + 22], [x, y + 30]], { fill: DARK }); ln(x, y + 34, x, y + 40); ground(x, y + 40); };
+    const thyr = (x, y, up) => {                        // тиристор: треугольник, черта и управляющий электрод
+      const d = up ? -1 : 1;
+      g.poly([[x - 6, y - 5 * d], [x + 6, y - 5 * d], [x, y + 5 * d]], { fill: DARK });
+      g.line(x - 7, y + 5 * d, x + 7, y + 5 * d, { w: 1.2 }); g.line(x + (up ? -3 : 3), y + 2 * d, x + (up ? -9 : 9), y + 8 * d, { w: .8 });
+    };
+    const block = (x, y0, y1) => {                      // тиристорный блок: встречно-параллельные тиристоры и RC-цепь
+      const bx0 = x - 46, bx1 = x + 46, m = (y0 + y1) / 2;
+      g.rect(bx0, y0, bx1 - bx0, y1 - y0, { w: 1.1, fill: PALE, stroke: true });
+      const r0 = y0 + 12, r1 = y1 - 12, xs = [x - 30, x - 10, x + 10, x + 30];
+      ln(x, y0, x, r0); ln(x, r1, x, y1); g.line(xs[0], r0, xs[3], r0, { w: 1 }); g.line(xs[0], r1, xs[3], r1, { w: 1 });
+      for (const xx of xs) ln(xx, r0, xx, r1, { w: .9 });
+      thyr(xs[0], m, false); thyr(xs[3], m, true);
+      g.rect(xs[1] - 4, m - 9, 8, 18, { w: .9, fill: WHITE, stroke: true });               // R
+      g.line(xs[2] - 6, m - 14, xs[2] + 6, m - 14, { w: 1.1 }); g.line(xs[2] - 6, m - 10, xs[2] + 6, m - 10, { w: 1.1 });   // C
+      g.rect(xs[2] - 4, m - 4, 8, 16, { w: .9, fill: WHITE, stroke: true });               // R
+      g.line(xs[2], m - 14, xs[2], m - 10, { w: 0, c: WHITE });
+    };
+
+    let y = 0;
+    // ввод
+    if (E) {
+      g.line(X0 - 70, 18, X0 + 70, 18, { w: 2.4 }); lbl('Сборные шины РУ ' + kv, X0 + 76, 21.5, { f: 'R', size: 8.6 });
+      dot(X0, 18); y = 18;
+      ln(X0, y, X0, 40); tri(X0, 27); plug(X0, 44, true); ln(X0, 50, X0, 56); sw(X0, 56, 92, 'QF'); ln(X0, 92, X0, 98); plug(X0, 102, false);
+      lbl('QF', X0 - 34, 80); note('выкатной вакуумный', X0 + 14, 70); note('выключатель', X0 + 14, 79);
+      y = 110;
+      ln(X0, y, X0, 166); ct(X0, 126); ct(X0, 148);
+      lbl('TA', X0 - 46, 141); g.text('1S', X0 - 20, 129, 7.4, { f: 'R', a: 'r' }); g.text('2S', X0 - 20, 151, 7.4, { f: 'R', a: 'r' });
+      y = 172;
+    } else {
+      g.text('От ячейки РУ ' + kv, X0, 8, 8.6, { f: 'R', a: 'c' });
+      g.poly([[X0 - 4, 14], [X0 + 4, 14], [X0, 22]], { fill: DARK }); ln(X0, 22, X0, IK ? 40 : 62); tri(X0, IK ? 30 : 38);
+      if (IK) { sw(X0, 40, 76, 'QS'); lbl('QS', X0 - 34, 64); note('вводной', X0 + 14, 58); note('разъединитель', X0 + 14, 67); ln(X0, 76, X0, 92); y = 92; }
+      else y = 62;
+      // напряжение сети: указатель (слева), TV1–TV2 через предохранитель (справа)
+      dot(X0, y); ln(X0, y, X0 - 92, y); ln(X0 - 92, y, X0 - 92, y + 8); indicator(X0 - 92, y + 8);
+      note('указатель', X0 - 104, y + 36, 'r'); note('напряжения', X0 - 104, y + 45, 'r');
+      const yt = y + 24, XT = X0 + 150; dot(X0, yt); ln(X0, yt, XT, yt); ln(XT, yt, XT, yt + 8); fuse(XT, yt + 8); ln(XT, yt + 30, XT, yt + 38);
+      tv(XT, yt + 46); lbl('FU', XT - 12, yt + 22, { a: 'r' }); lbl('TV1–TV2', XT - 12, yt + 56, { a: 'r' });
+      ln(X0, y, X0, y + 72); y += 72;
+    }
+    // тиристорный блок и байпас
+    const yA = y + 10, yB0 = yA + 22, yB1 = yB0 + 92, yC = yB1 + 24, XB = X0 + 92;
+    ln(X0, y, X0, yA); dot(X0, yA); ln(X0, yA, XB, yA); ln(X0, yA, X0, yB0);
+    block(X0, yB0, yB1); ln(X0, yB1, X0, yC); dot(X0, yC);
+    g.text('Тиристорный блок', X0 - 52, yB1 - 4, 7.4, { f: 'L', a: 'r', c: GREY });
+    ln(XB, yA, XB, yA + 30); sw(XB, yA + 30, yA + 76, 'KM'); ln(XB, yA + 76, XB, yC); ln(XB, yC, X0, yC);
+    lbl('KM', XB + 10, yA + 58); note('байпасный вакуумный', XB + 10, yA + 70); note('контактор', XB + 10, yA + 79);
+    // E: указатель напряжения после ТТ — слева
+    if (E) { ln(X0, yA, X0 - 92, yA); ln(X0 - 92, yA, X0 - 92, yA + 8); indicator(X0 - 92, yA + 8); note('указатель', X0 - 104, yA + 36, 'r'); note('напряжения', X0 - 104, yA + 45, 'r'); }
+    // ОПН на стороне двигателя
+    const yD = yC + 22; ln(X0, yC, X0, yD); dot(X0, yD); ln(X0, yD, X0 - 92, yD); arrester(X0 - 92, yD);
+    lbl('FV', X0 - 80, yD + 25); note('ОПН', X0 - 80, yD + 35);
+    // трансформаторы тока
+    let yE = yD + 26;
+    if (E) { ln(X0, yD, X0, yE + 30); ct(X0, yE + 12, 10); lbl('TA0', X0 - 48, yE + 15.5); note('ТТ нулевой', X0 + 36, yE + 10); note('последовательности', X0 + 36, yE + 19); yE += 30; }
+    else { ln(X0, yD, X0, yE + 48); ct(X0, yE + 12); ct(X0, yE + 34); lbl('TAa', X0 + 36, yE + 15.5); lbl('TAc', X0 + 36, yE + 37.5); yE += 48; }
+    // двигатель
+    ln(X0, yE, X0, yE + 16); tri(X0, yE + 7);
+    g.circle(X0, yE + 34, 18, { w: 1.3, fill: WHITE, stroke: true }); g.text('M', X0, yE + 36, 12, { f: 'S', a: 'c' }); g.text('3~', X0, yE + 46, 7, { f: 'R', a: 'c' });
+    note('электродвигатель ' + kv, X0 + 26, yE + 37);
+    // граница поставки УПП
+    const top = E ? 35 : (IK ? 38 : 52), bot = yD + (E ? 70 : 90);
+    g.rect(X0 - 160, top, 375, bot - top, { c: TEAL, w: .8, dash: [5, 3] });
+    g.text(s.mark, X0 + 211, bot - 6, 8.2, { f: 'S', a: 'r', c: TEAL });
+    return bot;
   }
 
   /* ================= Таблица характеристик (оформление как в ТКП на ПЧ) =================
@@ -703,4 +820,5 @@
   }
 
   window.downloadTKP = generate;
+  window.UPP_DRAW = { makeFonts, makeG, figInstall, figLift, drawScheme };   // для tools/pdf_figs.js (замена рисунков в ТО и РЭ)
 })();
