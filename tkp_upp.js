@@ -1,54 +1,33 @@
-/* Генератор ТКП для конфигуратора УПП ESQ F HVS.
-   Берёт assets/upp/template.pdf и меняет в нём только надписи, зависящие от комплектации.
+/* Генератор ТКП для конфигуратора УПП ESQ F HVS — в оформлении нового ТКП на ПЧ.
 
-   Устроен так же, как tkp.js для ПЧ: буквы рисуются контурами из assets/glyphs.json (ISOCPEUR — таблицы и штампы,
-   Arial — таблица предложения, Tahoma — обложка); шаблон УПП набран теми же шрифтами, поэтому вставки
-   совпадают с исходным текстом. Старая надпись не закрывается белым прямоугольником, а вырезается отсечением.
+   Листы берутся из assets/upp/shell.pdf (собирается tools/build_upp_shell.js):
+     0 обложка, 1 письмо, 2 содержание, 3 предложение, 4 лист с заголовком, 5 пустой лист, 6 лист-чертёж с рамкой и штампом,
+     7 «Наши клиенты» — из шаблона ТКП на ПЧ; 8–13 — листы старого ТКП на УПП, из них вырезаются (вектором) чертежи и рисунки.
+   Всё, что относится к УПП, дописывается здесь шрифтом Inter (контуры из assets/upp/glyphs.json: L, R, S),
+   поэтому текст выглядит как в ТКП на ПЧ. ISOCPEUR (iso) — только для правок надписей внутри старых схем.
+   Ненужное содержимое листов-заготовок не закрывается белым, а вырезается отсечением (маски).
 
-   Координаты — pt от левого верхнего угла страницы «как её видит человек». Номера страниц — с нуля (0 — обложка). */
+   Координаты — pt от левого верхнего угла листа «как его видит человек». */
 (function () {
   'use strict';
-  const { PDFDocument, StandardFonts, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, decodePDFRawStream } = window.PDFLib;
-  const WHITE = rgb(1, 1, 1), BLACK = rgb(0, 0, 0), BAND = rgb(10 / 255, 105 / 255, 114 / 255), NAVY = rgb(.137, .122, .129);
-  const LINE_H = rgb(10 / 255, 105 / 255, 114 / 255), LINE_V = rgb(32 / 255, 118 / 255, 126 / 255);   // линии таблицы стр. 8
-  const PROTO = { MT: 'Modbus TCP', PB: 'Profibus DP', PN: 'ProfiNet', CO: 'CANopen', EI: 'EtherNet/IP' };
-  const IFACE = { MT: 'Ethernet', PN: 'Ethernet', EI: 'Ethernet', CO: 'CAN' };
+  const { PDFDocument, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, rectangle, clipEvenOdd, endPath } = window.PDFLib;
+  const WHITE = rgb(1, 1, 1), DARK = rgb(35 / 255, 31 / 255, 33 / 255), TEAL = rgb(10 / 255, 105 / 255, 114 / 255),
+    ORANGE = rgb(242 / 255, 105 / 255, 40 / 255), LINE = rgb(12 / 255, 106 / 255, 115 / 255), BAND = rgb(.0392, .412, .447),
+    HEAD = rgb(212 / 255, 212 / 255, 212 / 255), TEAL5 = rgb(3 / 255, 91 / 255, 110 / 255), OR5 = rgb(243 / 255, 95 / 255, 39 / 255),
+    PALE = rgb(.92, .955, .96);
   const money = x => { const [a, b] = x.toFixed(2).replace(/\.00$/, '').split('.'); return a.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + (b ? ',' + b : ''); };
+  const PKG = { STD: 'стандартная', E: 'с вакуумным выключателем', S: 'с выкатными тиристорными блоками', IK: 'с вводным разъединителем' };
+  const PROTO = { MR: 'Modbus RTU', MT: 'Modbus TCP', PB: 'Profibus DP', PN: 'ProfiNet', CO: 'CANopen', EI: 'EtherNet/IP' };
+  const IFACE = { MT: 'Ethernet', PN: 'Ethernet', EI: 'Ethernet', CO: 'CAN', PB: 'RS-485 (Profibus)' };
+  const CTL = { AC220: 'AC 220 В ±15%', DC220: 'DC 220 В ±15%' };
+  const SH = { cover: 0, letter: 1, contents: 2, offer: 3, titled: 4, plain: 5, frame: 6, clients: 7, oDraw: 8, oScheme: 9, tdConn: 10, tdInst: 11, lift: 12, fork: 13, gabSTD1000: 14, gabSTD1200: 15, gabIK: 16 };
+  // рамка листов с заголовком / пустых (скруглённая) и зона текста в ней
+  const FR = { x0: 45.5, x1: 567, top: 82.5, bot: 741.5 }, TX0 = 58.6, TX1 = 554;
 
-  /* name: [страница, x0, x1, базовая линия, кегль, верх, низ, сжатие по ширине] — сняты с шаблона */
-  const FIELDS = {
-    p4_stamp: [4, 334.87, 407.15, 712.6, 12.22, 702.74, 714.96, .9],
-    p5_stamp: [5, 314.25, 404.8, 720.01, 12.22, 710.15, 722.37, .9],   // ширина — по самой длинной надписи из листов схем E и IK
-    p6_name: [6, 368.03, 440.25, 144.07, 10.99, 135.2, 146.19, 1],
-    p6_p: [6, 390.14, 426.27, 165.68, 10.99, 156.8, 167.8, 1],
-    p6_i: [6, 400.21, 420.61, 184.96, 10.99, 176.09, 187.08, 1],
-    p6_u: [6, 382.5, 434.68, 201.45, 10.99, 192.58, 203.73, 1],
-    p6_motor: [6, 305.51, 499.8, 235.48, 10.99, 226.61, 237.61, 1],
-    p6_ctl: [6, 368.73, 439.47, 277.55, 10.99, 268.68, 279.68, 1],
-    p6_ctlV: [6, 389.15, 404.01, 277.55, 10.99, 268.68, 279.68, 1],   // только «220» в «АС ~220 В ±15%»
-    p6_starts: [6, 324.27, 488.45, 294.99, 10.99, 286.12, 297.11, 1],
-    p6_tmin: [6, 431.72, 441.63, 350.9, 10.99, 342.03, 353.02, 1],        // «20» в «-20 °С» (эксплуатация)
-    p6_ol: [6, 257.0, 524.78, 692.4, 10.99, 683.52, 694.52, 1],
-    p6_ul: [6, 375.6, 445.12, 715.9, 10.99, 707.03, 718.03, 1],
-    p6_ult: [6, 345.84, 474.9, 727.78, 10.99, 718.91, 729.9, 1],
-    p7_log: [7, 307.63, 496.15, 682.11, 10.99, 673.24, 684.23, 1],
-    p10_tmin: [10, 277.46, 287.38, 666.08, 10.99, 657.2, 668.2, 1],      // «20» в «от -20⁰С» (эксплуатация)
-    p7_proto: [7, 384.89, 433.07, 285.17, 10.99, 276.3, 287.29, 1],
-    p7_iface: [7, 395.88, 427.77, 312.35, 10.99, 303.48, 314.47, 1],
-    p8_ip: [8, 382.48, 399.49, 134.83, 10.99, 125.96, 136.95, 1],
-    p8_dims: [8, 338.07, 442.9, 231.8, 10.99, 222.92, 233.92, 1],
-    p8_srv: [8, 356.79, 423.38, 266.84, 10.99, 257.97, 268.96, 1],
-    p8_cab: [8, 378.51, 402.95, 298.97, 10.99, 290.09, 301.09, 1],
-    p8_kv: [8, 126.55, 143.05, 455.41, 9.13, 448.04, 457.17, 1],
-    p8_L: [8, 170.5, 174.6, 529.6, 9.13, 521.7, 530.8, 1],
-    p8_N: [8, 170.4, 175.1, 539.6, 9.13, 531.7, 540.8, 1],
-    p11_srv: [11, 338.51, 418.54, 168.34, 10.99, 159.47, 170.2, 1]
-  };
-
-  /* ---------- векторный текст (как в tkp.js) ---------- */
-  function makeFonts(GL, helv) {
+  /* ---------- векторный текст ---------- */
+  function makeFonts(GL) {
     const F = {};
-    for (const key of ['iso', 'arial', 'tahoma']) {
+    for (const key of Object.keys(GL)) {
       const f = GL[key], upm = f.upm, g = f.g;
       const glyph = ch => g[ch] || g[ch.normalize('NFD')[0]] || g['?'] || g[' '];
       F[key] = {
@@ -69,28 +48,30 @@
         }
       };
     }
-    F.helv = { std: helv, width: (str, size) => helv.widthOfTextAtSize(str, size) };
     return F;
   }
 
-  /* Маски: исходное содержимое страницы обёрнуто в отсечение «страница минус зоны» */
+  /* Маски: старое содержимое листа обёрнуто в отсечение «страница минус зоны» */
   function prepareMasks(doc, pages) {
-    const slots = pages.map(p => {
+    const slots = new Map();
+    const slot = p => {
+      if (slots.has(p)) return slots.get(p);
       p.node.normalize();
       const arr = p.node.Contents();
       const pre = doc.context.register(doc.context.stream(' ')), post = doc.context.register(doc.context.stream(' '));
       arr.insert(0, pre); arr.push(post);
-      return { p, pre, post, zones: [] };
-    });
+      const sl = { p, pre, post, zones: [] }; slots.set(p, sl); return sl;
+    };
+    pages.forEach(slot);
     return {
-      add(i, x0, y0, x1, y1) { slots[i].zones.push([x0, y0, x1, y1]); },
+      add(p, x0, y0, x1, y1) { slot(p).zones.push([x0, y0, x1, y1]); },
       apply() {
-        for (const sl of slots) {
+        for (const sl of slots.values()) {
           if (!sl.zones.length) continue;
           const W = sl.p.getWidth(), H = sl.p.getHeight(), r = sl.p.getRotation().angle, n = v => +v.toFixed(2);
           let op = 'q\n';
           for (const [x0, y0, x1, y1] of sl.zones) {
-            const [a, b, c, d] = r === 90 ? [y0, x0, y1, x1] : [x0, H - y1, x1, H - y0];   // /Rotate 90 у стр. 4
+            const [a, b, c, d] = r === 90 ? [y0, x0, y1, x1] : [x0, H - y1, x1, H - y0];
             op += `0 0 ${n(W)} ${n(H)} re ${n(a)} ${n(b)} ${n(c - a)} ${n(d - b)} re W* n\n`;
           }
           doc.context.assign(sl.pre, doc.context.stream(op));
@@ -100,33 +81,106 @@
     };
   }
 
-  /* Удалить текст из потока страницы: «X Y TD[…]TJ» → «X Y TD[]TJ». Возвращает число удалённых. */
-  function deleteTJ(doc, page, patterns) {
-    let done = 0;
-    const arr = page.node.Contents();
-    for (let i = 0; i < arr.size(); i++) {
-      const ref = arr.get(i), st = doc.context.lookup(ref);
-      if (!st || !st.dict || !st.contents) continue;
-      let bytes; try { bytes = decodePDFRawStream(st).decode(); } catch (e) { continue; }
-      let changed = false;
-      for (const pat of patterns) {
-        const p = Array.from(pat, ch => ch.charCodeAt(0) & 255);
-        const head = pat.indexOf('[') + 1, tail = pat.length - 3;     // сохраняем «X Y TD[» и «]TJ»
-        outer: for (let j = 0; j + p.length <= bytes.length; j++) {
-          for (let k = 0; k < p.length; k++) if (bytes[j + k] !== p[k]) continue outer;
-          const out = new Uint8Array(bytes.length - (tail - head));
-          out.set(bytes.subarray(0, j + head)); out.set(bytes.subarray(j + tail), j + head);
-          bytes = out; changed = true; done++; break;
-        }
-      }
-      if (changed) doc.context.assign(ref, doc.context.flateStream(bytes));
-    }
-    return done;
+  /* ================= Содержимое, общее для всех комплектаций ================= */
+  const DESC_PARAS = [
+    'Высоковольтные устройства плавного пуска (УПП) серии ESQ F HVS предназначены для плавного безударного пуска высоковольтных асинхронных и синхронных электродвигателей во всех областях применения, где не требуется регулирование скорости вращения.',
+    'Устройство широко применяется в производстве стройматериалов, химической промышленности, металлургии, сталелитейной и бумажной промышленности и т.д.',
+    'Может использоваться на разных нагрузках — включая насосы, вентиляторы, компрессоры, дробилки, мешалки, конвейерные ленты и т.д.'];
+  const DESC_ALLOW = [
+    'Осуществлять плавное нарастание и снижение напряжения в течение заданного времени при пуске и останове двигателя с контролем тока и момента.',
+    'Значительно уменьшить пусковые токи двигателей.',
+    'В сетях с ограниченной мощностью короткого замыкания резко уменьшить провалы напряжения сети при пуске двигателей.',
+    'Существенно снизить при пуске электродинамические усилия на обмотки двигателя и ударные механические воздействия на механизмы.'];
+  const DESC_IS = [
+    ['Простота установки и эксплуатации', ' — готовая система управления пуском и защиты двигателя: для работы достаточно подключить питающий и моторный кабели.'],
+    ['Встроенный вакуумный байпасный контактор', ' — не требуется дополнительный шкаф для переключения двигателя на сеть после разгона.'],
+    ['Аварийный прямой пуск', ' — при неисправности УПП вакуумный контактор может выполнить прямой пуск двигателя, чтобы обеспечить непрерывность производства.'],
+    ['Интерфейс RS-485 и протокол Modbus RTU', ' в стандартной комплектации, возможность добавить другие протоколы передачи данных для интеграции в систему управления.'],
+    ['Самодиагностика', ' при подаче питания, журнал аварий и счётчик количества пусков.'],
+    ['Большой набор защитных функций', ' и электромагнитная блокировка дверей высоковольтной части.'],
+    ['Встроенная система обогрева шкафа', ' — поддержание рабочей температуры в холодный период.']];
+  const DESC_TAIL = [
+    'Основным управляющим элементом системы является микропроцессор, который управляет открытием силовых тиристоров для снижения напряжения на двигателе, а затем плавно увеличивает напряжение и ток двигателя, повышая его крутящий момент, пока двигатель не разгонится до номинальных оборотов. Это снижает пусковой ток, нагрузку на сеть и на сам двигатель, а также механическую нагрузку на приводные механизмы.',
+    'После разгона двигателя до номинальной скорости выходное реле УПП замыкает высоковольтный вакуумный байпасный контактор, и двигатель работает непосредственно от сети — без тепловых потерь на тиристорах.'];
+  const WARRANTY = 'Гарантийный срок на устройство плавного пуска составляет 24 месяца со дня начала эксплуатации при условии гарантийной наработки 10 000 ч., но не более 36 месяцев с даты продажи при условии соблюдения Покупателем правил эксплуатации изделия, изложенных в инструкции по эксплуатации. Информация о ценах, содержащихся в данном документе, является конфиденциальной и действительна только при заказе оборудования и услуг. Данное предложение носит информационный характер и не является публичной офертой (согласно ст. 435 ГК РФ).';
+
+  function extrasList(s) {
+    const L = [];
+    if (s.pkg === 'E') L.push(['Вводной вакуумный выключатель', ' в составе УПП (моноблочное исполнение) — включение и отключение питания, защита и измерения на стороне сети; однолинейная схема — п. 2.1.']);
+    if (s.pkg === 'S') L.push(['Выкатные тиристорные блоки', ' — быстрая замена силовых модулей при обслуживании.']);
+    if (s.pkg === 'IK') L.push(['Вводной разъединитель', ' в составе УПП — видимый разрыв цепи питания при обслуживании; однолинейная схема — п. 2.1.']);
+    if (s.ctl === 'DC220') L.push(['Питание цепей управления', ' от сети постоянного тока =220 В ±15%.']);
+    if (s.ip !== 'IP40') L.push(['Степень защиты ' + s.ip, ' (стандарт — IP40).']);
+    if (s.proto !== 'MR') L.push(['Протокол связи ' + PROTO[s.proto], ' — дополнительно к Modbus RTU (RS-485).']);
+    const more = [];
+    if (s.motor === 'S') more.push('пуск синхронного двигателя');
+    if (s.cable === 'T') more.push('ввод и вывод кабелей сверху');
+    if (s.srv === '1') more.push('одностороннее обслуживание');
+    if (more.length === 1) L.push([more[0][0].toUpperCase() + more[0].slice(1), '.']);
+    else if (more.length) L.push(['Также', ': ' + more.join('; ') + '.']);
+    return L;
   }
-  const SCHEMES = { E: 'assets/upp/scheme_E.pdf', IK: 'assets/upp/scheme_IK.pdf' };
-  const COVER_MODEL = ['39.147 115.402 TD[(ESQ)0.000312( F HVS)-0.000623(06-75)]TJ'];
-  const COVER_DATE = ['475.786 86.834 TD[(\x00\x15\x00\x15)]TJ', '487.098 86.834 TD[(.0)]TJ', '503.136 86.834 TD[(7)]TJ',
-    '506.621 86.834 TD[(.2)0.004186(0)0.025116(2)0.004186(6)]TJ'];
+
+  /* Строки таблицы характеристик: [параметр, значение | [значения]] или ['§', заголовок раздела] */
+  function techRows(s) {
+    const pr = s.proto === 'MR' ? 'Modbus RTU' : 'Modbus RTU; ' + PROTO[s.proto];
+    return [
+      ['Наименование', s.mark],
+      ['Мощность двигателя', s.P + ' кВт'],
+      ['Номинальный ток', s.I + ' А'],
+      ['Номинальное напряжение сети', (s.kv === 10 ? '10000' : '6000') + ' В ±15%'],
+      ['Частота сети', '50/60 Гц ±2 Гц'],
+      ['Тип нагрузки', s.motor === 'S' ? 'Трёхфазный синхронный двигатель' : 'Трёхфазный асинхронный двигатель с короткозамкнутым ротором'],
+      ['Комплектация', PKG[s.pkg][0].toUpperCase() + PKG[s.pkg].slice(1)],
+      ['Последовательность фаз', 'Любая (контроль чередования включается параметром)'],
+      ['Силовая цепь', 'Последовательно-параллельно включённые тиристоры (12, 18, 24 или 30 шт. в зависимости от модели и напряжения)'],
+      ['Байпасный контактор', 'Встроенный вакуумный, с возможностью прямого пуска'],
+      ['Питание цепей управления', CTL[s.ctl] || CTL.AC220],
+      ['Защита от перенапряжений', 'Снабберные RC-цепи dU/dt'],
+      ['Пусковой ток', '1,5–5,0 Ie (уставка ограничения тока 100–500% Ie)'],
+      ['Режимы пуска', ['Линейное или ускоренное изменение напряжения, ограничение тока, пуск с постоянным напряжением (30–80% Ue, 0–30 с)',
+        'Скачок напряжения (Kickstart): 20–100% Ue, 0–5 с']],
+      ['Режимы останова', 'Выбегом; плавный останов 0–60 с до 20–60% Ue'],
+      ['Частота пусков', '1–6 пусков в час с интервалом не менее 10 мин (в зависимости от мощности и условий пуска)'],
+      ['Охлаждение', 'Естественное воздушное'],
+      ['Тепловыделение', ['При пуске — 0,8–1% мощности УПП', 'После пуска (байпас) — 300–500 Вт']],
+      ['§', 'Функции защиты'],
+      ['Обрыв фазы', 'Обрыв любой фазы питания при пуске или в работе'],
+      ['Перегрузка по току в работе', '100–500% Ie, задержка 0–10 с'],
+      ['Небаланс тока фаз', '20–100%, задержка 0–10 с'],
+      ['Тепловая перегрузка', 'Классы 10A, 10, 20, 30 или выкл.; тепловая модель сохраняется при отключении питания'],
+      ['Недогрузка', '50–100% Ie, задержка 0–10 с'],
+      ['Заклинивание ротора', '5–10 Ie'],
+      ['Затянутый пуск', '10–120 с'],
+      ['Повышенное напряжение', 'Срабатывание при 120% Ue'],
+      ['Пониженное напряжение', 'Срабатывание при 70% Ue'],
+      ['Чередование фаз', 'Контроль включается / отключается параметром'],
+      ['Замыкание на землю', 'Срабатывание при превышении тока утечки заданного значения'],
+      ['Защита тиристоров', 'КЗ тиристоров, самоподжиг (BOD), RC-цепи и выравнивание напряжения'],
+      ['§', 'Управление и связь'],
+      ['Режимы управления', 'Местный (панель), дистанционный (сухие контакты), от АСУ ТП, по интерфейсу связи'],
+      ['Протокол передачи данных', pr],
+      ['Интерфейс связи', s.proto === 'MR' || !IFACE[s.proto] ? 'RS-485' : 'RS-485; ' + IFACE[s.proto]],
+      ['Подключение к сети', 'До 32 устройств в одной линии (адреса 1–32)'],
+      ['Дискретные входы', 'Пуск, стоп, внешняя авария, готовность, пуск/стоп от АСУ ТП'],
+      ['Релейные выходы', 'Готовность, работа, останов, авария, байпас, аварийное отключение вышестоящего выключателя'],
+      ['Аналоговый выход', '4–20 мА, пропорционально среднему току (0–2 Ie или 0–4 Ie)'],
+      ['Пульт управления', 'Сенсорный ЖК-дисплей; языки: русский, английский'],
+      ['Индикация', 'Трёхфазное напряжение сети и трёхфазный ток главной цепи'],
+      ['Журнал аварий', 'Последние 1000 аварийных сообщений'],
+      ['Счётчики', 'Количество пусков, наработка'],
+      ['§', 'Условия эксплуатации'],
+      ['Место установки', 'В помещении; без прямых солнечных лучей, токопроводящей пыли, агрессивных и горючих газов, масляного и соляного тумана, капель воды'],
+      ['Температура окружающей среды', 'От −20 °С до +50 °С'],
+      ['Относительная влажность', '5–95%, без образования конденсата'],
+      ['Высота над уровнем моря', 'До 1500 м (выше — со снижением номинальных характеристик)'],
+      ['Степень защиты', s.ip],
+      ['Габариты (Ш×Г×В)', s.dims ? s.dims + ' мм' : ''],
+      ['Масса', s.massKg + ' кг'],
+      ['Вид обслуживания', s.srv === '1' ? 'Одностороннее' : 'Двухстороннее'],
+      ['Ввод и вывод кабелей', s.cable === 'T' ? 'Сверху' : 'Снизу']
+    ];
+  }
 
   async function generate(ev) {
     if (ev) ev.preventDefault();
@@ -134,133 +188,518 @@
     try {
       const s = window.uppState();
       const get = u => fetch(u).then(r => { if (!r.ok) throw new Error('Не найден файл ' + u); return r; });
-      const [tpl, GL] = await Promise.all([get('assets/upp/template.pdf').then(r => r.arrayBuffer()), get('assets/glyphs.json').then(r => r.json())]);
-      const doc = await PDFDocument.load(tpl);
-      // исполнения E и IK — свой лист однолинейной схемы (стр. 5) из assets/upp/scheme_*.pdf, штамп на нём в том же месте
-      if (SCHEMES[s.pkg]) {
-        const src = await PDFDocument.load(await get(SCHEMES[s.pkg]).then(r => r.arrayBuffer()));
-        const [pageE] = await doc.copyPages(src, [0]);
-        doc.removePage(5); doc.insertPage(5, pageE);
-      }
-      const F = makeFonts(GL, await doc.embedFont(StandardFonts.Helvetica));
+      const [shellBuf, GL] = await Promise.all([get('assets/upp/shell.pdf').then(r => r.arrayBuffer()), get('assets/upp/glyphs.json').then(r => r.json())]);
+      const shell = await PDFDocument.load(shellBuf);
+      const F = makeFonts(GL);
+      if (!F.L || !F.R || !F.S) throw new Error('в assets/upp/glyphs.json нет шрифта Inter (L, R, S) — пересоберите его: node tools/build_upp_shell.js');
+
+      /* ---------- текстовые помощники ---------- */
+      const W = (str, f, size) => F[f].width(String(str), size);
+      const putOn = (p, str, vx, vy, size, o = {}) => {
+        str = String(str); if (!str) return 0;
+        const f = F[o.f || 'L'], w0 = f.width(str, size);
+        let hs = 1; if (o.maxW && w0 > o.maxW) hs = o.maxW / w0;
+        const w = w0 * hs, r = p.getRotation().angle, H = p.getHeight(), th = r * Math.PI / 180, cs = Math.cos(th), sn = Math.sin(th);
+        const off = o.a === 'c' ? -w / 2 : o.a === 'r' ? -w : 0;
+        let ux = r === 90 ? vy : vx, uy = r === 90 ? vx : H - vy;
+        ux += off * cs; uy += off * sn;
+        p.pushOperators(pushGraphicsState(), concatTransformationMatrix(cs * hs, sn * hs, -sn, cs, ux, uy));
+        p.drawSvgPath(f.path(str), { x: 0, y: 0, scale: size / f.upm, color: o.c || DARK, borderWidth: 0 });
+        p.pushOperators(popGraphicsState());
+        return w;
+      };
+      const wrap = (str, f, size, maxW) => {
+        const out = []; let cur = '';
+        for (const w of String(str).split(' ')) { const t = cur ? cur + ' ' + w : w; if (W(t, f, size) > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
+        out.push(cur); return out;
+      };
+      /* абзац с выравниванием по ширине; top — верх строки; возвращает низ абзаца */
+      const para = (p, x0, x1, top, str, o = {}) => {
+        const f = o.f || 'L', size = o.size || 9.4, lead = o.lead || size * 1.37, ind = o.indent || 0, c = o.c || DARK;
+        const words = String(str).split(' '), lines = []; let cur = [];
+        for (const w of words) {
+          const lim = x1 - x0 - (lines.length ? 0 : ind), t = cur.concat(w).join(' ');
+          if (cur.length && W(t, f, size) > lim) { lines.push(cur); cur = [w]; } else cur.push(w);
+        }
+        lines.push(cur);
+        let y = top + size * .95;
+        lines.forEach((ln, k) => {
+          const xs = x0 + (k ? 0 : ind), avail = x1 - xs;
+          if (o.justify !== false && k < lines.length - 1 && ln.length > 1) {
+            const ww = ln.reduce((a, w) => a + W(w, f, size), 0), gap = (avail - ww) / (ln.length - 1);
+            let xx = xs; for (const w of ln) { if (p) putOn(p, w, xx, y, size, { f, c }); xx += W(w, f, size) + gap; }
+          } else if (p) putOn(p, ln.join(' '), xs, y, size, { f, c });
+          y += lead;
+        });
+        return y - lead + size * .3;
+      };
+
+      /* ---------- план листов ---------- */
+      const rows = techRows(s);
+      const tPages = layoutTable(rows, null, W, wrap).pages;     // сколько листов займёт таблица
+      const plan = [['cover'], ['letter'], ['contents'], ['offer'], ['titled', 'desc'], ['plain', 'decode'],
+        ['frame', 'scheme'], ['frame', 'conn'], ['frame', 'draw']];
+      for (let i = 0; i < tPages; i++) plan.push([i ? 'plain' : 'titled', 'tech' + i]);
+      plan.push(['titled', 'tr1'], ['plain', 'tr2'], ['titled', 'srv'], ['clients']);
+      const at = key => plan.findIndex(x => x[1] === key || x[0] === key);
+
+      const doc = await PDFDocument.create();
+      const copied = await doc.copyPages(shell, plan.map(x => SH[x[0]]));
+      copied.forEach(p => doc.addPage(p));
       const pg = doc.getPages();
       const M = prepareMasks(doc, pg);
+      const put = (i, ...a) => putOn(pg[i], ...a);
 
-      /* ---------- помощники ---------- */
-      const rot = p => p.getRotation().angle;
-      const rect = (p, x0, y0, x1, y1, c = WHITE) => {
-        const H = p.getHeight();
-        if (rot(p) === 90) p.drawRectangle({ x: y0, y: x0, width: y1 - y0, height: x1 - x0, color: c, borderWidth: 0 });
-        else p.drawRectangle({ x: x0, y: H - y1, width: x1 - x0, height: y1 - y0, color: c, borderWidth: 0 });
+      /* номера листов в шапке (у листов из шаблона ПЧ они свои) */
+      plan.forEach(([kind], i) => {
+        if (['titled', 'plain'].includes(kind)) { M.add(pg[i], 532, 44.5, 562, 60); put(i, String(i), 535.0, 57.0, 12.7, { f: 'R', c: TEAL }); }
+        else if (kind === 'frame') { M.add(pg[i], 535, 44.6, 549.8, 55.4); put(i, String(i), 542.4, 53.75, 10.65, { f: 'R', c: TEAL, a: 'c' }); }
+        else if (kind === 'clients') { M.add(pg[i], 532, 42, 562, 57.5); put(i, String(i), 535.0, 54.5, 12.7, { f: 'R', c: TEAL }); }
+      });
+      const title = (i, str) => {                                   // оранжевый заголовок раздела на листе с заголовком
+        M.add(pg[i], 52, 104, 562, 130.5); put(i, str, TX0, 122, 13, { f: 'S', c: ORANGE, maxW: TX1 - TX0 });
       };
-      const put = (p, str, vx, vy, size, o = {}) => {
-        const f = F[o.f || 'iso'], w0 = f.width(str, size);
-        let hs = o.hs || 1; if (o.maxW && w0 * hs > o.maxW) hs = o.maxW / w0;
-        const w = w0 * hs; if (o.a === 'c') vx -= w / 2; else if (o.a === 'r') vx -= w;
-        const r = rot(p), H = p.getHeight(), th = (r * Math.PI) / 180;
-        const cs = Math.cos(th), sn = Math.sin(th), ux = r === 90 ? vy : vx, uy = r === 90 ? vx : H - vy;
-        p.pushOperators(pushGraphicsState(), concatTransformationMatrix(cs * hs, sn * hs, -sn, cs, ux, uy));
-        if (f.std) p.drawText(str, { x: 0, y: 0, size, font: f.std, color: o.c || BLACK });
-        else p.drawSvgPath(f.path(str), { x: 0, y: 0, scale: size / f.upm, color: o.c || BLACK, borderWidth: 0 });
-        p.pushOperators(popGraphicsState());
-      };
-      // заменить надпись из FIELDS: вырезать её глифы и вписать новую на ту же базовую линию (по центру старой или от её левого края)
-      const edit = (name, str, o = {}) => {
-        const [pi, x0, x1, base, size, top, bot, hs] = FIELDS[name], p = pg[pi];
-        M.add(pi, x0 - .5, top - .7, x1 + .5, bot + .6);
-        const a = o.a || 'c', ax = o.ax ?? (a === 'l' ? x0 : a === 'r' ? x1 : (x0 + x1) / 2);
-        put(p, str, ax, base, size, { f: 'iso', a, hs: o.hs || hs, maxW: o.maxW });
-      };
-      const fitLines = (str, f, maxW, maxH, sizes) => {          // перенос по словам, кегль уменьшается, пока текст не влезет
-        for (const size of sizes) {
-          const out = []; let cur = '';
-          for (const w of str.split(' ')) { const t = cur ? cur + ' ' + w : w; if (F[f].width(t, size) > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
-          out.push(cur);
-          if (out.length * size * 1.12 <= maxH || size === sizes[sizes.length - 1]) return { lines: out, size };
+      const frameTitle = (i, str) => { M.add(pg[i], 84, 127, 520, 150); put(i, str, 302.2, 144.25, 14.8, { f: 'R', c: TEAL, a: 'c', maxW: 420 }); };
+      const stamp = i => put(i, s.mark, 348.75, 713.0, 9, { f: 'R', a: 'c', maxW: 296 });
+
+      /* ---------- обложка ---------- */
+      pg[0].drawRectangle({ x: 36, y: pg[0].getHeight() - 708, width: 300, height: 26, color: BAND, borderWidth: 0 });   // «Преобразователь частоты» — на цветной плашке
+      put(0, 'Устройство плавного пуска', 39.2, 699.8, 20, { f: 'R', c: WHITE });
+      put(0, s.mark, 38.6, 727.5, 15.5, { f: 'R', c: WHITE, maxW: 518 });
+      if (s.who) put(0, s.who, 37.6 + W('Составил:', 'R', 12.5) + 7, 758.7, 12.5, { f: 'R', c: WHITE, maxW: 330 });
+      put(0, new Date().toLocaleDateString('ru-RU'), 443.5 + W('ДАТА:', 'R', 12.5) + 6, 758.7, 12.5, { f: 'R', c: WHITE });
+      try {
+        const png = await doc.embedPng(await get('assets/upp/cover_upp.png').then(r => r.arrayBuffer()));
+        M.add(pg[0], 20, 194.2, 279, 513.6);                                   // фото шкафа ПЧ из шаблона
+        const h = 300, w = h * png.width / png.height;
+        pg[0].drawImage(png, { x: 149.5 - w / 2, y: pg[0].getHeight() - 202 - h, width: w, height: h });
+      } catch (e) { console.warn('Фото УПП для обложки не найдено', e); }
+
+      /* ---------- содержание ---------- */
+      M.add(pg[2], 60, 158, 553, 600);
+      const toc = [['1. Технико-коммерческое предложение', at('offer')], ['2. Описание устройства плавного пуска', at('desc')],
+        ['2.1 Однолинейная схема', at('scheme')], ['2.2 Схема внешних подключений', at('conn')], ['2.3 Габаритный эскиз', at('draw')],
+        ['3. Основные технические характеристики предлагаемого оборудования', at('tech0')], ['4. Транспортировка и хранение', at('tr1')],
+        ['5. Условия эксплуатации', at('tr2')], ['6. Техническое обслуживание', at('srv')], ['7. Наши клиенты', at('clients')]];
+      toc.forEach(([t, n], k) => {
+        const y = 174.0 + k * 28.95, num = String(n), nw = W(num, 'L', 9.6), tw = put(2, t, 74, y, 9.6);
+        const x0 = 74 + tw + 4, x1 = 535 - nw - 4, dw = W('.', 'L', 9.6), cnt = Math.max(0, Math.floor((x1 - x0) / dw));
+        put(2, '.'.repeat(cnt), x1 - cnt * dw, y, 9.6);
+        put(2, num, 535, y, 9.6, { a: 'r' });
+      });
+
+      /* ---------- предложение ---------- */
+      wrap(s.name, 'L', 9.6, 240).forEach((l, i) => put(3, l, 102.4, 162.5 + i * 12.3, 9.6));
+      put(3, s.qty + ' шт', 375.85, 243, 10.2, { a: 'c' });
+      if (s.price) put(3, money(s.price), 470.9, 243, 10.2, { a: 'c' });
+      put(3, 'Всего позиций: 1, на сумму ' + (s.price ? money(s.price * s.qty) : '______________') + ' рублей, включая НДС 22 %', 58.6, 361.5, 10.6);
+      M.add(pg[3], 55, 369, 553, 482);                                          // гарантия — про преобразователь (рамка листа — x 557,9)
+      para(pg[3], 58.6, 537, 373.4, WARRANTY, { size: 9.6, lead: 15.5 });
+
+      /* ---------- описание ---------- */
+      const iDesc = at('desc');
+      title(iDesc, '2. Описание устройства плавного пуска');
+      drawDescription(pg[iDesc], s, para, putOn, W);
+
+      /* ---------- расшифровка обозначения и модельный ряд ---------- */
+      drawDecode(pg[at('decode')], s, putOn, W, wrap);
+
+      /* ---------- листы-чертежи ---------- */
+      const iS = at('scheme'), iC = at('conn'), iD = at('draw');
+      frameTitle(iS, '2.1 Однолинейная схема'); frameTitle(iC, '2.2 Схема внешних подключений'); frameTitle(iD, '2.3 Габаритный эскиз');
+      [iS, iC, iD].forEach(stamp);
+      const ZONE = [92, 160, 512, 684];
+      // однолинейная: стандартная — со старого листа ТКП, E и IK — свои листы
+      if (s.pkg === 'E' || s.pkg === 'IK') {
+        const src = await PDFDocument.load(await get('assets/upp/scheme_' + s.pkg + '.pdf').then(r => r.arrayBuffer()));
+        await placeCrop(doc, src.getPage(0), s.pkg === 'E' ? [176, 206, 445, 648] : [98, 190, 500, 619], pg[iS], ZONE, { max: 1.2 });
+      } else await placeCrop(doc, shell.getPage(SH.oScheme), [112, 190, 500, 619], pg[iS], ZONE, { max: 1.2 });
+      // схема внешних подключений — из технического описания ESQ F HVS (рис. 9)
+      // при питании =220 В подпись «Питание AC 220 В (L, N)» на схеме заменяется
+      const dc = s.ctl === 'DC220';
+      const mc = await placeCrop(doc, shell.getPage(SH.tdConn), [50, 214, 384, 488], pg[iC], ZONE, { max: 1.3, holes: dc ? [[80, 345, 148, 354.5]] : [] });
+      if (dc) { const q = mc(147.0, 351.6); putOn(pg[iC], 'Питание DC 220 В (+, −)', q[0], q[1], 5.6 * mc.k, { f: 'L', a: 'r' }); }
+      // габаритный эскиз по исполнению: стандарт и S — шкаф 1000 или 1200, E — свой, IK — свой; нет чертежа — лист пустой, как у ПЧ
+      if (s.drawing) {
+        let yb;
+        if (s.drawing === 'E') {
+          const m2 = await placeCrop(doc, shell.getPage(SH.oDraw), [93, 200, 518, 512], pg[iD], [92, 170, 512, 600], { max: 1.0 });
+          yb = m2(0, 512)[1] + 34;
+        } else {
+          // листы из DWG широкие: виды спереди и сбоку — верхним рядом, вид сверху — под ними (так чертёж крупнее)
+          const VIEWS = { STD1000: [[25, 0, 332, 218], [363, 30, 539, 148]], STD1200: [[2, 0, 342, 210], [359, 32, 540, 168]], IK: [[2, 0, 349, 214], [393, 12, 543, 137]] };
+          const sp = shell.getPage(SH['gab' + s.drawing]), [r1, r2] = VIEWS[s.drawing];
+          const h1 = r1[3] - r1[1], h2 = r2[3] - r2[1], GAP = 26;
+          const k = Math.min(420 / (r1[2] - r1[0]), 420 / (r2[2] - r2[0]), (400 - GAP) / (h1 + h2), 1.4);
+          const top = 175;
+          await placeCrop(doc, sp, r1, pg[iD], [92, top, 512, top + h1 * k], { max: k });
+          await placeCrop(doc, sp, r2, pg[iD], [92, top + h1 * k + GAP, 512, top + (h1 + h2) * k + GAP], { max: k });
+          yb = top + (h1 + h2) * k + GAP + 34;
         }
-      };
-
-      /* ---------- обложка: Helvetica 24,48 и Tahoma 14 белым по бирюзовой плашке ---------- */
-      if (!deleteTJ(doc, pg[0], COVER_MODEL)) rect(pg[0], 37.5, 705, 300, 734, BAND);
-      put(pg[0], s.mark, 39.15, 726.64, 24.48, { f: 'helv', c: WHITE, maxW: 515 });
-      if (deleteTJ(doc, pg[0], COVER_DATE) < COVER_DATE.length) rect(pg[0], 488, 742, 566, 761, BAND);
-      put(pg[0], new Date().toLocaleDateString('ru-RU'), 490.06, 755.21, 14.04, { f: 'tahoma', c: WHITE, hs: 1.03 });
-      if (s.who) put(pg[0], 'Составил: ' + s.who, 39.15, 755.21, 14.04, { f: 'tahoma', c: WHITE, maxW: 395 });
-
-      /* ---------- стр. 3: предложение ---------- */
-      M.add(3, 99, 147.1, 233.8, 183.6);                                     // ячейка «Наименование»
-      const nm = fitLines(s.name, 'arial', 128, 35, [10, 9, 8.5, 8, 7.5, 7]);
-      const y0 = 147.1 + (36.5 - nm.lines.length * nm.size * 1.12) / 2 + nm.size * .93;
-      nm.lines.forEach((l, i) => put(pg[3], l, 102.4, y0 + i * nm.size * 1.12, nm.size, { f: 'arial' }));
-      M.add(3, 263, 160.5, 275, 173);
-      put(pg[3], String(s.qty), 268.9, 169.71, 10, { f: 'helv', a: 'c' });
-      if (s.price) {
-        put(pg[3], money(s.price), 361.7, 169.71, 10, { f: 'helv', a: 'c', maxW: 116 });
-        put(pg[3], money(s.price * s.qty), 480.1, 169.71, 10, { f: 'helv', a: 'c', maxW: 109 });
-        put(pg[3], money(s.price * s.qty), 480.1, 197.33, 9.48, { f: 'tahoma', a: 'c', c: NAVY, maxW: 109 });
-        put(pg[3], money(s.price * s.qty), 292, 261.76, 12, { f: 'tahoma', a: 'c', c: NAVY, maxW: 74 });
+        put(iD, 'Габариты (Ш×Г×В): ' + s.dims + ' мм', 302.2, yb, 10, { a: 'c' });
+        put(iD, 'Масса — ' + s.massKg + ' кг', 302.2, yb + 16, 10, { a: 'c' });
       }
 
-      /* ---------- стр. 4: габаритный эскиз ---------- */
-      edit('p4_stamp', s.mark, { a: 'l', maxW: 250 });
-      if (s.noDrawing) M.add(4, 88, 160, 516, 520);                          // эскиз шаблона только для шкафа 1000×1500×2300
-      else put(pg[4], 'Масса — ' + s.massKg + ' кг', 307.5, 545, 12.22, { a: 'c' });
+      /* ---------- технические характеристики ---------- */
+      const i0 = at('tech0');
+      title(i0, '3. Основные технические характеристики предлагаемого оборудования');
+      layoutTable(rows, pg.slice(i0, i0 + tPages), W, wrap, putOn);
 
-      /* ---------- стр. 5: однолинейная схема ---------- */
-      edit('p5_stamp', s.mark, { a: 'l', maxW: 250 });
+      /* ---------- транспортировка, условия эксплуатации, обслуживание ---------- */
+      const i1 = at('tr1'), i2 = at('tr2'), i3 = at('srv');
+      title(i1, '4. Транспортировка и хранение');
+      await drawTransport(doc, shell, pg[i1], pg[i2], s, para, putOn, W);
+      title(i3, '6. Техническое обслуживание');
+      let y = para(pg[i3], TX0, TX1, 136, 'Шкаф устанавливается на раму из стального швеллера над кабельным каналом глубиной не менее 1000 мм. ' +
+        (s.srv === '1' ? 'Обслуживание устройства плавного пуска — одностороннее (с передней стороны); перед шкафом необходимо оставить проход не менее 1200 мм.'
+          : 'Обслуживание — двухстороннее: перед шкафом и за шкафом необходимо оставить проходы не менее 1200 мм.'), { indent: 18 });
+      y = para(pg[i3], TX0, TX1, y + 4, 'Тиристоры имеют большой срок службы и не требуют обслуживания в течение нескольких лет; модули каждой фазы заменяются по отдельности. ' +
+        'Перед подачей высокого напряжения систему управления можно проверить пониженным напряжением 380 В. Заземляющие проводники блоков управления подключены к медной шине заземления в нижней части шкафа.', { indent: 18 });
+      { const k3 = Math.min(1.35, (TX1 - TX0) / 340, (690 - y - 40) / 198), g3 = makeG(pg[i3], putOn, 306 - 170 * k3 + 4 * k3, y + 22 - 20 * k3, k3);
+        g3.setW(W); figInstall(g3, s.srv === '1'); y = y + 22 + 198 * k3 + 10; }
+      putOn(pg[i3], 'Рис. 3. Установка УПП: кабельный канал и проходы обслуживания, мм', 306, y, 8.6, { a: 'c' });
 
-      /* ---------- стр. 6: основные характеристики ---------- */
-      edit('p6_name', s.mark, { maxW: 290 });
-      edit('p6_p', s.P + ' кВт');
-      edit('p6_i', s.I + ' А');
-      if (s.kv === 10) edit('p6_u', '10000В ±15%');
-      if (s.motor === 'S') edit('p6_motor', 'Синхронный');
-      if (s.ctl === 'AC110') edit('p6_ctlV', '110', { a: 'l' });
-      else if (s.ctl === 'DC220' || s.ctl === 'DC110') edit('p6_ctl', 'DC ' + s.ctl.slice(2) + ' В ±15%');
-      if (s.startsH !== 6) edit('p6_starts', '1-' + s.startsH + ' пуска в час с перерывом 10 мин.');
-
-      // постоянные исправления шаблона — по данным завода (руководство RSE1000 V2025)
-      edit('p6_tmin', '10', { a: 'l' });
-      edit('p6_ol', 'Степени защиты от перегрузки: 10A, 10, 20, 30, OFF');
-      edit('p6_ul', 'Уровень: 50–100%');
-      edit('p6_ult', 'Время срабатывания: 0–10с');
-      edit('p7_log', 'Хранение данных о последних 1000 ошибках');
-      edit('p10_tmin', '10', { a: 'l' });
-
-      /* ---------- стр. 7: связь ---------- */
-      if (s.proto !== 'MR') {
-        edit('p7_proto', 'Modbus RTU; ' + PROTO[s.proto]);
-        if (IFACE[s.proto]) edit('p7_iface', 'RS-485; ' + IFACE[s.proto]);
-      }
-
-      /* ---------- стр. 8: условия эксплуатации, схема ---------- */
-      if (s.ip !== 'IP41') edit('p8_ip', s.ip);
-      if (!s.dims) M.add(8, 337.5, 222.2, 443.4, 234.5);                    // габариты по заказу — строка пустая
-      else if (s.noDrawing) edit('p8_dims', s.dims.replace(/×/g, 'х') + ' (ШхГхВ)');
-      if (s.srv === '1') edit('p8_srv', 'Одностороннее');
-      if (s.cable === 'T') edit('p8_cab', 'Сверху');
-      if (s.kv === 10) edit('p8_kv', '10 кВ', { a: 'l' });
-      if (s.ctl.startsWith('DC')) { edit('p8_L', '+'); edit('p8_N', '-'); }
-      // строка «Масса» под таблицей: линии как у таблицы (горизонтали 0,72 pt, вертикаль 1,2 pt)
-      const p8 = pg[8], H8 = p8.getHeight(), yb = 343.3;
-      p8.drawRectangle({ x: 34.0, y: H8 - yb - .36, width: 520.5, height: .72, color: LINE_H, borderWidth: 0 });
-      p8.drawRectangle({ x: 237.14, y: H8 - yb, width: 1.2, height: yb - 313.3, color: LINE_V, borderWidth: 0 });
-      put(p8, 'Масса', 128.6, 332.2, 10.99, { a: 'c' });
-      put(p8, s.massKg + ' кг', 390.1, 332.2, 10.99, { a: 'c' });
-
-      /* ---------- стр. 11: вид обслуживания ---------- */
-      if (s.srv === '1') edit('p11_srv', 'с одной стороны.', { a: 'l', maxW: 82 });
+      /* ---------- «Наши клиенты» ---------- */
+      const iK = at('clients');
+      M.add(pg[iK], 54, 104, 330, 127); put(iK, '7. Наши клиенты', 59.2, 120.0, 13, { f: 'S', c: ORANGE });
 
       M.apply();
-      if (s.noDrawing) alert('Напоминание: для ' + s.mark + ' габаритный эскиз в ТКП не вставляется — страница эскиза останется пустой' +
+      if (s.noDrawing) alert('Напоминание: для ' + s.mark + ' габаритный эскиз в ТКП не вставляется — лист эскиза останется пустым' +
         (s.dims ? '' : ', строка «Габариты» тоже') + '. Приложите эскиз к ТКП отдельно.');
-      const out = await doc.save();
+      const out = await doc.save({ useObjectStreams: true });
       const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
       const link = document.createElement('a'); link.href = url;
       link.download = 'TKP_' + s.mark.replace(/ /g, '_') + '.pdf';
       document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (e) { console.error(e); alert('Не удалось сформировать ТКП: ' + e.message); }
     finally { if (btn) btn.style.opacity = 1; }
+  }
+
+  /* ================= Вставка фрагмента листа (вектором) =================
+     box — область исходного листа «как его видит человек», zone — куда вписать на листе ТКП.
+     holes — области исходного листа, которые нужно скрыть (надписи под замену).
+     Возвращает функцию пересчёта точки исходного листа в координаты листа ТКП (и масштаб map.k). */
+  async function placeCrop(doc, srcPage, box, dst, zone, o = {}) {
+    const [sx0, sy0, sx1, sy1] = box, sw = sx1 - sx0, sh = sy1 - sy0;
+    const zw = zone[2] - zone[0], zh = zone[3] - zone[1];
+    const k = Math.min(zw / sw, zh / sh, o.max || 99);
+    const DX = zone[0] + (zw - sw * k) / 2, DY = zone[1] + (zh - sh * k) / 2, Hd = dst.getHeight(), rd = dst.getRotation().angle % 360;
+    const r = srcPage.getRotation().angle % 360, Hs = srcPage.getHeight();
+    const bb = r === 90 ? { left: sy0, right: sy1, bottom: sx0, top: sx1 } : { left: sx0, right: sx1, bottom: Hs - sy1, top: Hs - sy0 };
+    const em = await doc.embedPage(srcPage, bb);
+    const map = (x, y) => [DX + (x - sx0) * k, DY + (y - sy0) * k];
+    map.k = k;
+    // прямоугольник «как видит человек» → координаты листа ТКП (у листов-чертежей /Rotate 90)
+    const vrect = (X0, Y0, X1, Y1) => rd === 90 ? rectangle(Y0, X0, Y1 - Y0, X1 - X0) : rectangle(X0, Hd - Y1, X1 - X0, Y1 - Y0);
+    dst.pushOperators(pushGraphicsState());
+    if (o.holes && o.holes.length) {
+      const ops = [rectangle(0, 0, dst.getWidth(), Hd)];
+      for (const [a, b, c, d] of o.holes) { const p = map(a, b), q = map(c, d); ops.push(vrect(p[0], p[1], q[0], q[1])); }
+      dst.pushOperators(...ops, clipEvenOdd(), endPath());
+    }
+    // (u, v) — координаты вырезки исходного листа без поворота; матрица переводит их сразу в координаты листа ТКП
+    const m = r === 90
+      ? (rd === 90 ? [k, 0, 0, k, DY, DX] : [0, -k, k, 0, DX, Hd - DY])
+      : (rd === 90 ? [0, k, -k, 0, DY + sh * k, DX] : [k, 0, 0, k, DX, Hd - DY - sh * k]);
+    dst.pushOperators(concatTransformationMatrix(...m));
+    dst.drawPage(em, { x: 0, y: 0, width: bb.right - bb.left, height: bb.top - bb.bottom });
+    dst.pushOperators(popGraphicsState());
+    return map;
+  }
+
+
+  /* ================= Рисунки, нарисованные кодом (вектор) =================
+     Локальные координаты рисунка (сверху вниз) → лист: X = ox + x*k, Y = oy + y*k. Надписи — Inter, размер в pt листа. */
+  const GREY = rgb(.55, .58, .6), FILL = rgb(.93, .95, .96), SOIL = rgb(.45, .45, .45);
+  function makeG(p, put, ox, oy, k) {
+    const H = p.getHeight(), X = x => ox + x * k, Y = y => oy + y * k;
+    const path = (d, o = {}) => p.drawSvgPath(d, { x: 0, y: H, borderColor: o.c || (o.fill && !o.stroke ? undefined : DARK), borderWidth: o.fill && !o.stroke ? 0 : (o.w || .8), color: o.fill, borderDashArray: o.dash, borderLineCap: o.cap });
+    const g = {
+      k, X, Y,
+      line: (x0, y0, x1, y1, o = {}) => path(`M ${X(x0)} ${Y(y0)} L ${X(x1)} ${Y(y1)}`, o),
+      poly: (pts, o = {}) => path('M ' + pts.map(([x, y]) => X(x) + ' ' + Y(y)).join(' L ') + (o.open ? '' : ' Z'), o),
+      rect: (x, y, w, h, o = {}) => g.poly([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], o),
+      circle: (cx, cy, r, o = {}) => { const R = r * k, a = X(cx), b = Y(cy);
+        path(`M ${a - R} ${b} A ${R} ${R} 0 1 0 ${a + R} ${b} A ${R} ${R} 0 1 0 ${a - R} ${b} Z`, o); },
+      text: (str, x, y, size, o = {}) => put(p, str, X(x), Y(y), size, o),
+      // штриховка прямоугольника линиями под 45°
+      hatch: (x0, y0, x1, y1, step, o = {}) => {
+        for (let c = x0 - (y1 - y0); c < x1; c += step) {
+          let ax = c, ay = y1, bx = c + (y1 - y0), by = y0;
+          if (ax < x0) { ay -= x0 - ax; ax = x0; }
+          if (bx > x1) { by += bx - x1; bx = x1; }
+          if (ay > y0 && by < y1 && ax < bx) g.line(ax, ay, bx, by, { w: o.w || .35, c: o.c || SOIL });
+        }
+      },
+      arrow: (x, y, dx, dy, o = {}) => { const L = 4 / k, W2 = 1.4 / k, n = Math.hypot(dx, dy), ux = dx / n, uy = dy / n;
+        g.poly([[x, y], [x - ux * L - uy * W2, y - uy * L + ux * W2], [x - ux * L + uy * W2, y - uy * L - ux * W2]], { fill: o.c || TEAL }); },
+      // размер: линия со стрелками и текст по середине
+      dim: (x0, y0, x1, y1, str, o = {}) => {
+        const c = o.c || TEAL; g.line(x0, y0, x1, y1, { c, w: .6 }); g.arrow(x0, y0, x0 - x1, y0 - y1, { c }); g.arrow(x1, y1, x1 - x0, y1 - y0, { c });
+        if (y0 === y1) g.text(str, (x0 + x1) / 2, y0 - 3 / k, o.size || 7.4, { f: 'S', c, a: 'c' });
+        else g.text(str, x0 + (o.side === 'r' ? 4 / k : -4 / k), (y0 + y1) / 2 + 2.5 / k, o.size || 7.4, { f: 'S', c, a: o.side === 'r' ? 'l' : 'r' });
+      },
+      // выноска с подписью
+      lead: (x0, y0, x1, y1, str, o = {}) => { g.circle(x0, y0, .9 / k, { fill: DARK }); g.line(x0, y0, x1, y1, { w: .5 }); const r = o.a === 'r';
+        const z = o.size || 7.6; g.line(x1, y1, x1 + (r ? -1 : 1) * (W(str) * z / 7.6 / k + 2 / k), y1, { w: .5 }); g.text(str, x1 + (r ? -1 : 1) * 1 / k, y1 - 2 / k, z, { f: 'R', a: r ? 'r' : 'l' }); }
+    };
+    let W = s => 0; g.setW = f => { W = s => f(s, 'R', 7.6); };
+    return g;
+  }
+  // фасад шкафа УПП: отсек управления с дисплеем, высоковольтный отсек, отсек ввода
+  function cabFront(g, x, y, w, h) {
+    g.rect(x, y, w, h, { fill: FILL, stroke: true, w: .9 });
+    g.line(x, y + h * .3, x + w, y + h * .3, { w: .6 }); g.line(x, y + h * .64, x + w * .78, y + h * .64, { w: .6 });
+    g.line(x + w * .78, y + h * .3, x + w * .78, y + h, { w: .6 });
+    g.rect(x + w * .3, y + h * .09, w * .24, h * .075, { fill: rgb(.75, .85, .88), stroke: true, w: .5 });
+    for (let i = 0; i < 5; i++) g.circle(x + w * (.16 + i * .12), y + h * .045, w * .022, { w: .4 });
+    for (let i = 0; i < 4; i++) g.circle(x + w * (.22 + i * .13), y + h * .23, w * .022, { w: .4 });
+    g.rect(x + w * .68, y + h * .1, w * .12, h * .05, { w: .4 });
+    g.rect(x + w * .33, y + h * .38, w * .12, h * .07, { w: .5 });
+    g.rect(x + w * .3, y + h * .8, w * .24, h * .055, { w: .5 });
+    g.rect(x + w * .86, y + h * .45, w * .04, h * .12, { w: .5 });
+    g.rect(x + w * .66, y + h * .7, w * .05, h * .035, { w: .4 });
+  }
+  // Рис. 1 — подъём УПП на стропах (локальная область 250×236)
+  function figLift(g) {
+    const cx = 130, top = 84, bot = 222, cw = 62;
+    g.line(cx, 0, cx, 12, { w: 2.2 });
+    g.poly([[cx, 12], [cx, 22], [cx - 1.5, 26], [cx - 5, 27.5], [cx - 9, 26], [cx - 10.5, 22]], { open: true, w: 2 });
+    const ax = cx - 5, ay = 27, L = cx - 22, R = cx + 22;
+    const hit = xb => ax + (xb - ax) * (top - ay) / (bot + 3 - ay);
+    g.line(ax, ay, L, bot + 3, { w: 1.3, c: rgb(.25, .27, .3) }); g.line(ax, ay, R, bot + 3, { w: 1.3, c: rgb(.25, .27, .3) });
+    cabFront(g, cx - cw / 2, top, cw, bot - top);
+    g.line(ax, ay, L, bot + 3, { w: 1.3, c: rgb(.25, .27, .3) }); g.line(ax, ay, R, bot + 3, { w: 1.3, c: rgb(.25, .27, .3) });
+    for (const xb of [L, R]) g.rect(hit(xb) - 5, top - 3, 10, 4.5, { fill: ORANGE, stroke: true, w: .4 });
+    g.rect(cx - cw / 2 - 2, bot, cw + 4, 7, { fill: rgb(.85, .87, .88), stroke: true, w: .6 });
+    for (const xb of [L, R]) g.rect(xb - 6, bot + 1.5, 12, 4.5, { fill: ORANGE, stroke: true, w: .4 });
+    g.line(70, bot + 7, 190, bot + 7, { w: .8 }); g.hatch(70, bot + 7, 190, bot + 12, 3);
+    g.line(cx - cw / 2 - 2, top, 82, top, { c: TEAL, w: .4, dash: [2, 1.5] }); g.line(ax - 4, ay, 82, ay, { c: TEAL, w: .4, dash: [2, 1.5] });
+    g.dim(86, ay, 86, top, 'не менее 1,2 м');
+    { const yy = (ay + top) / 2; g.lead(ax + (R - ax) * (yy - ay) / (bot + 3 - ay), yy, 172, 40, 'Строп (трос, цепь)'); }
+    g.lead(hit(R) + 4, top - 1, 172, 72, 'Защитная пластина');
+    g.lead(cx + cw / 2 - 4, (top + bot) / 2, 172, 140, 'УПП');
+    g.lead(R + 5, bot + 4, 172, 200, 'Проём под стропы');
+  }
+  // Рис. 3 — установка УПП: вид сбоку и вид спереди (локальная область 340×214), без размеров самого шкафа
+  function figInstall(g, oneSide) {
+    const fl = 150, tr = 40;
+    // вид сбоку
+    const c0 = 100, c1 = 160, wl = oneSide ? 166 : 210;
+    g.hatch(20, fl, 104, fl + tr + 8, 3.2); g.hatch(150, fl, oneSide ? 186 : 230, fl + tr + 8, 3.2); g.hatch(104, fl + tr, 150, fl + tr + 8, 3.2);
+    g.line(20, fl, 104, fl, { w: .9 }); g.line(150, fl, oneSide ? 186 : 230, fl, { w: .9 });
+    g.poly([[104, fl], [104, fl + tr], [150, fl + tr], [150, fl]], { open: true, w: .9 });
+    for (const [x0, x1] of [[34, 44], [wl, wl + 10]]) { g.rect(x0, 40, x1 - x0, fl - 40, { w: .7 }); g.hatch(x0, 40, x1, fl, 3, { c: GREY }); }
+    g.rect(c0, 54, c1 - c0, fl - 6 - 54, { fill: FILL, stroke: true, w: .9 });
+    g.line(c0 + 4, 60, c0 + 4, fl - 10, { w: .4 }); g.line(c1 - 4, 60, c1 - 4, fl - 10, { w: .4 });
+    g.text('УПП', (c0 + c1) / 2, 104, 8, { f: 'S', a: 'c' });
+    g.rect(c0 - 2, fl - 6, c1 - c0 + 4, 6, { fill: rgb(.35, .38, .4) });
+    g.line(44, 34, 44, 28, { c: TEAL, w: .4 }); g.line(c0, 52, c0, 28, { c: TEAL, w: .4, dash: [2, 1.5] });
+    g.dim(44, 31, c0, 31, '≥1200');
+    if (!oneSide) { g.line(c1, 52, c1, 28, { c: TEAL, w: .4, dash: [2, 1.5] }); g.line(wl, 34, wl, 28, { c: TEAL, w: .4 }); g.dim(c1, 31, wl, 31, '≥1200'); }
+    g.dim(127, fl + 1, 127, fl + tr - 1, '≥1000', { side: 'r' });
+    g.lead(c0 + 2, fl - 3, 96, 128, 'Стальной швеллер', { a: 'r', size: 6.8 });
+    g.text('Вид сбоку', 125, 212, 8.2, { f: 'S', a: 'c' });
+    // вид спереди
+    const fx = 262, fw = 40;
+    g.hatch(236, fl, 270, fl + tr + 8, 3.2); g.hatch(298, fl, 332, fl + tr + 8, 3.2); g.hatch(270, fl + tr, 298, fl + tr + 8, 3.2);
+    g.line(236, fl, 270, fl, { w: .9 }); g.line(298, fl, 332, fl, { w: .9 });
+    g.poly([[270, fl], [270, fl + tr], [298, fl + tr], [298, fl]], { open: true, w: .9 });
+    cabFront(g, fx, 54, fw, fl - 6 - 54);
+    g.rect(fx - 2, fl - 6, fw + 4, 6, { fill: rgb(.35, .38, .4) });
+    g.text('Вид спереди', fx + fw / 2, 212, 8.2, { f: 'S', a: 'c' });
+  }
+
+  /* ================= Таблица характеристик (оформление как в ТКП на ПЧ) =================
+     Без pages — только считает, сколько листов займёт. Первый лист — под заголовком (таблица с y 128,7),
+     следующие — от верха рамки. */
+  function layoutTable(rows, pages, W, wrap, put) {
+    const FS = 8.6, LD = FS * 1.24, PAD = 4.5, C0 = FR.x0, C1 = 244.8, C2 = FR.x1, MINH = 18;
+    const lines = (str, w) => str ? wrap(str, 'L', FS, w - 2 * PAD) : [''];
+    const hOf = n => Math.max(MINH, (n - 1) * LD + FS * .72 + 2 * 6.2);
+    const meas = rows.map(([a, b]) => {
+      if (a === '§') return { sec: b, h: 21 };
+      const L = lines(a, C1 - C0), vals = (Array.isArray(b) ? b : [b]).map(v => lines(v, C2 - C1)), vh = vals.map(v => hOf(v.length));
+      return { L, vals, vh, h: Math.max(hOf(L.length), vh.reduce((x, y) => x + y, 0)) };
+    });
+    let page = 0, y = 128.7;
+    const P = () => pages && pages[page];
+    const hline = (x0, x1, yy) => P() && P().drawLine({ start: { x: x0, y: P().getHeight() - yy }, end: { x: x1, y: P().getHeight() - yy }, thickness: .7, color: LINE });
+    const vline = (x, y0, y1) => P() && P().drawLine({ start: { x, y: P().getHeight() - y0 }, end: { x, y: P().getHeight() - y1 }, thickness: .55, color: LINE });
+    const text = (ls, cx, top, h, f = 'L') => {
+      if (!P()) return;
+      const th = (ls.length - 1) * LD + FS * .72; let yy = top + h / 2 - th / 2 + FS * .72;
+      for (const l of ls) { put(P(), l, cx, yy, FS, { f, a: 'c' }); yy += LD; }
+    };
+    if (P()) hline(C0, C2, y);
+    for (const r of meas) {
+      if (y + r.h > FR.bot - 1) { page++; y = FR.top; }
+      if (r.sec) { text([r.sec], (C0 + C2) / 2, y, r.h, 'S'); y += r.h; if (y < FR.bot - 3) hline(C0, C2, y); continue; }
+      text(r.L, (C0 + C1) / 2, y, r.h);
+      let vy = y;
+      r.vals.forEach((v, k) => {
+        const h = k === r.vals.length - 1 ? y + r.h - vy : r.vh[k];
+        text(v, (C1 + C2) / 2, vy, h); vy += h;
+        if (k < r.vals.length - 1) hline(C1, C2, vy);
+      });
+      vline(C1, y, y + r.h);
+      y += r.h;
+      if (y < FR.bot - 3) hline(C0, C2, y);
+    }
+    return { pages: page + 1 };
+  }
+
+  /* ================= Описание ================= */
+  function drawDescription(p, s, para, put, W) {
+    const X0 = 56, X1 = 548, TOP = 133, BOTTOM = 728, ex = extrasList(s);
+    const layout = (size, dry) => {
+      const lead = size * 1.37, o = { size, lead }, gap = size * .45, P = dry ? null : p;
+      const bullet = (head, rest, y, c) => {
+        if (P) put(P, '•', X0 + 4, y + size * .95, size, { c: c || DARK });
+        if (!head) return para(P, X0 + 15, X1, y, rest, { ...o, justify: false });
+        const hw = W(head, 'S', size);
+        if (P) put(P, head, X0 + 15, y + size * .95, size, { f: 'S' });
+        const glue = /^ /.test(rest) ? W(' ', 'L', size) : 0, restTxt = rest.replace(/^ /, '');
+        if (restTxt === '.') { if (P) put(P, '.', X0 + 15 + hw, y + size * .95, size); return y + size * 1.25; }
+        return para(P, X0 + 15, X1, y, restTxt, { ...o, indent: hw + glue, justify: false });
+      };
+      let y = TOP;
+      for (const t of DESC_PARAS) y = para(P, X0, X1, y, t, { ...o, indent: 22 }) + gap;
+      y += gap;
+      if (P) put(P, 'ВВ УПП типа ESQ F HVS позволяют:', X0 + 22, y + size * .95, size, { f: 'S' });
+      y += lead + 1;
+      for (const b of DESC_ALLOW) y = bullet('', b, y) + size * .18;
+      y += gap * 1.5;
+      if (P) put(P, 'ВВ УПП типа ESQ F HVS — это:', X0 + 22, y + size * .95, size, { f: 'S' });
+      y += lead + 1;
+      for (const [h, r] of DESC_IS) y = bullet(h, r, y) + size * .3;
+      y += gap * 1.5;
+      if (P) put(P, 'Принцип работы', X0 + 22, y + size * .95, size, { f: 'S' });
+      y += lead + 1;
+      for (const t of DESC_TAIL) y = para(P, X0, X1, y, t, { ...o, indent: 22 }) + gap;
+      if (ex.length) {
+        y += gap * 1.5;
+        if (P) put(P, 'Дополнительная комплектация в данном предложении:', X0 + 22, y + size * .95, size, { f: 'S', c: TEAL });
+        y += lead + 1;
+        for (const [h, r] of ex) y = bullet(h, r, y, TEAL) + size * .3;
+      }
+      return y;
+    };
+    let size = 9.6;
+    while (size > 7.2 && layout(size, true) > BOTTOM) size -= .1;
+    layout(size, false);
+  }
+
+  /* ================= Расшифровка обозначения + модельный ряд ================= */
+  function drawDecode(p, s, put, W, wrap) {
+    const H = p.getHeight(), X0 = 58, X1 = 554;
+    put(p, 'Расшифровка обозначения', X0, 122, 13, { f: 'S', c: ORANGE });
+    const v = s.kv === 10 ? '10' : '06', cur = String(s.I).padStart(3, '0');
+    const seg = [['ESQ F HVS', 1], [v, 2], ['–'], [cur, 3]];
+    if (s.pkg !== 'STD') seg.push(['–'], [s.pkg, 4]);
+    const fw = (t, z) => W(t, 'S', z), gap = .3;
+    const w1 = seg.reduce((a, [t]) => a + fw(t, 1), 0) + gap * (seg.length - 1);
+    const z = Math.min(26, (X1 - X0 - 4) / w1), base = 172;
+    let x = X0 + ((X1 - X0) - w1 * z) / 2, k = 0;
+    for (const [t, n] of seg) {
+      const w = fw(t, z);
+      if (!n) { put(p, t, x, base, z, { f: 'S' }); x += w + gap * z; continue; }
+      const c = k++ % 2 ? OR5 : TEAL5;
+      put(p, t, x, base, z, { f: 'S', c });
+      const uy = base + z * .2, cx = x + w / 2;
+      p.drawRectangle({ x, y: H - uy - z * .1, width: w, height: z * .1, color: c, borderWidth: 0 });
+      p.drawLine({ start: { x: cx, y: H - uy - z * .1 }, end: { x: cx, y: H - uy - z * .5 }, thickness: .6, color: DARK });
+      put(p, String(n), cx, uy + z * 1.0, z * .42, { f: 'R', a: 'c' });
+      x += w + gap * z;
+    }
+    put(p, 'Маркировка устройства плавного пуска', (X0 + X1) / 2, base + z * 1.85, 8.5, { a: 'c' });
+
+    const rows = [['Серия высоковольтных устройств плавного пуска', 'ESQ F HVS'],
+      ['Номинальное напряжение УПП', v + ' — ' + s.kv + ' кВ'],
+      ['Номинальный ток УПП, А (три цифры)', cur + ' — ' + s.I + ' А (двигатель до ' + s.P + ' кВт)'],
+      ['Исполнение', s.pkg === 'STD' ? 'без буквы — стандартное' : s.pkg + ' — ' + PKG[s.pkg]]];
+    const FS = 8.4, LH = 10.6, PAD = 3.6, line = (x0, y0, x1, y1) => p.drawLine({ start: { x: x0, y: H - y0 }, end: { x: x1, y: H - y1 }, thickness: .6, color: DARK });
+    const table = (y, cols, head, body, hl) => {
+      const hh = 16, top = y;
+      p.drawRectangle({ x: cols[0], y: H - y - hh, width: cols[cols.length - 1] - cols[0], height: hh, color: HEAD, borderWidth: 0 });
+      head.forEach((t, i) => put(p, t, (cols[i] + cols[i + 1]) / 2, y + hh / 2 + FS * .36, FS, { f: 'S', a: 'c', maxW: cols[i + 1] - cols[i] - 4 }));
+      line(cols[0], y, cols[cols.length - 1], y); y += hh; line(cols[0], y, cols[cols.length - 1], y);
+      body.forEach((r, ri) => {
+        const L = r.map((t, i) => wrap(t, 'L', FS, cols[i + 1] - cols[i] - 2 * PAD)), n = Math.max(...L.map(l => l.length)), h = n * LH + 2 * PAD - 1;
+        if (hl === ri) p.drawRectangle({ x: cols[0], y: H - y - h, width: cols[cols.length - 1] - cols[0], height: h, color: PALE, borderWidth: 0 });
+        L.forEach((ls, i) => {
+          const ty = y + PAD + FS * .82 + (n - ls.length) * LH / 2, center = i === 0 || r.length > 2;
+          ls.forEach((t, j) => put(p, t, center ? (cols[i] + cols[i + 1]) / 2 : cols[i] + PAD, ty + j * LH, FS, { f: hl === ri ? 'S' : 'L', a: center ? 'c' : 'l' }));
+        });
+        y += h; line(cols[0], y, cols[cols.length - 1], y);
+      });
+      cols.forEach(cx => line(cx, top, cx, y));
+      return y;
+    };
+    let y = table(base + z * 2.6, [X0, X0 + 40, X0 + 236, X1], ['Поз.', 'Параметр', 'Обозначение'], rows.map((r, i) => [String(i + 1), ...r]));
+
+    // модельный ряд выбранного напряжения; выбранная модель выделена
+    const list = (window.UPP_MODELS && window.UPP_MODELS[v]) || [];
+    if (list.length) {
+      y += 26;
+      put(p, 'Модельный ряд ESQ F HVS на ' + s.kv + ' кВ', X0, y, 11, { f: 'S', c: TEAL });
+      // габариты — по техописанию (разд. 7.2) и чертежам исполнений
+      const dims = I => I >= 600 ? 'по запросу' : s.pkg === 'IK' ? '1200×1700×2300'
+        : s.pkg === 'E' ? (I <= (v === '06' ? 150 : 130) ? '1000×1500×2300' : 'по запросу') : I >= 400 ? '1200×1700×2300' : '1000×1500×2300';
+      const suf = s.pkg === 'STD' ? '' : '-' + s.pkg;
+      const body = list.map(([I, P]) => ['ESQ F HVS' + v + '-' + String(I).padStart(3, '0') + suf, P + ' кВт', I + ' А', dims(I)]);
+      const sel = list.findIndex(([I]) => I === s.I);
+      // если не помещается — уменьшаем шаг строк
+      table(y + 8, [X0, X0 + 150, X0 + 260, X0 + 350, X1], ['Модель', 'Мощность двигателя', 'Номинальный ток', 'Габариты (Ш×Г×В), мм'], body, sel);
+    }
+  }
+
+  /* ================= Транспортировка, условия эксплуатации ================= */
+  async function drawTransport(doc, shell, p1, p2, s, para, put, W) {
+    const X0 = TX0, X1 = TX1, z = 9.4, o = { size: z };
+    const h2 = (p, t, y) => { put(p, t, X0, y + z * .95, 9.6, { f: 'S' }); return y + 15; };
+    const dash = (p, t, y) => { put(p, '–', X0 + 4, y + z * .95, z); return para(p, X0 + 15, X1, y, t, { ...o, justify: false }) + 2; };
+    let y = 134;
+    y = h2(p1, '4.1 Осмотр при приёмке', y);
+    y = para(p1, X0, X1, y, 'Правильная процедура проверки при приёмке оборудования:', { ...o, indent: 18 }) + 3;
+    y = dash(p1, 'проверьте накладную отгрузки и убедитесь в комплектности оборудования;', y);
+    y = dash(p1, 'проверьте продукт на предмет наличия повреждений, нанесённых при транспортировке, при их наличии претензии следует направлять в транспортную компанию.', y) + 4;
+    y = para(p1, X0, X1, y, 'Примечание: в зависимости от габаритов, структуры и типа УПП блоки могут иметь деревянные подставки, которые убирают в процессе установки.', { ...o, indent: 18 }) + 10;
+    y = h2(p1, '4.2 Разгрузка, погрузка, перемещение', y);
+    y = para(p1, X0, X1, y, 'Перед началом перемещения необходимо правильно оценить вес оборудования. Поскольку конфигурация конкретного устройства плавного пуска зависит от предъявляемых пользователем требований, его точный вес может варьироваться в зависимости от номинальных значений и параметров оборудования. Размеры и вес системы указаны на заводской упаковке. Для удобства погрузки-разгрузки отверстие для вилочного погрузчика находится в нижней части корпуса шкафа.', { ...o, indent: 18 }) + 3;
+    y = para(p1, X0, X1, y, 'При транспортировке используют:', { ...o, indent: 18 });
+    y = para(p1, X0, X1, y, 'а) кран или цепной блок для подъёма;', o);
+    y = para(p1, X0, X1, y, 'б) вилочный погрузчик.', o) + 12;
+    // «ОПАСНО!» — знак как в ТКП на ПЧ
+    const H = p1.getHeight(), cx = X0 + 9, cy = y + 9, r = 9;
+    p1.drawSvgPath(`M ${cx} ${cy - r} L ${cx + r} ${cy} L ${cx} ${cy + r} L ${cx - r} ${cy} Z`, { x: 0, y: H, borderColor: DARK, borderWidth: 1.1 });
+    put(p1, '!', cx, cy + 4, 11, { f: 'S', a: 'c' });
+    put(p1, 'ОПАСНО!', X0 + 26, cy + 4.2, 11, { f: 'S' });
+    y += 26;
+    y = para(p1, X0, X1, y, 'Запрещено перемещать шкаф УПП за верхнюю часть корпуса и поднимать шкаф за рым-болт. Стропу следует продеть через нижнее отверстие. Ключевые параметры — длина и прочность строп. Стропы должны быть достаточно длинными, чтобы обеспечить минимальное расстояние 1,2 м между подъёмным крюком и верхней частью шкафа во избежание деформации шкафа. Если длины стропы недостаточно, необходимо добавить ребро жёсткости. При подъёме стропа должна проходить через соответствующее отверстие для вилочного погрузчика. Ось гака подъёмного механизма по возможности должна находиться как можно ближе к центру тяжести УПП.', { ...o, indent: 18 });
+    const k1 = Math.min(1.25, (712 - y - 26) / 236), g1 = makeG(p1, put, 306 - 135 * k1, y + 12, k1);
+    g1.setW(W); figLift(g1);
+    put(p1, 'Рис. 1. Вид спереди при подъёме', 306, y + 12 + 236 * k1 + 10, 8.6, { a: 'c' });
+
+    y = 100;
+    y = para(p2, X0, X1, y, 'Вилочный автопогрузчик должен иметь соответствующую грузоподъёмность, а длина его вил должна превышать ширину шкафа. В случае если длина корпуса шкафа превышает допустимую, задействуют два вилочных погрузчика.', { ...o, indent: 18 });
+    const m2 = await placeCrop(doc, shell.getPage(SH.fork), [62, 186, 504, 414], p2, [X0, y + 10, X1, 385], { max: 1.0, holes: [[413, 211, 494, 227]] });
+    { const q = m2(414.3, 222.4); put(p2, 'УПП, вид сбоку', q[0], q[1], 10.2 * m2.k, { f: 'S' }); }
+    y = m2(0, 414)[1] + 15;
+    put(p2, 'Рис. 2. Перемещение УПП при помощи автопогрузчика', 306, y, 8.6, { a: 'c' });
+    y += 10;
+    for (const t of ['При перемещении вилочным автопогрузчиком не допускайте повреждения стен шкафа. Для этого между грузом и кареткой вставьте деревянный отбойник. Центр тяжести стандартного шкафа УПП находится возле средней линии между передней и задней панелями.',
+      'Во избежание повреждения оборудования во время транспортировки, хранения и установки не допускается попадание воды в УПП. Применяемое подъёмное оборудование должно соответствовать требованиям по грузоподъёмности. Подъём, спуск и перемещение УПП следует выполнять медленно и аккуратно. Перемещение, транспортировку и размещение оборудования следует проводить на ровной горизонтальной площадке.',
+      'Запрещается установка и эксплуатация УПП в случае повреждения его элементов.',
+      'При монтаже и эксплуатации оборудования всегда устанавливайте закреплённое на месте защитное ограждение со знаком «Опасно! Высокое напряжение!». Не допускайте попадания в УПП посторонних предметов.'])
+      y = para(p2, X0, X1, y, t, { ...o, indent: 18 }) + 2;
+    y += 14;
+    put(p2, '5. Условия эксплуатации', X0, y + 13, 13, { f: 'S', c: ORANGE });
+    y += 24;
+    for (const t of ['установка в помещении; без прямых солнечных лучей, токопроводящей пыли, агрессивных и горючих газов, масляного и соляного тумана, капель воды;',
+      'температура окружающего воздуха — от минус 20 °С до плюс 50 °С;', 'относительная влажность — 5–95%, без образования конденсата;',
+      'высота над уровнем моря — до 1500 м (выше — со снижением номинальных характеристик);', 'степень защиты оболочки — ' + s.ip + '.'])
+      y = dash(p2, t, y);
   }
 
   window.downloadTKP = generate;

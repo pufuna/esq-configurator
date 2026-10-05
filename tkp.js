@@ -9,6 +9,14 @@
    Координаты — pt от левого верхнего угла страницы «как её видит человек». */
 (function () {
   'use strict';
+  // Safari (iPad/iPhone, старые Mac) не умеет перебирать ReadableStream через for await — а pdf.js так читает страницы
+  if (typeof ReadableStream !== 'undefined' && !ReadableStream.prototype[Symbol.asyncIterator]) {
+    ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
+      const reader = this.getReader();
+      try { for (;;) { const { done, value } = await reader.read(); if (done) return; yield value; } }
+      finally { reader.releaseLock(); }
+    };
+  }
   const { PDFDocument, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix,
     rectangle, clipEvenOdd, endPath } = window.PDFLib;
   const $ = id => document.getElementById(id);
