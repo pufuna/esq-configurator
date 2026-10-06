@@ -1,118 +1,178 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>Конфигураторы оборудования</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), 
-                       
-            position: relative;
-        }
+  <meta charset="UTF-8">
+  <title>Конфигураторы оборудования ESQ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff') format('woff')}
+    :root{
+      --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
+      --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
+      --ink:#231f20; --muted:#6b787c; --line:#cfdfe1; --bg:#f5f8f8; --white:#fff;
+      --r:18px;
+    }
+    *{box-sizing:border-box}
+    html{-webkit-text-size-adjust:100%}
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);
+      font:400 15px/1.45 'Inter',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;font-feature-settings:'tnum' 1}
 
-        #video-bg {
-            position: fixed;
-            right: 0;
-            bottom: 0;
-            min-width: 100%;
-            min-height: 100%;
-            z-index: -1;
-            filter: brightness(0.6);
-            object-fit: cover;
-        }
+    /* ---------- шапка: как верх страниц ТКП ---------- */
+    .topbar{background:#fff;border-bottom:1px solid var(--line)}
+    .topbar-in{max-width:1240px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:24px}
+    .topbar .elkom{height:30px;width:auto;display:block}
+    .topbar .caption{flex:1;color:var(--teal);font-weight:400;font-size:15px;letter-spacing:.32em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .topbar .home-button{color:var(--teal);text-decoration:none;font-weight:500;font-size:14px;padding:8px 14px;border:1.5px solid var(--teal);border-radius:999px;white-space:nowrap;transition:background .15s,color .15s}
+    .topbar .home-button:hover{background:var(--teal);color:#fff}
 
-        h1 {
-            color: white;
-            font-size: 2.5em;
-            text-align: center;
-            margin: 0 20px 40px 20px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-        }
+    /* ---------- обложка: как титул ТКП ---------- */
+    .hero{position:relative;background:#fff;overflow:hidden;border-bottom:1px solid var(--line)}
+    .hero-in{position:relative;max-width:1240px;margin:0 auto;padding:30px 24px 0;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:end;min-height:280px}
+    .hero .arcs{position:absolute;right:-40px;top:-60px;height:440px;width:auto;opacity:.95;pointer-events:none}
+    .hero .esq{height:58px;width:auto;display:block;margin-bottom:18px}
+    .hero h1{margin:0 0 26px;color:var(--orange);font-weight:600;font-size:clamp(26px,3.6vw,44px);line-height:1.08;text-transform:uppercase;letter-spacing:.005em}
+    .hero .photo{position:relative;justify-self:end;align-self:end;height:260px;width:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,.12))}
+    .hero .band{position:relative;background:var(--teal);color:#fff}
+    .hero .band-in{max-width:1240px;margin:0 auto;padding:18px 24px 20px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+    .hero .band b{font-weight:400;font-size:22px}
+    .hero .band span{font-weight:300;font-size:16px;opacity:.92}
+    .hero .band .housing{margin-left:auto;font-size:13px;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.14);padding:4px 10px;border-radius:999px;font-weight:500}
 
-        .btn-container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            align-items: center;
-            width: 100%;
-            max-width: 800px;
-            padding: 0 20px;
-        }
+    /* ---------- подвал: как низ страниц ТКП ---------- */
+    .footer{background:#fff;border-top:1px solid var(--line)}
+    .footer-in{max-width:1240px;margin:0 auto;padding:18px 24px 16px;display:flex;align-items:center;gap:24px}
+    .footer .icons{height:38px;width:auto;flex:0 1 auto;min-width:0;object-fit:contain;object-position:left}
+    .footer .esq-s{height:30px;width:auto;margin-left:auto}
+    .footer p{margin:0;color:var(--muted);font-size:12.5px;white-space:nowrap}
+    .ft-link{color:inherit;text-decoration:none;cursor:default}
 
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 16px 32px;
-            width: 100%;
-            max-width: 400px;
-            font-size: 18px;
-            font-weight: 500;
-            cursor: pointer;
-            background: linear-gradient(135deg, rgba(52,152,219,0.9), rgba(41,128,185,0.9));
-            color: white;
-            border: none;
-            border-radius: 12px;
-            text-decoration: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            backdrop-filter: blur(4px);
-        }
+    /* ---------- главная: выбор конфигуратора ---------- */
+    .hero h1{margin-bottom:12px}
+    .hero .lead{margin:0 0 30px;color:var(--muted);font-size:17px;max-width:560px}
+    .hero-in{min-height:250px;grid-template-columns:minmax(0,1fr)}
+    .wrap{width:100%;max-width:1240px;margin:32px auto 44px;padding:0 24px;flex:1}
+    .products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+    .prod{display:flex;flex-direction:column;background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);overflow:hidden;transition:box-shadow .2s,transform .2s}
+    .prod:hover{box-shadow:0 14px 34px rgba(10,105,114,.14);transform:translateY(-2px)}
+    .prod .pic{position:relative;height:300px;display:flex;align-items:flex-end;justify-content:center;background:linear-gradient(180deg,#fff 0%,var(--teal-ll) 100%);border-bottom:1.5px solid var(--teal);overflow:hidden;text-decoration:none}
+    .prod .pic img{max-height:270px;max-width:86%;width:auto;object-fit:contain;filter:drop-shadow(0 10px 16px rgba(0,0,0,.12))}
+    .prod .tag{position:absolute;left:18px;top:16px;background:var(--teal);color:#fff;font-size:12px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;padding:5px 11px;border-radius:999px}
+    .prod .body{padding:22px 24px 24px;display:flex;flex-direction:column;flex:1}
+    .prod h2{margin:0;color:var(--orange);font-weight:600;font-size:23px;line-height:1.2}
+    .prod .model{margin:4px 0 14px;color:var(--teal);font-weight:600;font-size:16px;letter-spacing:.02em}
+    .prod p{margin:0 0 14px;color:var(--ink)}
+    .specs{list-style:none;margin:0 0 20px;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+    .specs li{border-left:3px solid var(--orange);padding:2px 0 2px 10px;font-size:13.5px;color:var(--muted)}
+    .specs b{display:block;color:var(--ink);font-weight:600;font-size:15px}
+    .prod .go{margin-top:auto;display:flex;flex-wrap:wrap;gap:10px}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;font-weight:600;font-size:15px;border-radius:999px;padding:12px 22px;transition:background .15s,color .15s}
+    .btn-primary{background:var(--orange);color:#fff;flex:1 1 auto}
+    .btn-primary:hover{background:var(--orange-d)}
+    .about{margin-top:24px;background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);padding:22px 24px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+    .about div{font-size:14px;color:var(--muted)}
+    .about b{display:block;color:var(--teal);font-weight:600;font-size:16px;margin-bottom:4px}
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 7px 14px rgba(0,0,0,0.2);
-            background: linear-gradient(135deg, rgba(41,128,185,0.95), rgba(52,152,219,0.95));
-        }
-
-        .footer {
-            text-align: center;
-            padding: 20px;
-            background: rgba(44, 62, 80, 0.9);
-            color: white;
-            width: 100%;
-            position: fixed;
-            bottom: 0;
-            backdrop-filter: blur(5px);
-        }
-
-        @media (max-width: 768px) {
-            h1 {
-                font-size: 1.8em;
-                margin-bottom: 30px;
-            }
-            
-            .btn {
-                font-size: 16px;
-                padding: 14px 24px;
-                max-width: 300px;
-            }
-        }
-    </style>
+    @media (max-width:900px){
+      .products{grid-template-columns:1fr}
+      .about{grid-template-columns:1fr}
+    }
+    @media (max-width:720px){
+      body{font-size:14.5px}
+      .topbar-in{padding:10px 16px;gap:12px}
+      .topbar .caption{font-size:11px;letter-spacing:.18em}
+      .topbar .elkom{height:24px}
+      .hero-in{padding:22px 16px 0;min-height:0}
+      .hero .arcs{height:260px;right:-90px;top:-40px;opacity:.55}
+      .hero .esq{height:44px;margin-bottom:12px}
+      .hero .lead{font-size:15px;margin-bottom:20px}
+      .hero .band-in{padding:14px 16px}
+      .hero .band b{font-size:18px}
+      .wrap{padding:0 16px;margin:18px auto 28px}
+      .prod .pic{height:230px}
+      .prod .pic img{max-height:205px}
+      .prod .body{padding:18px 16px 20px}
+      .specs{grid-template-columns:1fr}
+      .footer-in{flex-wrap:wrap;padding:14px 16px;gap:10px 16px}
+      .footer .icons{height:26px;max-width:100%}
+      .footer .esq-s{display:none}
+    }
+  </style>
 </head>
 <body>
-    <video autoplay muted loop id="video-bg">
-        <source src="background.mp4" type="video/mp4">
-        Ваш браузер не поддерживает видео-фон.
-    </video>
+  <header class="topbar">
+    <div class="topbar-in">
+      <img class="elkom" src="assets/ui/elkom.png" alt="ЭЛКОМ — стандарт качества">
+      <div class="caption">Высоковольтное оборудование ESQ</div>
+    </div>
+  </header>
 
-    <h1>Выберите конфигуратор:</h1>
-    
-    <div class="btn-container">
-        <a href="configurator_vv_pch.html" class="btn">Конфигуратор ВВ ПЧ</a>
-        <a href="vv_upp.html" class="btn">Конфигуратор ВВ УПП</a>
+  <section class="hero">
+    <img class="arcs" src="assets/ui/arcs.jpg" alt="">
+    <div class="hero-in">
+      <div>
+        <img class="esq" src="assets/ui/esq.png" alt="ESQ — Elcom Standard of Quality">
+        <h1>Конфигураторы<br>оборудования</h1>
+        <p class="lead">Подберите исполнение, получите маркировку, техническое описание и готовое ТКП в PDF за пару минут.</p>
+      </div>
+    </div>
+    <div class="band"><div class="band-in">
+      <b>Выберите конфигуратор</b><span>Оборудование 6 и 10 кВ · ООО «Элком»</span>
+    </div></div>
+  </section>
+
+  <main class="wrap">
+    <div class="products">
+      <article class="prod">
+        <a class="pic" href="configurator_vv_pch.html"><span class="tag">ВВ ПЧ</span><img src="assets/ui/pch_g1g3.png" alt="Преобразователь частоты ESQ F ME800"></a>
+        <div class="body">
+          <h2>Высоковольтный преобразователь частоты</h2>
+          <div class="model">ESQ F ME800</div>
+          <p>Регулирование скорости высоковольтных двигателей: насосы, вентиляторы, компрессоры, конвейеры.</p>
+          <ul class="specs">
+            <li><b>6 и 10 кВ</b>напряжение сети</li>
+            <li><b>280–12 500 кВт</b>мощность</li>
+            <li><b>G1 · G3 · G4</b>исполнения корпуса</li>
+            <li><b>Дополнительные шкафы</b>пусковой, байпаса, реактора</li>
+          </ul>
+          <div class="go"><a class="btn btn-primary" href="configurator_vv_pch.html">Открыть конфигуратор ПЧ →</a></div>
+        </div>
+      </article>
+
+      <article class="prod">
+        <a class="pic" href="vv_upp.html"><span class="tag">ВВ УПП</span><img src="assets/upp/cover_upp.png" alt="Устройство плавного пуска ESQ F HVS"></a>
+        <div class="body">
+          <h2>Высоковольтное устройство плавного пуска</h2>
+          <div class="model">ESQ F HVS</div>
+          <p>Плавный пуск и останов высоковольтных асинхронных и синхронных двигателей без регулирования скорости.</p>
+          <ul class="specs">
+            <li><b>6 и 10 кВ</b>напряжение сети</li>
+            <li><b>420–7000 кВт</b>мощность двигателя</li>
+            <li><b>Встроенный байпас</b>вакуумный контактор</li>
+            <li><b>4 варианта комплектации</b>под требования проекта</li>
+          </ul>
+          <div class="go"><a class="btn btn-primary" href="vv_upp.html">Открыть конфигуратор УПП →</a></div>
+        </div>
+      </article>
     </div>
 
-    <div class="footer">
-        <p>© 2025 ESQ </p>
+    <section class="about">
+      <div><b>1. Параметры</b>Выберите напряжение, мощность и опции — маркировка собирается автоматически.</div>
+      <div><b>2. Описание</b>Техническое описание конфигурации и габаритный чертёж — прямо на странице.</div>
+      <div><b>3. ТКП</b>Скачайте технико-коммерческое предложение в PDF с вашей конфигурацией.</div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-in">
+      <img class="icons" src="assets/ui/icons.png" alt="">
+      <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
+      <p>© 2026 ESQ · ООО «Элком»</p>
     </div>
+  </footer>
 </body>
 </html>

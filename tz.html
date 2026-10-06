@@ -6,74 +6,185 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <style>
-    :root{--ink:#2c3e50;--muted:#6b7a90;--line:#e6ecf5;--soft:#f3f6fb;--blue:#1f6feb;--green:#0f6b3f;--orange:#e8631a;--violet:#6f42c1;
-      --ok:#e2f0d9;--opt:#ddebf7;--dev:#f8cbad;--check:#fff2cc;--ctr:#ededed;--na:#f7f7f7}
+    /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff') format('woff')}
+    :root{
+      --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
+      --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
+      --ink:#231f20; --muted:#6b787c; --line:#cfdfe1; --bg:#f5f8f8; --white:#fff;
+      --r:18px;
+    }
     *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;color:var(--ink);display:flex;flex-direction:column;align-items:center;
-      background:linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),url('background2.jpg') center/cover fixed #3b4a5a}
-    .wrap{width:94%;max-width:1200px;margin:30px auto;padding:26px;background:rgba(255,255,255,.95);border-radius:15px;box-shadow:0 8px 32px rgba(0,0,0,.12)}
-    h1{margin:0 0 4px;text-align:center;font-size:1.9em}
-    .sub{text-align:center;color:var(--muted);margin-bottom:22px}
-    h2{font-size:1.15em;margin:0 0 12px;display:flex;align-items:center;gap:10px}
-    h2 .n{display:inline-flex;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;align-items:center;justify-content:center;font-size:.85em}
-    .card{border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:18px;background:#fff}
+    html{-webkit-text-size-adjust:100%}
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);
+      font:400 15px/1.45 'Inter',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;font-feature-settings:'tnum' 1}
+
+    /* ---------- шапка: как верх страниц ТКП ---------- */
+    .topbar{background:#fff;border-bottom:1px solid var(--line)}
+    .topbar-in{max-width:1240px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:24px}
+    .topbar .elkom{height:30px;width:auto;display:block}
+    .topbar .caption{flex:1;color:var(--teal);font-weight:400;font-size:15px;letter-spacing:.32em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .topbar .home-button{color:var(--teal);text-decoration:none;font-weight:500;font-size:14px;padding:8px 14px;border:1.5px solid var(--teal);border-radius:999px;white-space:nowrap;transition:background .15s,color .15s}
+    .topbar .home-button:hover{background:var(--teal);color:#fff}
+
+    /* ---------- обложка: как титул ТКП ---------- */
+    .hero{position:relative;background:#fff;overflow:hidden;border-bottom:1px solid var(--line)}
+    .hero-in{position:relative;max-width:1240px;margin:0 auto;padding:30px 24px 0;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:end;min-height:280px}
+    .hero .arcs{position:absolute;right:-40px;top:-60px;height:440px;width:auto;opacity:.95;pointer-events:none}
+    .hero .esq{height:58px;width:auto;display:block;margin-bottom:18px}
+    .hero h1{margin:0 0 26px;color:var(--orange);font-weight:600;font-size:clamp(26px,3.6vw,44px);line-height:1.08;text-transform:uppercase;letter-spacing:.005em}
+    .hero .photo{position:relative;justify-self:end;align-self:end;height:260px;width:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,.12))}
+    .hero .band{position:relative;background:var(--teal);color:#fff}
+    .hero .band-in{max-width:1240px;margin:0 auto;padding:18px 24px 20px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+    .hero .band b{font-weight:400;font-size:22px}
+    .hero .band span{font-weight:300;font-size:16px;opacity:.92}
+    .hero .band .housing{margin-left:auto;font-size:13px;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.14);padding:4px 10px;border-radius:999px;font-weight:500}
+
+    /* ---------- подвал: как низ страниц ТКП ---------- */
+    .footer{background:#fff;border-top:1px solid var(--line)}
+    .footer-in{max-width:1240px;margin:0 auto;padding:18px 24px 16px;display:flex;align-items:center;gap:24px}
+    .footer .icons{height:38px;width:auto;flex:0 1 auto;min-width:0;object-fit:contain;object-position:left}
+    .footer .esq-s{height:30px;width:auto;margin-left:auto}
+    .footer p{margin:0;color:var(--muted);font-size:12.5px;white-space:nowrap}
+    .ft-link{color:inherit;text-decoration:none;cursor:default}
+
+    /* ---------- рабочая область разбора ТЗ ---------- */
+    :root{--ok:#e3f1dc;--opt:#e2eff1;--dev:#fbd9c6;--check:#fff2cc;--ctr:#ededed;--na:#f7f7f7}
+    .wrap{width:100%;max-width:1240px;margin:28px auto 40px;padding:0 24px;flex:1}
+    .hero .sw{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 26px}
+    .hero #prodSwitch .chip{font-size:14px;font-weight:500;padding:8px 16px;border:1.5px solid var(--teal);color:var(--teal);background:#fff;border-radius:999px;outline:none}
+    .hero #prodSwitch .chip:hover{background:var(--teal-l)}
+    .hero #prodSwitch .chip.on{background:var(--teal);color:#fff;outline:none}
+    .hero .band .sub{font-weight:300;font-size:16px;opacity:.92}
+    .hero .band .sub #subModel{font-weight:500}
+
+    h2{margin:0 0 14px;color:var(--orange);font-weight:600;font-size:19px;display:flex;align-items:center;gap:10px}
+    h2 .n{display:inline-flex;flex:0 0 30px;width:30px;height:30px;border-radius:50%;background:var(--teal);color:#fff;align-items:center;justify-content:center;font-size:15px;font-weight:600}
+    .card{background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);padding:22px 24px;margin-bottom:20px}
     .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-    input[type=password],input[type=text],input[type=number],select,textarea{padding:9px 10px;border:1px solid #d5dbe5;border-radius:8px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
-    textarea{width:100%;resize:vertical}
-    .btn{display:inline-block;padding:10px 20px;border:0;border-radius:22px;background:var(--ink);color:#fff;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;font-size:14px}
-    .btn:hover{filter:brightness(1.12)}.btn:disabled{opacity:.45;cursor:default;filter:none}
-    .btn.blue{background:var(--blue)}.btn.green{background:var(--green)}.btn.orange{background:var(--orange)}.btn.violet{background:var(--violet)}.btn.ghost{background:#fff;color:var(--ink);border:1px solid #c9d3df}
-    .msg{font-size:13px;color:var(--muted)}.msg.err{color:#b42318}.msg.ok{color:var(--green)}
-    .drop{border:2px dashed #c9d3df;border-radius:12px;padding:26px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s}
-    .drop.over{border-color:var(--blue);background:#f2f7ff}
+    input[type=password],input[type=text],input[type=number],select,textarea{font:inherit;font-size:14.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-height:42px;outline:none;transition:border-color .15s,box-shadow .15s}
+    input:hover,select:hover,textarea:hover{border-color:#9fc3c7}
+    input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(10,105,114,.15)}
+    select{appearance:none;-webkit-appearance:none;padding-right:34px;cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%230a6972' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 12px center}
+    input[type=checkbox]{accent-color:var(--teal);width:16px;height:16px;vertical-align:-3px;margin:0 6px 0 0}
+    textarea{width:100%;resize:vertical;line-height:1.4}
+
+    .btn{display:inline-block;padding:11px 22px;border:1.5px solid transparent;border-radius:999px;background:var(--teal);color:#fff;font:inherit;font-weight:600;font-size:14.5px;cursor:pointer;text-decoration:none;transition:background .15s,color .15s,transform .1s}
+    .btn:hover{background:var(--teal-d)}
+    .btn:active{transform:translateY(1px)}
+    .btn:disabled{opacity:.4;cursor:default;transform:none}
+    .btn.blue{background:var(--teal)}.btn.blue:hover{background:var(--teal-d)}
+    .btn.green{background:var(--teal-d)}.btn.green:hover{background:#053f44}
+    .btn.orange,.btn.violet{background:var(--orange)}.btn.orange:hover,.btn.violet:hover{background:var(--orange-d)}
+    .btn.ghost{background:#fff;color:var(--teal);border-color:var(--teal)}.btn.ghost:hover{background:var(--teal-l)}
+    .btn:disabled:hover{background:var(--teal)}.btn.violet:disabled:hover{background:var(--orange)}.btn.ghost:disabled:hover{background:#fff}
+
+    .msg{font-size:13px;color:var(--muted)}.msg.err{color:#b42318}.msg.ok{color:var(--teal)}
+    .drop{border:2px dashed #9fc3c7;border-radius:14px;padding:28px 20px;text-align:center;color:var(--ink);background:var(--teal-ll);cursor:pointer;transition:.15s;font-weight:500}
+    .drop .msg{font-weight:400}
+    .drop:hover{border-color:var(--teal)}
+    .drop.over{border-color:var(--orange);background:var(--orange-l)}
     .files{margin:12px 0 0;padding:0;list-style:none;font-size:14px}
-    .files li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+    .files li{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--teal-l)}
     .files li span:last-child{color:var(--muted);white-space:nowrap}
-    .bar{height:6px;background:var(--soft);border-radius:4px;overflow:hidden;margin-top:10px;display:none}.bar i{display:block;height:100%;width:0;background:var(--blue);transition:width .2s}
-    details summary{cursor:pointer;color:var(--blue);font-size:14px;margin:10px 0}
+    .bar{height:6px;background:var(--teal-l);border-radius:4px;overflow:hidden;margin-top:12px;display:none}.bar i{display:block;height:100%;width:0;background:var(--orange);transition:width .2s}
+    details summary{cursor:pointer;color:var(--teal);font-size:14px;font-weight:500;margin:10px 0}
+    pre#diagOut{background:var(--teal-ll)!important;border:1px solid var(--line)}
     .hidden{display:none!important}
-    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 16px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px 18px}
     .field{display:flex;flex-direction:column;gap:4px;font-size:13px}
-    .field label{color:var(--muted)}.field .src{font-size:11px;color:#98a4b5}
-    .sku{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:16px;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:14px 0 8px;word-break:break-all}
-    .notes{font-size:13px;background:#fffaf0;border:1px solid #f5dfb0;border-radius:8px;padding:8px 10px;margin-top:10px}
+    .field label{color:var(--muted);font-weight:500}.field .src{font-size:11px;color:#8fa2a5}
+    .sku{font-weight:600;font-size:17px;color:var(--teal);background:var(--teal-ll);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:16px 0 8px;word-break:break-all;letter-spacing:.01em}
+    .notes{font-size:13px;background:var(--orange-l);border:1px solid #f7c3a8;border-radius:10px;padding:9px 12px;margin-top:12px}
     .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
-    .chip{border:1px solid #c9d3df;border-radius:16px;padding:5px 12px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
-    .chip.on{outline:2px solid var(--ink)}
-    #prodSwitch .chip{text-decoration:none;color:var(--ink)}
-    .chip b{margin-left:4px}
+    .chip{border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+    .chip.on{outline:2px solid var(--teal);outline-offset:-1px}
+    #prodSwitch .chip{text-decoration:none}
+    .chip b{margin-left:5px;font-weight:600}
     .s-OK{background:var(--ok)}.s-OPT{background:var(--opt)}.s-DEV{background:var(--dev)}.s-CHECK{background:var(--check)}.s-CTR{background:var(--ctr)}.s-NA{background:var(--na)}
     table.req{width:100%;border-collapse:collapse;font-size:13px}
-    table.req th{position:sticky;top:0;background:var(--ink);color:#fff;padding:8px 6px;text-align:left;font-weight:600;z-index:1}
+    table.req th{position:sticky;top:0;background:var(--teal);color:#fff;padding:9px 7px;text-align:left;font-weight:600;z-index:1}
     table.req td{border-bottom:1px solid #fff;padding:6px;vertical-align:top}
     table.req td.c{white-space:nowrap;font-weight:600}
-    table.req textarea{min-height:52px;font-size:13px;padding:5px 6px;background:rgba(255,255,255,.75)}
-    table.req select{font-size:13px;padding:5px;width:100%}
-    .auto{display:block;margin-top:4px;font-size:11px;color:#8a3b12}
+    table.req textarea{min-height:52px;font-size:13px;padding:5px 7px;background:rgba(255,255,255,.75);border-radius:8px}
+    table.req select{font-size:13px;padding:5px 26px 5px 7px;width:100%;min-height:32px;border-radius:8px;background-position:right 8px center}
+    table.req input{min-height:0}
+    .auto{display:block;margin-top:4px;font-size:11px;color:#9a3d10}
     .rule{font-size:11px;color:var(--muted)}
-    .inner{display:block;margin-top:4px;font-size:11px;color:#5b6b80;font-style:italic}
+    .inner{display:block;margin-top:4px;font-size:11px;color:#55676b;font-style:italic}
     .inner::before{content:"внутр.: "}
-    .tablebox{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
-    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
-    .spin{display:inline-block;width:14px;height:14px;border:2px solid #c9d3df;border-top-color:var(--blue);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-2px;margin-right:6px}
+    .tablebox{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:12px}
+    .actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+    .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--orange);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-2px;margin-right:6px}
     @keyframes sp{to{transform:rotate(360deg)}}
-    .footer{text-align:center;padding:18px;background:rgba(44,62,80,.9);color:#fff;width:100%;margin-top:auto}
+    #cfgFrame{width:100%;height:640px;border:1px solid var(--line);border-radius:12px;margin-top:14px}
+
+    @media (max-width:1100px){
+      .hero-in{grid-template-columns:minmax(0,1fr) 260px}
+      .hero .photo{height:210px}
+    }
     @media (max-width:760px){
-      .wrap{width:100%;margin:0;border-radius:0;padding:16px}
+      body{font-size:14.5px}
+      .topbar-in{padding:10px 16px;gap:12px}
+      .topbar .caption{font-size:11px;letter-spacing:.18em}
+      .topbar .elkom{height:24px}
+      .hero-in{grid-template-columns:1fr;padding:22px 16px 0;min-height:0}
+      .hero .arcs{height:260px;right:-90px;top:-40px;opacity:.55}
+      .hero .esq{height:44px;margin-bottom:12px}
+      .hero h1{margin-bottom:14px}
+      .hero .sw{margin-bottom:16px}
+      .hero .photo{justify-self:center;height:170px}
+      .hero .band-in{padding:14px 16px}
+      .hero .band b{font-size:18px}
+      .wrap{padding:0 16px;margin:18px auto 28px}
+      .card{padding:18px 14px;border-radius:14px}
+      .row > *{flex:1 1 100%!important}
       table.req thead{display:none}
       table.req,table.req tbody,table.req tr,table.req td{display:block;width:100%}
       table.req tr{border-bottom:3px solid #fff;padding:6px 0}
       table.req td{border:0;padding:3px 8px}
       table.req td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--muted)}
       .tablebox{max-height:none}
+      .footer-in{flex-wrap:wrap;padding:14px 16px;gap:10px 16px}
+      .footer .icons{height:26px;max-width:100%}
+      .footer .esq-s{display:none}
     }
   </style>
+
 </head>
 <body>
-<div class="wrap">
-  <h1>Разбор ТЗ</h1>
-  <div class="sub"><span id="subModel">ESQ F ME800</span> · ТЗ → проверка человеком → ТКП и лист несоответствий</div>
-  <div class="chips" id="prodSwitch" style="justify-content:center;margin-bottom:18px"><a class="chip" data-p="pch" href="tz.html">ВВ ПЧ ESQ F ME800</a><a class="chip" data-p="upp" href="tz.html?p=upp">ВВ УПП ESQ F HVS</a></div>
+<header class="topbar">
+  <div class="topbar-in">
+    <img class="elkom" src="assets/ui/elkom.png" alt="ЭЛКОМ — стандарт качества">
+    <div class="caption">Подбор оборудования по ТЗ</div>
+    <a href="index.html" class="home-button">На главную</a>
+  </div>
+</header>
+
+<section class="hero">
+  <img class="arcs" src="assets/ui/arcs.jpg" alt="">
+  <div class="hero-in">
+    <div>
+      <img class="esq" src="assets/ui/esq.png" alt="ESQ — Elcom Standard of Quality">
+      <h1>Разбор ТЗ</h1>
+      <div class="sw chips" id="prodSwitch"><a class="chip" data-p="pch" href="tz.html">ВВ ПЧ ESQ F ME800</a><a class="chip" data-p="upp" href="tz.html?p=upp">ВВ УПП ESQ F HVS</a></div>
+    </div>
+    <img class="photo" id="heroPhoto" src="assets/ui/pch_g1g3.png" alt="">
+  </div>
+  <div class="band"><div class="band-in">
+    <b>Подбор по техническому заданию</b>
+    <span class="sub"><span id="subModel">ESQ F ME800</span> · ТЗ → проверка человеком → ТКП и лист несоответствий</span>
+  </div></div>
+</section>
+<script>(function(){try{if(new URLSearchParams(location.search).get('p')==='upp'){var i=document.getElementById('heroPhoto');i.src='assets/upp/cover_upp.png';}}catch(e){}})();</script>
+
+<main class="wrap">
 
   <!-- 1. Доступ -->
   <div class="card" id="secAuth">
@@ -85,7 +196,7 @@
     </div>
     <details style="margin-top:8px"><summary>Диагностика подключения</summary>
       <button class="btn ghost" id="btnDiag" style="margin-top:6px">Проверить подключение</button>
-      <pre id="diagOut" style="white-space:pre-wrap;font-size:12px;background:var(--soft);padding:10px;border-radius:8px;margin-top:8px" class="hidden"></pre>
+      <pre id="diagOut" style="white-space:pre-wrap;font-size:12px;padding:10px;border-radius:10px;margin-top:8px" class="hidden"></pre>
     </details>
   </div>
 
@@ -157,8 +268,14 @@
   </div>
 
   <div class="actions" style="justify-content:center"><a href="configurator_vv_pch.html" class="btn ghost" id="backLink">← Конфигуратор</a></div>
-</div>
-<div class="footer">© 2025 ESQ · ООО «Элком»</div>
+</main>
+<footer class="footer">
+  <div class="footer-in">
+    <img class="icons" src="assets/ui/icons.png" alt="">
+    <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
+    <p>© 2026 ESQ · ООО «Элком»</p>
+  </div>
+</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@9.6.1/dist/index.iife.js"></script>

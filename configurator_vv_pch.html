@@ -2,298 +2,415 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Конфигуратор преобразователя частоты ESQ F ME 800</title>
+  <title>Конфигуратор преобразователя частоты ESQ F ME800</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body{
-      margin:0;padding:0;min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;
-      display:flex;flex-direction:column;align-items:center;
-      background:linear-gradient(rgba(0,0,0,0.4),rgba(0,0,0,0.4)), url('background2.jpg') center/cover fixed;
-      position:relative
+    /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff') format('woff')}
+    :root{
+      --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
+      --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
+      --ink:#231f20; --muted:#6b787c; --line:#cfdfe1; --bg:#f5f8f8; --white:#fff;
+      --r:18px;
     }
-    .configurator{
-      width:90%;max-width:800px;margin:40px auto;padding:30px;background:rgba(255,255,255,.9);
-      border-radius:15px;box-shadow:0 8px 32px rgba(0,0,0,.1);backdrop-filter:blur(5px)
-    }
-    .param{margin-bottom:20px;display:flex;flex-wrap:wrap;gap:15px;align-items:center;padding:15px;border-bottom:1px solid #eee}
-    label{flex:1 1 250px;font-weight:500;color:#2c3e50;min-width:250px}
-    select,input{flex:2 1 300px;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:#fff}
-    .note{flex:1 1 100%;margin-top:6px;color:#666;font-size:12px}
-    #result,#old-result{
-      margin:30px 0;padding:20px;background:#f8f9fa;border-radius:10px;font-family:monospace;
-      font-size:24px;color:#2c3e50;border:1px solid #eee;text-align:center;font-weight:bold
-    }
-    .result-title{font-size:1.5em;margin-bottom:15px;color:#2c3e50;font-weight:700;text-align:center}
-    .home-button,.techdesc-btn,.copy-btn{
-      display:inline-block;padding:12px 30px;background:#2c3e50;color:#fff;text-decoration:none;border-radius:25px;
-      transition:background .3s;font-weight:600;width:100%;text-align:center;box-sizing:border-box
-    }
-    .home-button{margin:20px 0 10px}
-    .home-button:hover{background:#34495e;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
-    .techdesc-btn{margin:10px 0;background:#0f6b3f}
-    .techdesc-btn:hover{background:#11824c;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
-    .copy-btn{margin:10px 0;background:#1f6feb}
-    .copy-btn:hover{background:#2556b8;transform:translateY(-1px);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    *{box-sizing:border-box}
+    html{-webkit-text-size-adjust:100%}
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);
+      font:400 15px/1.45 'Inter',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;font-feature-settings:'tnum' 1}
 
-    /* Блок технического описания */
-    .techdesc{
-      display:none;margin-top:10px;padding:20px;background:#fff;border:1px solid #e6ecf5;border-radius:12px;
-      box-shadow:0 6px 18px rgba(0,0,0,.06)
-    }
-    .techdesc h2{margin:0 0 8px;color:#1f3147}
-    .meta{color:#6b7a90;margin-bottom:12px}
-    table{border-collapse:collapse;width:100%;margin:12px 0}
-    th,td{border:1px solid #e6ecf5;padding:8px;text-align:left;font-size:14px}
-    th{background:#f3f6fb}
-    .muted{color:#6b7a90}
-    .sku{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f6f8fb;border:1px solid #e6ecf5;border-radius:8px;padding:10px;margin:10px 0;font-weight:700}
+    /* ---------- шапка: как верх страниц ТКП ---------- */
+    .topbar{background:#fff;border-bottom:1px solid var(--line)}
+    .topbar-in{max-width:1240px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:24px}
+    .topbar .elkom{height:30px;width:auto;display:block}
+    .topbar .caption{flex:1;color:var(--teal);font-weight:400;font-size:15px;letter-spacing:.32em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .topbar .home-button{color:var(--teal);text-decoration:none;font-weight:500;font-size:14px;padding:8px 14px;border:1.5px solid var(--teal);border-radius:999px;white-space:nowrap;transition:background .15s,color .15s}
+    .topbar .home-button:hover{background:var(--teal);color:#fff}
 
-    /* Чертёж */
-    .drawing-block{margin-top:16px}
-    .drawing-iframe{width:100%;height:620px;border:1px solid #e6ecf5;border-radius:10px}
-    .drawing-img{max-width:100%;height:auto;border:1px solid #e6ecf5;border-radius:10px}
-    .drawing-empty{padding:10px;color:#6b7a90;background:#fafcff;border:1px dashed #d8e1f0;border-radius:10px}
-    .drawing-link{margin-top:8px}
-    .drawing-link a{color:#1f6feb;text-decoration:none}
-    .drawing-link a:hover{text-decoration:underline}
+    /* ---------- обложка: как титул ТКП ---------- */
+    .hero{position:relative;background:#fff;overflow:hidden;border-bottom:1px solid var(--line)}
+    .hero-in{position:relative;max-width:1240px;margin:0 auto;padding:30px 24px 0;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:end;min-height:280px}
+    .hero .arcs{position:absolute;right:-40px;top:-60px;height:440px;width:auto;opacity:.95;pointer-events:none}
+    .hero .esq{height:58px;width:auto;display:block;margin-bottom:18px}
+    .hero h1{margin:0 0 26px;color:var(--orange);font-weight:600;font-size:clamp(26px,3.6vw,44px);line-height:1.08;text-transform:uppercase;letter-spacing:.005em}
+    .hero .photo{position:relative;justify-self:end;align-self:end;height:260px;width:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,.12))}
+    .hero .band{position:relative;background:var(--teal);color:#fff}
+    .hero .band-in{max-width:1240px;margin:0 auto;padding:18px 24px 20px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+    .hero .band b{font-weight:400;font-size:22px}
+    .hero .band span{font-weight:300;font-size:16px;opacity:.92}
+    .hero .band .housing{margin-left:auto;font-size:13px;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.14);padding:4px 10px;border-radius:999px;font-weight:500}
 
-    @media (max-width:768px){
-      .configurator{width:95%;padding:20px;margin:20px auto}
-      .param{flex-direction:column;align-items:stretch}
-      label,select,input{flex:1 1 100%}
-    }
-    h1{color:#2c3e50;text-align:center;margin-bottom:15px;font-size:2.2em;text-shadow:0 2px 4px rgba(0,0,0,.1)}
-    .title-sub{display:block;font-size:1.8em;margin-top:10px;color:#2c3e50}
-    .footer{text-align:center;padding:20px;background:rgba(44,62,80,.9);color:#fff;width:100%;margin-top:auto;backdrop-filter:blur(5px)}
+    /* ---------- рабочая область ---------- */
+    .wrap{width:100%;max-width:1240px;margin:28px auto 40px;padding:0 24px;flex:1}
+    .configurator{display:flex;flex-direction:column;gap:24px}
+    .top-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+    .form-col{display:flex;flex-direction:column;gap:20px;min-width:0}
+    .side-col{position:sticky;top:16px;display:flex;flex-direction:column;gap:16px;min-width:0}
+    .full{grid-column:1 / -1;min-width:0}
 
-    /* Расшифровка маркировки */
-    .decode{margin:10px 0 30px;padding:18px 20px;background:#f8f9fa;border:1px solid #eee;border-radius:10px}
-    .decode h3{margin:0 0 12px;color:#2c3e50;font-size:1.1em;text-align:center}
-    .dc-code{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:3px 2px;margin-bottom:16px}
-    .dc-seg{display:flex;flex-direction:column;align-items:center;padding:4px 5px 2px;border-radius:6px;cursor:default;transition:background .15s}
-    .dc-seg b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;color:#2c3e50;border-bottom:2px solid #c9d3df;padding:0 1px 2px;white-space:nowrap}
-    .dc-seg i{font-style:normal;font-size:11px;color:#6b7a90;margin-top:3px}
-    .dc-sep{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;color:#9aa6b5;padding:4px 1px 0;font-weight:700}
-    .dc-seg.hl{background:#e3edff}.dc-seg.hl b{border-bottom-color:#1f6feb;color:#1f6feb}
+    .card{background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);padding:22px 24px}
+    .card > h2{margin:0 0 6px;color:var(--orange);font-weight:600;font-size:19px}
+    .card > .lead{margin:0 0 12px;color:var(--muted);font-size:13.5px}
+
+    .param{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:6px 18px;align-items:center;padding:11px 0;border-top:1px solid var(--teal-l)}
+    .card > h2 + .lead + .param, .card > h2 + .param{border-top:none}
+    .param label{font-weight:500;color:var(--ink);font-size:14.5px}
+    .param .note{grid-column:1 / -1;color:var(--muted);font-size:12.5px;margin-top:2px}
+    select,input{width:100%;font:inherit;font-size:15px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:42px;outline:none;transition:border-color .15s,box-shadow .15s}
+    select{appearance:none;-webkit-appearance:none;padding-right:38px;cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%230a6972' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 14px center}
+    select:hover,input:hover{border-color:#9fc3c7}
+    select:focus,input:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(10,105,114,.15)}
+    select:disabled,input[readonly]{background-color:var(--teal-ll);color:#3c4a4d;cursor:default}
+
+    /* ---------- итог ---------- */
+    .result-card{background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);overflow:hidden}
+    .result-card .rc-head{background:var(--teal);color:#fff;padding:12px 18px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;font-size:13px}
+    .result-card .rc-body{padding:16px 18px 18px}
+    .result-title{color:var(--muted);font-size:12.5px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin:0 0 6px}
+    #result{font-weight:600;font-size:17px;line-height:1.35;color:var(--teal);overflow-wrap:anywhere;letter-spacing:.01em;margin:0 0 14px}
+    #old-result{font-size:14px;color:var(--ink);overflow-wrap:anywhere;margin:0 0 4px}
+    .btns{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+    .btn{display:block;text-align:center;text-decoration:none;font-weight:600;font-size:15px;border-radius:999px;padding:12px 18px;transition:background .15s,color .15s,transform .1s}
+    .btn:active{transform:translateY(1px)}
+    .btn-primary{background:var(--orange);color:#fff}
+    .btn-primary:hover{background:var(--orange-d)}
+    .btn-teal{background:var(--teal);color:#fff}
+    .btn-teal:hover{background:var(--teal-d)}
+    .btn-line{background:#fff;color:var(--teal);border:1.5px solid var(--teal);padding:10.5px 18px}
+    .btn-line:hover{background:var(--teal-l)}
+
+    /* ---------- расшифровка маркировки (как рис. 10 и таблица в ТКП) ---------- */
+    .decode h2{margin:0 0 14px;color:var(--orange);font-weight:600;font-size:19px}
+    .dc-code{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:4px 3px;margin:4px 0 18px}
+    .dc-seg{display:flex;flex-direction:column;align-items:center;padding:4px 4px 2px;border-radius:8px;cursor:default;transition:background .15s}
+    .dc-seg b{font-weight:600;font-size:19px;color:var(--teal);border-bottom:3px solid var(--teal);padding:0 1px 3px;white-space:nowrap}
+    .dc-seg.alt b{color:var(--orange);border-bottom-color:var(--orange)}
+    .dc-seg i{font-style:normal;font-size:11px;color:var(--muted);margin-top:4px}
+    .dc-sep{font-size:19px;color:#9aa8ab;padding:4px 1px 0;font-weight:600}
+    .dc-seg.hl{background:var(--teal-l)}
     .dc-table{width:100%;border-collapse:collapse;font-size:14px;background:#fff}
-    .dc-table th,.dc-table td{border:1px solid #e6ecf5;padding:7px 9px;text-align:left;vertical-align:top}
-    .dc-table th{background:#f3f6fb;color:#2c3e50;font-weight:600}
-    .dc-table td:first-child{width:28px;text-align:center;color:#6b7a90}
-    .dc-table td.dc-c{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;color:#2c3e50;white-space:nowrap}
-    .dc-table .dc-v{display:block;font-size:12px;color:#8391a5;margin-top:3px}
-    .dc-table tr.hl,.dc-table tr.hl td{background:#eef4ff}
-    @media (max-width:768px){
-      .decode{padding:12px 8px}
+    .dc-table th,.dc-table td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+    .dc-table th{background:#d4d4d4;color:var(--ink);font-weight:600}
+    .dc-table td:first-child{width:34px;text-align:center;font-weight:600}
+    .dc-table td.dc-c{font-weight:600;color:var(--teal);white-space:nowrap}
+    .dc-table .dc-v{display:block;font-size:12px;color:var(--muted);margin-top:3px}
+    .dc-table tr.hl td{background:var(--teal-l)}
+
+    /* ---------- техописание и чертёж ---------- */
+    .techdesc{display:none}
+    .techdesc h2{margin:0 0 4px;color:var(--orange);font-weight:600;font-size:19px}
+    .techdesc h3{margin:22px 0 8px;color:var(--teal);font-weight:600;font-size:16px}
+    .meta,.muted{color:var(--muted)}
+    .meta{font-size:13px;margin-bottom:10px}
+    .sku{font-weight:600;color:var(--teal);background:var(--teal-ll);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0;overflow-wrap:anywhere}
+    .techdesc table{border-collapse:collapse;width:100%;margin:8px 0}
+    .techdesc th,.techdesc td{border:1px solid var(--line);padding:8px 10px;text-align:left;font-size:14px;vertical-align:top}
+    .techdesc th{background:var(--teal-l);color:var(--teal-d);font-weight:600}
+    .drawing-block{margin-top:16px}
+    .drawing-iframe{width:100%;height:620px;border:1px solid var(--line);border-radius:12px;background:#fff}
+    .drawing-img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:12px}
+    .drawing-empty{padding:12px 14px;color:var(--muted);background:var(--teal-ll);border:1px dashed var(--line);border-radius:12px}
+    .drawing-link{margin-top:8px}
+    .drawing-link a{color:var(--teal);font-weight:500;text-decoration:none}
+    .drawing-link a:hover{text-decoration:underline}
+    .tz-banner{padding:12px 16px;background:var(--orange-l);border:1.5px solid var(--orange);border-radius:var(--r);color:var(--ink);font-size:14px}
+    .tz-banner span{color:var(--muted);font-size:13px}
+
+    /* ---------- подвал: как низ страниц ТКП ---------- */
+    .footer{background:#fff;border-top:1px solid var(--line)}
+    .footer-in{max-width:1240px;margin:0 auto;padding:18px 24px 16px;display:flex;align-items:center;gap:24px}
+    .footer .icons{height:38px;width:auto;flex:0 1 auto;min-width:0;object-fit:contain;object-position:left}
+    .footer .esq-s{height:30px;width:auto;margin-left:auto}
+    .footer p{margin:0;color:var(--muted);font-size:12.5px;white-space:nowrap}
+    .ft-link{color:inherit;text-decoration:none;cursor:default}
+
+    /* ---------- адаптив ---------- */
+    @media (max-width:1100px){
+      .top-grid{grid-template-columns:1fr}
+      .side-col{position:static}
+      .hero-in{grid-template-columns:minmax(0,1fr) 260px}
+      .hero .photo{height:210px}
+    }
+    @media (max-width:720px){
+      body{font-size:14.5px}
+      .topbar-in{padding:10px 16px;gap:12px}
+      .topbar .caption{font-size:11px;letter-spacing:.18em}
+      .topbar .elkom{height:24px}
+      .hero-in{grid-template-columns:1fr;padding:22px 16px 0;min-height:0}
+      .hero .arcs{height:260px;right:-90px;top:-40px;opacity:.55}
+      .hero .esq{height:44px;margin-bottom:12px}
+      .hero h1{margin-bottom:14px}
+      .hero .photo{justify-self:center;height:180px}
+      .hero .band-in{padding:14px 16px}
+      .hero .band b{font-size:18px}
+      .hero .band .housing{margin-left:0}
+      .wrap{padding:0 16px;margin:18px auto 28px}
+      .card{padding:18px 16px;border-radius:14px}
+      .param{grid-template-columns:1fr;gap:6px}
       .dc-seg b,.dc-sep{font-size:15px}
-      /* на телефоне строки таблицы — карточки: № | код | параметр, ниже выбранное значение */
       .dc-table{font-size:13px}
       .dc-table thead{display:none}
       .dc-table,.dc-table tbody{display:block}
-      .dc-table tr{display:grid;grid-template-columns:24px 76px 1fr;border:1px solid #e6ecf5;border-top:none;background:#fff}
-      .dc-table tr:first-child{border-top:1px solid #e6ecf5}
+      .dc-table tr{display:grid;grid-template-columns:28px 76px 1fr;border:1px solid var(--line);border-top:none;background:#fff}
+      .dc-table tr:first-child{border-top:1px solid var(--line)}
       .dc-table td{border:none;padding:6px 5px 2px}
       .dc-table td:first-child{width:auto}
       .dc-table td.dc-c{white-space:normal}
-      .dc-table td:nth-child(3){font-weight:600;color:#2c3e50}
+      .dc-table td:nth-child(3){font-weight:600}
       .dc-table td:nth-child(4){grid-column:2 / 4;padding:0 5px 7px}
+      .drawing-iframe{height:420px}
+      .footer-in{flex-wrap:wrap;padding:14px 16px;gap:10px 16px}
+      .footer .icons{height:26px;max-width:100%}
+      .footer .esq-s{display:none}
     }
-    .ft-link{color:inherit;text-decoration:none;cursor:default}
-    .tz-banner{margin:0 0 15px;padding:12px 15px;background:#fff7e6;border:1px solid #f5c26b;border-radius:10px;color:#2c3e50;font-size:14px}
-    .tz-banner span{color:#6b7a90;font-size:13px}
-    /* страница не должна быть шире экрана */
-    .configurator,.footer{box-sizing:border-box}
-    #result,#old-result{overflow-wrap:anywhere}
+    /* ---------- документация ---------- */
+    .docs-card{background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);padding:16px 18px 18px}
+    .docs-card .btns{margin-top:8px}
+    .doc-btn{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;padding:10.5px 12px;white-space:nowrap}
+    @media (max-width:360px){.doc-btn{white-space:normal}}
+    .doc-btn svg{flex:0 0 auto}
   </style>
 </head>
 <body>
+  <header class="topbar">
+    <div class="topbar-in">
+      <img class="elkom" src="assets/ui/elkom.png" alt="ЭЛКОМ — стандарт качества">
+      <div class="caption">Конфигуратор преобразователя частоты</div>
+      <a href="index.html" class="home-button">На главную</a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <img class="arcs" src="assets/ui/arcs.jpg" alt="">
+    <div class="hero-in">
+      <div>
+        <img class="esq" src="assets/ui/esq.png" alt="ESQ — Elcom Standard of Quality">
+        <h1>Конфигуратор<br>преобразователя частоты</h1>
+      </div>
+      <img class="photo" id="heroPhoto" src="assets/ui/pch_g1g3.png" alt="Преобразователь частоты ESQ F ME800">
+    </div>
+    <div class="band"><div class="band-in">
+      <b>Преобразователь частоты</b><span>ESQ F ME800 · 6 и 10 кВ · 280–12 500 кВт</span>
+      <span class="housing" id="heroHousing">Корпус G3</span>
+    </div></div>
+  </section>
+
+  <main class="wrap">
   <div class="configurator">
-    <h1>Конфигуратор преобразователя частоты<br><span class="title-sub">ESQ F ME 800</span></h1>
+   <div class="top-grid">
+    <div class="form-col">
 
-    <div class="param">
-      <label>1. Напряжение:</label>
-      <select id="voltage" onchange="updatePowerOptions()">
-        <option value="T060">6 кВ</option>
-        <option value="T100">10 кВ</option>
-      </select>
+    <section class="card">
+      <h2>1. Основные параметры</h2>
+      <p class="lead">Напряжение и мощность определяют ток, пульсность и исполнение корпуса.</p>
+      <div class="param">
+        <label for="voltage">1. Напряжение</label>
+        <select id="voltage" onchange="updatePowerOptions()">
+          <option value="T060">6 кВ</option>
+          <option value="T100">10 кВ</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="power">2. Мощность ПЧ, кВт</label>
+        <select id="power" onchange="updateDependencies()"></select>
+      </div>
+      <div class="param">
+        <label for="current">3. Номинальный ток, А</label>
+        <input type="text" id="current" readonly>
+      </div>
+      <div class="param">
+        <label for="material">4. Материал обмоток</label>
+        <select id="material" onchange="updateNomenclature()">
+          <option value="AL">Алюминий</option>
+          <option value="CU">Медь</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="pulsation">5. Пульсность</label>
+        <select id="pulsation" onchange="updateNomenclature()"></select>
+      </div>
+      <div class="param">
+        <label for="capacitorType">6. Тип конденсаторов</label>
+        <select id="capacitorType" onchange="onCapacitorTypeChange()">
+          <option value="EL">Электролитические</option>
+          <option value="PF">Пленочные</option>
+        </select>
+        <div class="note" id="capNote">Плёночные — на любой мощности. Компактный шкаф G4 с габаритным чертежом: 6 кВ — до 710 кВт, 10 кВ — до 1250 кВт.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2. Дополнительные шкафы и опции</h2>
+      <p class="lead">Каждый дополнительный шкаф добавляет 0,7 т к массе; на чертеже — слева направо: пусковой, байпас, ПЧ, реактор.</p>
+      <div class="param">
+        <label for="starter">7. Пусковой шкаф</label>
+        <select id="starter" onchange="updateNomenclature()">
+          <option value="X">Отсутствует</option>
+          <option value="S">Включен</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="bypass">8. Шкаф байпаса</label>
+        <select id="bypass" onchange="updateNomenclature()">
+          <option value="X">Нет</option>
+          <option value="A">Автоматический</option>
+          <option value="M">Ручной</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="reactor">9. Шкаф реактора</label>
+        <select id="reactor" onchange="updateNomenclature()">
+          <option value="X">Отсутствует</option>
+          <option value="R">Включен</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="ip">10. Степень защиты</label>
+        <select id="ip" onchange="updateNomenclature()">
+          <option value="31">IP31</option>
+          <option value="42">IP42</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="expansion">11. Плата расширения</label>
+        <select id="expansion" onchange="updateNomenclature()">
+          <option value="X">Нет</option>
+          <option value="E">+8DI/DO</option>
+          <option value="2E">+16DI/DO</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="ups">12. ИБП</label>
+        <select id="ups" onchange="updateNomenclature()">
+          <option value="X">Отсутствует</option>
+          <option value="U">Присутствует</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. Подключение и управление</h2>
+      <div class="param">
+        <label for="cable">13. Вводы/выводы</label>
+        <select id="cable" onchange="updateNomenclature()">
+          <option value="D">Снизу</option>
+          <option value="T">Сверху</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="protocol">14. Протокол связи</label>
+        <select id="protocol" onchange="updateNomenclature()">
+          <option value="MR">Modbus RTU</option>
+          <option value="MT">Modbus TCP</option>
+          <option value="PB">ProfibusDP</option>
+          <option value="PN">ProfiNet</option>
+          <option value="CO">CanOpen</option>
+          <option value="EI">Ethernet/IP</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="cellSize">15. Тип силовых ячеек</label>
+        <select id="cellSize" onchange="updateNomenclature()" disabled>
+          <option value="PE">PE</option>
+          <option value="PA">PA</option>
+          <option value="PB">PB</option>
+          <option value="PC">PC</option>
+          <option value="PD">PD</option>
+          <option value="PF">PF</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="cellBypass">16. Байпас ячейки</label>
+        <select id="cellBypass" onchange="updateNomenclature()">
+          <option value="N">Отсутствует</option>
+          <option value="B">Присутствует</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="motor">17. Тип двигателя</label>
+        <select id="motor" onchange="updateNomenclature()">
+          <option value="A">Асинхронный</option>
+          <option value="S">Синхронный</option>
+        </select>
+      </div>
+      <div class="param">
+        <label for="sync">18. Синхронный перевод на сеть</label>
+        <select id="sync" onchange="updateNomenclature()">
+          <option value="X">Без синхронизации</option>
+          <option value="B">С синхронизацией</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. Данные для ТКП</h2>
+      <div class="param">
+        <label for="tkpAuthor">Составил (ФИО)</label>
+        <input type="text" id="tkpAuthor" placeholder="Для обложки ТКП">
+      </div>
+      <div class="param">
+        <label for="tkpQty">Количество, шт</label>
+        <input type="number" id="tkpQty" value="1" min="1">
+      </div>
+      <div class="param">
+        <label for="tkpPrice">Цена за ед., руб. (с НДС 22%)</label>
+        <input type="text" id="tkpPrice" placeholder="Необязательно">
+      </div>
+    </section>
+
     </div>
 
-    <div class="param">
-      <label>2. Мощность ПЧ (кВт):</label>
-      <select id="power" onchange="updateDependencies()"></select>
-    </div>
+    <aside class="side-col">
+      <div class="result-card">
+        <div class="rc-head">Итог</div>
+        <div class="rc-body">
+          <div class="result-title">Маркировка</div>
+          <div id="result">ESQ F ME800-</div>
+          <div class="result-title">Комплектация</div>
+          <div id="old-result"></div>
+          <div class="btns">
+            <a href="#" class="btn btn-primary" onclick="downloadTKP(event)">Скачать ТКП (PDF)</a>
+            <a href="#" class="btn btn-teal techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
+            <a href="#" class="btn btn-line copy-btn" onclick="copyTechDesc(event)">Копировать описание</a>
+          </div>
+        </div>
+      </div>
+      <div class="docs-card">
+        <div class="result-title">Документация</div>
+        <div class="btns">
+          <a class="btn btn-line doc-btn" href="assets/docs/TO_ESQ_F_ME800.pdf" download><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Скачать техническое описание</a>
+          <a class="btn btn-line doc-btn" href="assets/docs/RE_ESQ_F_ME800.pdf" download><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Скачать руководство по эксплуатации</a>
+        </div>
+      </div>
+    </aside>
+   </div>
 
-    <div class="param">
-      <label>3. Номинальный ток (А):</label>
-      <input type="text" id="current" readonly>
-    </div>
-
-    <div class="param">
-      <label>4. Материал обмоток:</label>
-      <select id="material" onchange="updateNomenclature()">
-        <option value="AL">Алюминий</option>
-        <option value="CU">Медь</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>5. Пульсность:</label>
-      <select id="pulsation" onchange="updateNomenclature()"></select>
-    </div>
-
-    <!-- Пункт 6 — Тип конденсаторов -->
-    <div class="param">
-      <label>6. Тип конденсаторов:</label>
-      <select id="capacitorType" onchange="onCapacitorTypeChange()">
-        <option value="EL">Электролитические</option>
-        <option value="PF">Пленочные</option>
-      </select>
-      <div class="note" id="capNote">Плёночные — на любой мощности. Компактный шкаф G4 с габаритным чертежом: 6 кВ — до 710 кВт, 10 кВ — до 1250 кВт.</div>
-    </div>
-
-    <div class="param">
-      <label>7. Пусковой шкаф:</label>
-      <select id="starter" onchange="updateNomenclature()">
-        <option value="X">Отсутствует</option>
-        <option value="S">Включен</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>8. Шкаф байпаса:</label>
-      <select id="bypass" onchange="updateNomenclature()">
-        <option value="X">Нет</option>
-        <option value="A">Автоматический</option>
-        <option value="M">Ручной</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>9. Шкаф реактора:</label>
-      <select id="reactor" onchange="updateNomenclature()">
-        <option value="X">Отсутствует</option>
-        <option value="R">Включен</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>10. Степень защиты:</label>
-      <select id="ip" onchange="updateNomenclature()">
-        <option value="31">IP31</option>
-        <option value="42">IP42</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>11. Плата расширения:</label>
-      <select id="expansion" onchange="updateNomenclature()">
-        <option value="X">Нет</option>
-        <option value="E">+8DI/DO</option>
-        <option value="2E">+16DI/DO</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>12. ИБП:</label>
-      <select id="ups" onchange="updateNomenclature()">
-        <option value="X">Отсутствует</option>
-        <option value="U">Присутствует</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>13. Вводы/выводы:</label>
-      <select id="cable" onchange="updateNomenclature()">
-        <option value="D">Снизу</option>
-        <option value="T">Сверху</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>14. Протокол связи:</label>
-      <select id="protocol" onchange="updateNomenclature()">
-        <option value="MR">Modbus RTU</option>
-        <option value="MT">Modbus TCP</option>
-        <option value="PB">ProfibusDP</option>
-        <option value="PN">ProfiNet</option>
-        <option value="CO">CanOpen</option>
-        <option value="EI">Ethernet/IP</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>15. Тип силовых ячеек:</label>
-      <select id="cellSize" onchange="updateNomenclature()" disabled>
-        <option value="PE">PE</option>
-        <option value="PA">PA</option>
-        <option value="PB">PB</option>
-        <option value="PC">PC</option>
-        <option value="PD">PD</option>
-        <option value="PF">PF</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>16. Байпас ячейки:</label>
-      <select id="cellBypass" onchange="updateNomenclature()">
-        <option value="N">Отсутствует</option>
-        <option value="B">Присутствует</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>17. Тип двигателя:</label>
-      <select id="motor" onchange="updateNomenclature()">
-        <option value="A">Асинхронный</option>
-        <option value="S">Синхронный</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>18. Синхронный перевод на сеть:</label>
-      <select id="sync" onchange="updateNomenclature()">
-        <option value="X">Без синхронизации</option>
-        <option value="B">С синхронизацией</option>
-      </select>
-    </div>
-
-    <div class="param">
-      <label>Составил (ФИО):</label>
-      <input type="text" id="tkpAuthor" placeholder="Для обложки ТКП">
-    </div>
-    <div class="param">
-      <label>Количество, шт:</label>
-      <input type="number" id="tkpQty" value="1" min="1">
-    </div>
-    <div class="param">
-      <label>Цена за ед., руб. (с НДС 22%):</label>
-      <input type="text" id="tkpPrice" placeholder="Необязательно">
-    </div>
-
-    <div class="result-title">Итог</div>
-    <div id="result">ESQ F ME800-</div>
-
-    <div class="decode">
-      <h3>Расшифровка маркировки</h3>
+    <section class="card decode full">
+      <h2>Расшифровка маркировки</h2>
       <div class="dc-code" id="dc-code"></div>
       <table class="dc-table">
-        <thead><tr><th>№</th><th>Код</th><th>Что означает</th><th>Выбрано</th></tr></thead>
+        <thead><tr><th>Поз.</th><th>Код</th><th>Параметр</th><th>Выбрано</th></tr></thead>
         <tbody id="dc-body"></tbody>
       </table>
-    </div>
-
-    <div class="result-title">Ответ по старой номенклатуре</div>
-    <div id="old-result"></div>
-
-    <a href="index.html" class="home-button">Вернуться на главную</a>
-    <a href="#" class="techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
-    <a href="#" class="copy-btn" onclick="copyTechDesc(event)">Копировать описание</a>
-    <a href="#" class="copy-btn" style="background:#e8631a" onclick="downloadTKP(event)">Скачать ТКП (PDF)</a>
+    </section>
 
     <!-- Техописание (внутри него появится и чертёж) -->
-    <div id="techdesc" class="techdesc"></div>
+    <section id="techdesc" class="techdesc card full"></section>
   </div>
+  </main>
 
-  <div class="footer"><p><a href="tz.html" class="ft-link" tabindex="-1" aria-hidden="true">©</a> 2025 ESQ</p></div>
+  <footer class="footer">
+    <div class="footer-in">
+      <img class="icons" src="assets/ui/icons.png" alt="">
+      <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
+      <p><a href="tz.html" class="ft-link" tabindex="-1" aria-hidden="true">©</a> 2026 ESQ · ООО «Элком»</p>
+    </div>
+  </footer>
 
   <script>
     /* ===== ДАННЫЕ МОДЕЛЕЙ (ток и тип ячеек) ===== */
@@ -633,7 +750,7 @@
       ];
       const sepAfter = {0:'-', 15:'-'};     // дефисы в маркировке: после модели и перед типом ячейки
       document.getElementById('dc-code').innerHTML = seg.map((s, i) =>
-        `<span class="dc-seg" data-i="${i}"><b>${esc(s[0])}</b><i>${i + 1}</i></span>` + (sepAfter[i] ? '<span class="dc-sep">-</span>' : '')).join('');
+        `<span class="dc-seg${i % 2 ? ' alt' : ''}" data-i="${i}"><b>${esc(s[0])}</b><i>${i + 1}</i></span>` + (sepAfter[i] ? '<span class="dc-sep">-</span>' : '')).join('');
       document.getElementById('dc-body').innerHTML = seg.map((s, i) =>
         `<tr data-i="${i}"><td>${i + 1}</td><td class="dc-c">${esc(s[0])}</td><td>${esc(s[1])}</td><td>${esc(s[2])}${s[3] ? `<span class="dc-v">${esc(s[3])}</span>` : ''}</td></tr>`).join('');
     }
@@ -765,6 +882,7 @@
           <tr><td>Питание цепей управления</td><td>3PH+N, 380 В AC ±15% (5–50 кВА)</td></tr>
           <tr><td>Охлаждение</td><td>Воздушное, принудительное</td></tr>
           <tr><td>Условия эксплуатации</td><td>−5…+40 °C; влажность ≤95% без конденсации; высота ≤1000 м</td></tr>
+          <tr><td>Хранение и транспортировка</td><td>−20…+70 °C</td></tr>
         </table>
 
         ${mechBlock}
@@ -886,9 +1004,7 @@
             ? `<img class="drawing-img" src="${found}" alt="Габаритный чертёж">`
             : `<iframe class="drawing-iframe" src="${found}"></iframe>`}
           <div class="drawing-link"><a href="${found}" target="_blank" rel="noopener">Открыть в новой вкладке</a></div>
-          <p style="font-size:0.85em;color:#555;margin-top:6px;">
-            <i>*Шкаф реактора на габаритных чертежах не отображен</i>
-          </p>
+          ${/drawings_(pf|g3)\//.test(found) ? '' : '<p class="muted" style="font-size:13px;margin-top:6px"><i>*Шкаф реактора на габаритных чертежах не отображен</i></p>'}
         `;
       } else {
         box.innerHTML = `
@@ -956,9 +1072,21 @@
       box.className = 'tz-banner';
       box.innerHTML = '<b>Конфигурация из разбора ТЗ</b>' + (q.get('tz') ? ': ' + esc(q.get('tz')) : '') +
         '<br><span>Проверьте параметры перед скачиванием ТКП.' + (notes.length ? ' Внимание: ' + esc(notes.join('; ')) + '.' : '') + '</span>';
-      const host = document.querySelector('.configurator');
-      host.insertBefore(box, host.querySelector('.param'));
+      const host = document.querySelector('.form-col');
+      host.insertBefore(box, host.firstChild);
     }
+
+    /* ===== Обложка страницы: фото и исполнение корпуса по выбранной модели ===== */
+    function updateHero(){
+      const v = document.getElementById('voltage').value, p = document.getElementById('power').value;
+      const film = document.getElementById('capacitorType').value === 'PF';
+      const g4 = film && isPFNCabinet(v, p);
+      const g1 = Number(p) > (v === 'T060' ? 1600 : 2650);
+      const img = document.getElementById('heroPhoto'), hs = document.getElementById('heroHousing');
+      if (img) { const src = g4 ? 'assets/ui/pch_g4.png' : 'assets/ui/pch_g1g3.png'; if (!img.src.endsWith(src)) img.src = src; }
+      if (hs) hs.textContent = 'Корпус ' + (g4 ? 'G4' : (g1 ? 'G1' : 'G3'));
+    }
+    document.addEventListener('change', () => setTimeout(updateHero, 0));
 
     /* ===== Инициализация ===== */
     document.addEventListener('DOMContentLoaded', ()=>{
@@ -970,10 +1098,23 @@
         else if (el.id==='power') el.addEventListener('change', updateDependencies);
         else el.addEventListener('change', updateNomenclature);
       });
+      updateHero();
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script src="tkp.js"></script>
+
+  <script>
+    /* Кнопки скачивания документации: если файл ещё не выложен в assets/docs/, показываем понятное сообщение вместо страницы 404 */
+    document.querySelectorAll('a.doc-btn').forEach(a => {
+      fetch(a.getAttribute('href'), { method: 'HEAD', cache: 'no-store' }).then(r => { if (!r.ok) a.dataset.missing = '1'; }).catch(() => { a.dataset.missing = '1'; });
+      a.addEventListener('click', e => {
+        if (!a.dataset.missing) return;
+        e.preventDefault();
+        alert('Документ пока не загружен на сайт. Обратитесь в ООО «Элком» — пришлём его по запросу.');
+      });
+    });
+  </script>
 </body>
 </html>
 
