@@ -299,8 +299,9 @@
     <section class="card">
       <h2>4. Данные для ТКП</h2>
       <div class="param">
-        <label for="tkpAuthor">Составил (ФИО)</label>
-        <input type="text" id="tkpAuthor" placeholder="Для обложки ТКП">
+        <label for="tkpAuthor">Составил (фамилия и инициалы)</label>
+        <input type="text" id="tkpAuthor" placeholder="Иванов И.И." autocomplete="name" required>
+        <div class="note" id="authorNote"></div>
       </div>
       <div class="param">
         <label for="tkpQty">Количество, шт</label>
@@ -605,6 +606,91 @@
         alert('Документ пока не загружен на сайт. Обратитесь в ООО «Элком» — пришлём его по запросу.');
       });
     });
+  </script>
+
+  <script>
+    /* ===== Скачивание ТКП: обязательны фамилия и инициалы; для фамилии Нестеренко — ещё и пароль сотрудника ===== */
+    (function () {
+      const PRODUCT = 'upp';
+      const FUNCTION_URL = window.TZ_FUNCTION_URL || 'https://functions.yandexcloud.net/d4eplvhu1pvut5be24vd';
+      const CAP = '[A-ZА-ЯЁ]', LET = '[A-Za-zА-Яа-яЁё]';
+      const SUR = CAP + LET + '+(?:-' + CAP + LET + '+)?', INI = CAP + '\\.(?:\\s?' + CAP + '\\.)?';
+      const RE_A = new RegExp('^' + SUR + '\\s+' + INI + '$'), RE_B = new RegExp('^' + INI + '\\s*' + SUR + '$');
+      const HINT = 'Укажите фамилию и инициалы, например: Иванов И.И.';
+      const LOOK = { a: 'а', b: 'в', c: 'с', e: 'е', h: 'н', k: 'к', m: 'м', o: 'о', p: 'р', t: 'т', x: 'х', y: 'у' };
+      function isNesterenko(s) {
+        const low = s.toLowerCase().replace(/ё/g, 'е');
+        const cyr = low.replace(/[a-z]/g, ch => LOOK[ch] || ch).replace(/[^а-я]/g, '');
+        return cyr.includes('нестеренко') || low.replace(/[^a-z]/g, '').includes('nesterenko');
+      }
+      const input = document.getElementById('tkpAuthor');
+      const note = document.getElementById('authorNote');
+      function norm() { return (input.value || '').replace(/\s+/g, ' ').trim(); }
+      function valid(s) { return RE_A.test(s) || RE_B.test(s); }
+      function show(msg) {
+        if (note) { note.textContent = msg || ''; note.style.color = msg ? '#b42318' : ''; }
+        input.classList.toggle('invalid', !!msg);
+      }
+      input.addEventListener('input', () => { if (input.classList.contains('invalid') && valid(norm())) show(''); });
+      input.addEventListener('blur', () => { const s = norm(); if (s && !valid(s)) show(HINT); else if (s) show(''); });
+
+      const st = document.createElement('style');
+      st.textContent = 'input.invalid{border-color:#b42318!important;box-shadow:0 0 0 3px rgba(180,35,24,.12)!important}' +
+        '.pw-ov{position:fixed;inset:0;background:rgba(7,83,90,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}' +
+        '.pw-card{background:#fff;border:1.5px solid #0a6972;border-radius:18px;padding:22px 24px;width:100%;max-width:400px;box-shadow:0 20px 50px rgba(0,0,0,.25)}' +
+        '.pw-card h3{margin:0 0 6px;color:#f26928;font-size:19px;font-weight:600}' +
+        '.pw-card p{margin:0 0 14px;color:#6b787c;font-size:14px}' +
+        '.pw-card input{width:100%;font:inherit;font-size:15px;border:1px solid #cfdfe1;border-radius:10px;padding:10px 12px;min-height:42px;outline:none}' +
+        '.pw-card input:focus{border-color:#0a6972;box-shadow:0 0 0 3px rgba(10,105,114,.15)}' +
+        '.pw-err{min-height:18px;margin:8px 0 0;color:#b42318;font-size:13px}' +
+        '.pw-row{display:flex;gap:10px;margin-top:10px}' +
+        '.pw-row button{flex:1;font:inherit;font-weight:600;font-size:15px;border-radius:999px;padding:11px 16px;cursor:pointer;border:1.5px solid #f26928;background:#f26928;color:#fff}' +
+        '.pw-row button.ghost{background:#fff;color:#0a6972;border-color:#0a6972}.pw-row button:disabled{opacity:.5;cursor:default}';
+      document.head.appendChild(st);
+
+      let okSession = false; try { okSession = sessionStorage.getItem('tkpPwOk') === '1'; } catch (e) {}
+      function askPassword() {
+        return new Promise(resolve => {
+          const ov = document.createElement('div'); ov.className = 'pw-ov';
+          ov.innerHTML = '<div class="pw-card" role="dialog" aria-modal="true"><h3>Нужен пароль</h3><p>Для этого составителя скачивание ТКП доступно после ввода пароля сотрудника.</p>' +
+            '<input type="password" autocomplete="current-password" placeholder="Пароль"><div class="pw-err"></div>' +
+            '<div class="pw-row"><button type="button" class="ghost">Отмена</button><button type="button" class="go">Скачать</button></div></div>';
+          document.body.appendChild(ov);
+          const pw = ov.querySelector('input'), err = ov.querySelector('.pw-err'), go = ov.querySelector('.go'), cancel = ov.querySelector('.ghost');
+          const close = r => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(r); };
+          const onKey = e => { if (e.key === 'Escape') close(false); };
+          document.addEventListener('keydown', onKey);
+          async function submit() {
+            if (!pw.value) { err.textContent = 'Введите пароль'; return; }
+            go.disabled = true; err.style.color = '#6b787c'; err.textContent = 'Проверяю…';
+            try {
+              const r = await fetch(FUNCTION_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({ password: pw.value, action: 'ping', product: PRODUCT }) });
+              let j = null; try { j = await r.json(); } catch (e) {}
+              if (r.ok && j && j.ok) { try { sessionStorage.setItem('tkpPwOk', '1'); } catch (e) {} okSession = true; close(true); return; }
+              err.style.color = '#b42318'; err.textContent = (j && j.error) ? j.error : 'Не удалось проверить пароль (код ' + r.status + ')';
+            } catch (e) { err.style.color = '#b42318'; err.textContent = 'Нет связи с сервером проверки — попробуйте позже'; }
+            go.disabled = false; pw.select();
+          }
+          go.onclick = submit; cancel.onclick = () => close(false);
+          pw.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+          ov.addEventListener('mousedown', e => { if (e.target === ov) close(false); });
+          setTimeout(() => pw.focus(), 30);
+        });
+      }
+
+      const orig = window.downloadTKP;
+      window.downloadTKP = async function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        const s = norm();
+        if (!valid(s)) {
+          show(HINT); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => input.focus(), 250);
+          return;
+        }
+        show('');
+        if (isNesterenko(s) && !okSession && !(await askPassword())) return;
+        return orig.call(this, e);
+      };
+    })();
   </script>
 </body>
 </html>
