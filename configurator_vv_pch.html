@@ -79,6 +79,12 @@
     .btn:active{transform:translateY(1px)}
     .btn-primary{background:var(--orange);color:#fff}
     .btn-primary:hover{background:var(--orange-d)}
+    .tkp-row{display:flex;gap:8px;align-items:stretch}
+    .tkp-row .btn{flex:1}
+    .r-chk{display:inline-flex;align-items:center;gap:6px;padding:0 14px;border:1.5px solid var(--orange);border-radius:999px;cursor:pointer;user-select:none;font-weight:600;color:var(--orange);background:#fff}
+    .r-chk input{accent-color:var(--orange);width:16px;height:16px;margin:0;cursor:pointer}
+    .r-chk:has(input:checked){background:var(--orange);color:#fff}
+    .r-chk:has(input:checked) input{accent-color:#fff}
     .btn-teal{background:var(--teal);color:#fff}
     .btn-teal:hover{background:var(--teal-d)}
     .btn-line{background:#fff;color:var(--teal);border:1.5px solid var(--teal);padding:10.5px 18px}
@@ -375,7 +381,12 @@
           <div class="result-title">Комплектация</div>
           <div id="old-result"></div>
           <div class="btns">
-            <a href="#" class="btn btn-primary" onclick="downloadTKP(event)">Скачать ТКП (PDF)</a>
+            <div class="tkp-row">
+              <a href="#" class="btn btn-primary" onclick="downloadTKP(event)">Скачать ТКП (PDF)</a>
+              <label class="r-chk" title="Маркировка без буквы P в типе силовой ячейки (PFB → FB); на листе габаритного чертежа — примечание о габаритах">
+                <input type="checkbox" id="tkpR" onchange="updateNomenclature()"><span>R</span>
+              </label>
+            </div>
             <a href="#" class="btn btn-teal techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
             <a href="#" class="btn btn-line copy-btn" onclick="copyTechDesc(event)">Копировать описание</a>
           </div>
@@ -697,6 +708,12 @@
       return parts.concat(adds).filter(Boolean).join(', ');
     }
 
+    /* Тип силовой ячейки в маркировке: при галочке «R» без буквы P (PF → F) */
+    function cellCode(){
+      const v = document.getElementById('cellSize').value, r = document.getElementById('tkpR');
+      return r && r.checked ? v.replace(/^P/, '') : v;
+    }
+    window.cellCode = cellCode;
     function updateNomenclature(){
       const params = [
         document.getElementById('power').value.padStart(4,'0') + 'P',
@@ -714,7 +731,7 @@
         document.getElementById('protocol').value,
         document.getElementById('motor').value,
         document.getElementById('sync').value,
-        '-' + document.getElementById('cellSize').value,
+        '-' + cellCode(),
         document.getElementById('cellBypass').value
       ];
       document.getElementById('result').textContent = `ESQ F ME800-${params.join('')}`;
@@ -746,7 +763,7 @@
         [$v('protocol'), 'Протокол связи', $t('protocol'), 'MR — Modbus RTU; MT — Modbus TCP; PB — ProfibusDP; PN — ProfiNet; CO — CanOpen; EI — Ethernet/IP'],
         [$v('motor'), 'Тип двигателя', $v('motor') === 'S' ? 'синхронный' : 'асинхронный', 'A — асинхронный; S — синхронный'],
         [$v('sync'), 'Синхронный перевод на сеть', $v('sync') === 'B' ? 'с синхронизацией' : 'без синхронизации', 'X — без синхронизации; B — с синхронизацией'],
-        [$v('cellSize'), 'Тип силовой ячейки', $v('cellSize') + ($v('cellSize') === 'PF' ? ' — с плёночными конденсаторами' : ''), 'определяется мощностью и типом конденсаторов'],
+        [cellCode(), 'Тип силовой ячейки', cellCode() + ($v('cellSize') === 'PF' ? ' — с плёночными конденсаторами' : ''), 'определяется мощностью и типом конденсаторов'],
         [$v('cellBypass'), 'Байпас силовой ячейки', yn($v('cellBypass'), 'B'), 'B — включен; N — не включен']
       ];
       const sepAfter = {0:'-', 15:'-'};     // дефисы в маркировке: после модели и перед типом ячейки
