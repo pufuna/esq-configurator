@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Реестр выданных ТКП — ESQ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff') format('woff')}
+    :root{
+      --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
+      --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
+      --ink:#231f20; --muted:#6b787c; --line:#cfdfe1; --bg:#f5f8f8; --white:#fff;
+      --r:18px;
+    }
+    *{box-sizing:border-box}
+    html{-webkit-text-size-adjust:100%}
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);
+      font:400 15px/1.45 'Inter',system-ui,-apple-system,'Segoe UI',Arial,sans-serif;font-feature-settings:'tnum' 1}
+
+    /* ---------- шапка: как верх страниц ТКП ---------- */
+    .topbar{background:#fff;border-bottom:1px solid var(--line)}
+    .topbar-in{max-width:1240px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:24px}
+    .topbar .elkom{height:30px;width:auto;display:block}
+    .topbar .caption{flex:1;color:var(--teal);font-weight:400;font-size:15px;letter-spacing:.32em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .topbar .home-button{color:var(--teal);text-decoration:none;font-weight:500;font-size:14px;padding:8px 14px;border:1.5px solid var(--teal);border-radius:999px;white-space:nowrap;transition:background .15s,color .15s}
+    .topbar .home-button:hover{background:var(--teal);color:#fff}
+
+    /* ---------- обложка: как титул ТКП ---------- */
+    .hero{position:relative;background:#fff;overflow:hidden;border-bottom:1px solid var(--line)}
+    .hero-in{position:relative;max-width:1240px;margin:0 auto;padding:30px 24px 0;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:end;min-height:280px}
+    .hero .arcs{position:absolute;right:-40px;top:-60px;height:440px;width:auto;opacity:.95;pointer-events:none}
+    .hero .esq{height:58px;width:auto;display:block;margin-bottom:18px}
+    .hero h1{margin:0 0 26px;color:var(--orange);font-weight:600;font-size:clamp(26px,3.6vw,44px);line-height:1.08;text-transform:uppercase;letter-spacing:.005em}
+    .hero .photo{position:relative;justify-self:end;align-self:end;height:260px;width:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,.12))}
+    .hero .band{position:relative;background:var(--teal);color:#fff}
+    .hero .band-in{max-width:1240px;margin:0 auto;padding:18px 24px 20px;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+    .hero .band b{font-weight:400;font-size:22px}
+    .hero .band span{font-weight:300;font-size:16px;opacity:.92}
+    .hero .band .housing{margin-left:auto;font-size:13px;letter-spacing:.06em;text-transform:uppercase;background:rgba(255,255,255,.14);padding:4px 10px;border-radius:999px;font-weight:500}
+
+    /* ---------- рабочая область ---------- */
+    .wrap{width:100%;max-width:1240px;margin:28px auto 40px;padding:0 24px;flex:1}
+    .configurator{display:flex;flex-direction:column;gap:24px}
+    .top-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+    .form-col{display:flex;flex-direction:column;gap:20px;min-width:0}
+    .side-col{position:sticky;top:16px;display:flex;flex-direction:column;gap:16px;min-width:0}
+    .full{grid-column:1 / -1;min-width:0}
+
+    .card{background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);padding:22px 24px}
+    .card > h2{margin:0 0 6px;color:var(--orange);font-weight:600;font-size:19px}
+    .card > .lead{margin:0 0 12px;color:var(--muted);font-size:13.5px}
+
+    .param{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:6px 18px;align-items:center;padding:11px 0;border-top:1px solid var(--teal-l)}
+    .card > h2 + .lead + .param, .card > h2 + .param{border-top:none}
+    .param label{font-weight:500;color:var(--ink);font-size:14.5px}
+    .param .note{grid-column:1 / -1;color:var(--muted);font-size:12.5px;margin-top:2px}
+    select,input{width:100%;font:inherit;font-size:15px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:42px;outline:none;transition:border-color .15s,box-shadow .15s}
+    select{appearance:none;-webkit-appearance:none;padding-right:38px;cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%230a6972' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 14px center}
+    select:hover,input:hover{border-color:#9fc3c7}
+    select:focus,input:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(10,105,114,.15)}
+    select:disabled,input[readonly]{background-color:var(--teal-ll);color:#3c4a4d;cursor:default}
+
+    /* ---------- итог ---------- */
+    .result-card{background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);overflow:hidden}
+    .result-card .rc-head{background:var(--teal);color:#fff;padding:12px 18px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;font-size:13px}
+    .result-card .rc-body{padding:16px 18px 18px}
+    .result-title{color:var(--muted);font-size:12.5px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin:0 0 6px}
+    #result{font-weight:600;font-size:17px;line-height:1.35;color:var(--teal);overflow-wrap:anywhere;letter-spacing:.01em;margin:0 0 14px}
+    #old-result{font-size:14px;color:var(--ink);overflow-wrap:anywhere;margin:0 0 4px}
+    .btns{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+    .btn{display:block;text-align:center;text-decoration:none;font-weight:600;font-size:15px;border-radius:999px;padding:12px 18px;transition:background .15s,color .15s,transform .1s}
+    .btn:active{transform:translateY(1px)}
+    .btn-primary{background:var(--orange);color:#fff}
+    .btn-primary:hover{background:var(--orange-d)}
+    .tkp-row{display:flex;gap:8px;align-items:stretch}
+    .tkp-row .btn{flex:1}
+    .r-chk{display:inline-flex;align-items:center;gap:6px;padding:0 14px;border:1.5px solid var(--orange);border-radius:999px;cursor:pointer;user-select:none;font-weight:600;color:var(--orange);background:#fff}
+    .r-chk input{accent-color:var(--orange);width:16px;height:16px;margin:0;cursor:pointer}
+    .r-chk:has(input:checked){background:var(--orange);color:#fff}
+    .r-chk:has(input:checked) input{accent-color:#fff}
+    .btn-teal{background:var(--teal);color:#fff}
+    .btn-teal:hover{background:var(--teal-d)}
+    .btn-line{background:#fff;color:var(--teal);border:1.5px solid var(--teal);padding:10.5px 18px}
+    .btn-line:hover{background:var(--teal-l)}
+
+    /* ---------- техописание и чертёж ---------- */
+    .techdesc{display:none}
+    .techdesc h2{margin:0 0 4px;color:var(--orange);font-weight:600;font-size:19px}
+    .techdesc h3{margin:22px 0 8px;color:var(--teal);font-weight:600;font-size:16px}
+    .meta,.muted{color:var(--muted)}
+    .meta{font-size:13px;margin-bottom:10px}
+    .sku{font-weight:600;color:var(--teal);background:var(--teal-ll);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0;overflow-wrap:anywhere}
+    .techdesc table{border-collapse:collapse;width:100%;margin:8px 0}
+    .techdesc th,.techdesc td{border:1px solid var(--line);padding:8px 10px;text-align:left;font-size:14px;vertical-align:top}
+    .techdesc th{background:var(--teal-l);color:var(--teal-d);font-weight:600}
+    .drawing-block{margin-top:16px}
+    .drawing-iframe{width:100%;height:620px;border:1px solid var(--line);border-radius:12px;background:#fff}
+    .drawing-img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:12px}
+    .drawing-empty{padding:12px 14px;color:var(--muted);background:var(--teal-ll);border:1px dashed var(--line);border-radius:12px}
+    .drawing-link{margin-top:8px}
+    .drawing-link a{color:var(--teal);font-weight:500;text-decoration:none}
+    .drawing-link a:hover{text-decoration:underline}
+    .tz-banner{padding:12px 16px;background:var(--orange-l);border:1.5px solid var(--orange);border-radius:var(--r);color:var(--ink);font-size:14px}
+    .tz-banner span{color:var(--muted);font-size:13px}
+
+    /* ---------- подвал: как низ страниц ТКП ---------- */
+    .footer{background:#fff;border-top:1px solid var(--line)}
+    .footer-in{max-width:1240px;margin:0 auto;padding:18px 24px 16px;display:flex;align-items:center;gap:24px}
+    .footer .icons{height:38px;width:auto;flex:0 1 auto;min-width:0;object-fit:contain;object-position:left}
+    .footer .esq-s{height:30px;width:auto;margin-left:auto}
+    .footer p{margin:0;color:var(--muted);font-size:12.5px;white-space:nowrap}
+    .ft-link{color:inherit;text-decoration:none;cursor:default}
+
+    /* ---------- адаптив ---------- */
+    @media (max-width:1100px){
+      .top-grid{grid-template-columns:1fr}
+      .side-col{position:static}
+      .hero-in{grid-template-columns:minmax(0,1fr) 260px}
+      .hero .photo{height:210px}
+    }
+    @media (max-width:720px){
+      body{font-size:14.5px}
+      .topbar-in{padding:10px 16px;gap:12px}
+      .topbar .caption{font-size:11px;letter-spacing:.18em}
+      .topbar .elkom{height:24px}
+      .hero-in{grid-template-columns:1fr;padding:22px 16px 0;min-height:0}
+      .hero .arcs{height:260px;right:-90px;top:-40px;opacity:.55}
+      .hero .esq{height:44px;margin-bottom:12px}
+      .hero h1{margin-bottom:14px}
+      .hero .photo{justify-self:center;height:180px}
+      .hero .band-in{padding:14px 16px}
+      .hero .band b{font-size:18px}
+      .hero .band .housing{margin-left:0}
+      .wrap{padding:0 16px;margin:18px auto 28px}
+      .card{padding:18px 16px;border-radius:14px}
+      .param{grid-template-columns:1fr;gap:6px}
+      .dc-seg b,.dc-sep{font-size:15px}
+      .dc-table{font-size:13px}
+      .dc-table thead{display:none}
+      .dc-table,.dc-table tbody{display:block}
+      .dc-table tr{display:grid;grid-template-columns:28px 76px 1fr;border:1px solid var(--line);border-top:none;background:#fff}
+      .dc-table tr:first-child{border-top:1px solid var(--line)}
+      .dc-table td{border:none;padding:6px 5px 2px}
+      .dc-table td:first-child{width:auto}
+      .dc-table td.dc-c{white-space:normal}
+      .dc-table td:nth-child(3){font-weight:600}
+      .dc-table td:nth-child(4){grid-column:2 / 4;padding:0 5px 7px}
+      .drawing-iframe{height:420px}
+      .footer-in{flex-wrap:wrap;padding:14px 16px;gap:10px 16px}
+      .footer .icons{height:26px;max-width:100%}
+      .footer .esq-s{display:none}
+    }
+    /* ---------- подбор по двигателю ---------- */
+    .motor-pick{border-top:1px solid var(--teal-l);padding:10px 0 4px}
+    .motor-pick summary{cursor:pointer;color:var(--teal);font-weight:500;font-size:14.5px}
+    .mp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-top:10px;align-items:end}
+    .mp-grid small{display:block;color:var(--muted);font-size:11.5px;margin:0 0 3px 2px}
+    .mp-grid .mp-load{grid-column:1 / -1}
+    .mp-grid .btn{grid-column:1 / -1;cursor:pointer;font-family:inherit}
+    .motor-pick .note{color:var(--muted);font-size:12.5px;margin-top:8px}
+    .motor-pick .note.ok{color:var(--teal-d);font-weight:500}.motor-pick .note.warn{color:#b54708;font-weight:600}
+
+    /* ---------- доп. строки таблицы ТКП ---------- */
+    .extras{border-top:1px solid var(--teal-l);padding-top:12px;margin-top:2px}
+    .extras-head label{font-weight:500;font-size:14.5px;display:block}
+    .extras-head .note{display:block;color:var(--muted);font-size:12.5px;margin:2px 0 10px}
+    .ex-row{display:grid;grid-template-columns:minmax(0,1fr) 78px 92px 140px 38px;gap:8px;align-items:start;padding:10px;margin-bottom:10px;background:var(--teal-ll);border:1px solid var(--line);border-radius:12px}
+    .ex-row textarea{width:100%;font:inherit;font-size:14.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-height:42px;resize:vertical;outline:none}
+    .ex-row textarea:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(10,105,114,.15)}
+    .ex-row .ex-del{min-height:42px;border:1.5px solid var(--line);background:#fff;border-radius:10px;color:#b42318;font-size:20px;line-height:1;cursor:pointer}
+    .ex-row .ex-del:hover{border-color:#b42318}
+    .ex-row small{display:block;color:var(--muted);font-size:11.5px;margin:0 0 3px 2px}
+    .add-row{width:100%;cursor:pointer;font-family:inherit}
+    @media (max-width:720px){.ex-row{grid-template-columns:1fr 1fr 38px}.ex-row .ex-name{grid-column:1 / -1}}
+
+    /* ---------- документация ---------- */
+    .docs-card{background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);padding:16px 18px 18px}
+    .docs-card .btns{margin-top:8px}
+    .doc-btn{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;padding:10.5px 12px;white-space:nowrap}
+    @media (max-width:360px){.doc-btn{white-space:normal}}
+    .doc-btn svg{flex:0 0 auto}
+
+    /* ---------- реестр ТКП ---------- */
+    .reg-tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+    .reg-tools input{flex:1 1 260px;width:auto}
+    .reg-tools select{flex:0 0 180px;width:auto}
+    .reg-tools .btn{cursor:pointer;font-family:inherit;padding:10px 16px}
+    .reg-sum{color:var(--muted);font-size:13.5px;margin:0 0 10px}
+    .reg-sum b{color:var(--teal)}
+    .reg-wrap{overflow-x:auto}
+    .reg{width:100%;border-collapse:collapse;font-size:13.5px;background:#fff}
+    .reg th,.reg td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+    .reg th{background:var(--teal-l);color:var(--teal-d);font-weight:600;white-space:nowrap;position:sticky;top:0}
+    .reg td.num{text-align:right;white-space:nowrap}
+    .reg td.mark{font-weight:600;color:var(--teal);overflow-wrap:anywhere;min-width:220px}
+    .reg .tag{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--teal-l);color:var(--teal-d)}
+    .reg .tag.word{background:#eef3fb;color:#2b579a}
+    .reg .ex{color:var(--muted);font-size:12.5px;margin-top:3px}
+    .reg a{color:var(--teal);font-weight:500;text-decoration:none;white-space:nowrap}
+    .reg a:hover{text-decoration:underline}
+    .reg button.del{border:none;background:none;color:#b42318;font-size:18px;cursor:pointer;line-height:1}
+    .empty{padding:24px;text-align:center;color:var(--muted);background:var(--teal-ll);border:1px dashed var(--line);border-radius:12px}
+    .note-box{margin-top:14px;font-size:13px;color:var(--muted)}
+    .login,.shared-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:12px 14px;background:var(--teal-ll);border:1px solid var(--line);border-radius:12px}
+    .login span:first-child{font-weight:600;color:var(--teal)}
+    .login input{flex:0 1 240px;width:auto}
+    .login .btn,.shared-bar .btn{cursor:pointer;font-family:inherit;padding:9px 16px}
+    .login .err{color:#b42318;font-size:13px}
+    .shared-bar a{color:var(--muted);font-size:13px;margin-left:auto}
+    .warn{color:#b54708;font-weight:600}
+    #mode{color:var(--teal);font-weight:600}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-in">
+      <img class="elkom" src="assets/ui/elkom.png" alt="ЭЛКОМ — стандарт качества">
+      <div class="caption">Реестр выданных ТКП</div>
+      <a href="index.html" class="home-button">На главную</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>Реестр выданных ТКП</h2>
+      <p class="lead">Каждое ТКП, скачанное в конфигураторах ПЧ и УПП (PDF или Word), записывается сюда автоматически. <b id="mode"></b></p>
+      <form class="login" id="login" hidden>
+        <span>Общий реестр команды</span>
+        <input type="text" autocomplete="username" value="ESQ" hidden aria-hidden="true">
+        <input type="password" id="pw" placeholder="Пароль сотрудника" autocomplete="current-password">
+        <button type="submit" class="btn btn-teal">Войти</button>
+        <span class="err" id="loginErr"></span>
+      </form>
+      <div class="shared-bar" id="sharedBar" hidden>
+        <button type="button" class="btn btn-line" id="reload">Обновить</button>
+        <button type="button" class="btn btn-line" id="push" hidden></button>
+        <a href="#" id="logout">Выйти</a>
+      </div>
+      <div class="reg-tools">
+        <input type="search" id="q" placeholder="Поиск: маркировка, составитель, доп. позиция…">
+        <select id="prod"><option value="">Все изделия</option><option>ВВ ПЧ</option><option>ВВ УПП</option></select>
+        <select id="period"><option value="">За всё время</option><option value="30">30 дней</option><option value="90">90 дней</option><option value="365">Год</option></select>
+        <button type="button" class="btn btn-primary" id="csv">Выгрузить в Excel (CSV)</button>
+        <button type="button" class="btn btn-line" id="imp">Загрузить CSV</button>
+        <input type="file" id="impFile" accept=".csv,text/csv" hidden>
+      </div>
+      <p class="reg-sum" id="sum"></p>
+      <div class="reg-wrap"><table class="reg">
+        <thead><tr><th>Дата</th><th>Составил</th><th>Изделие</th><th>Маркировка</th><th>Кол-во</th><th>Цена за ед., руб.</th><th>Сумма, руб.</th><th>Формат</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <div class="empty" id="empty" hidden>Пока пусто. Скачайте ТКП в <a href="configurator_vv_pch.html">конфигураторе ПЧ</a> или <a href="vv_upp.html">УПП</a> — оно появится здесь.</div>
+      <p class="note-box" id="localNote">Реестр хранится в этом браузере на этом компьютере. Чтобы перенести его или объединить с коллегами — выгрузите CSV и загрузите его на другом компьютере (записи объединятся без повторов).</p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-in">
+      <img class="icons" src="assets/ui/icons.png" alt="">
+      <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
+      <p>© 2026 ESQ · ООО «Элком»</p>
+    </div>
+  </footer>
+  <script src="registry.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const $ = id => document.getElementById(id), R = window.TkpRegistry, SH = R.shared;
+    const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const money = x => x ? Number(x).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) : '';
+    const date = iso => { const d = new Date(iso); return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); };
+    const hay = e => [e.mark, e.who, e.product, e.model, ...(e.extra || []).map(x => x.name)].join(' ').toLowerCase();
+
+    /* ---------- источник данных: общий реестр (по паролю) или этот браузер ---------- */
+    let pw = null, server = null;                                     // server — записи общего реестра, null — не загружены
+    try { pw = sessionStorage.getItem('esq.regPw'); } catch (e) {}
+    const shared = () => SH.on && pw && server;
+    function source() {
+      if (!shared()) return R.read();
+      const have = new Set(server.map(e => e.id));
+      return server.concat(R.read().filter(e => !have.has(e.id) && e.sent === false));   // + ещё не отправленные из этого браузера
+    }
+    async function loadServer() {
+      if (!SH.on || !pw) return;
+      $('sum').textContent = 'Загружаю общий реестр…';
+      try {
+        server = await SH.list(pw, +$('period').value || 0);
+        R.markSent(server.map(e => e.id));
+        $('login').hidden = true; $('sharedBar').hidden = false;
+      } catch (e) {
+        server = null;
+        if (e.status === 403) { pw = null; try { sessionStorage.removeItem('esq.regPw'); } catch (x) {} $('loginErr').textContent = 'Неверный пароль'; }
+        else $('loginErr').textContent = 'Общий реестр недоступен: ' + e.message + '. Показаны записи этого браузера.';
+        $('login').hidden = false;
+      }
+      render();
+    }
+
+    function filtered() {
+      const q = $('q').value.trim().toLowerCase(), prod = $('prod').value, days = +$('period').value;
+      const from = days ? Date.now() - days * 864e5 : 0;
+      return source().filter(e => (!prod || e.product === prod) && (!q || hay(e).includes(q)) && new Date(e.at) >= from)
+        .sort((a, b) => (a.at < b.at ? 1 : -1));
+    }
+    function render() {
+      const list = filtered(), all = source().length;
+      $('mode').textContent = shared() ? 'Общий реестр команды' : (SH.on ? 'Записи этого браузера — войдите, чтобы видеть общий реестр' : 'Записи этого браузера');
+      $('empty').hidden = !!all; document.querySelector('.reg-wrap').hidden = !all;
+      $('localNote').hidden = !!shared();
+      const sum = list.reduce((a, e) => a + (e.total || 0), 0);
+      $('sum').innerHTML = all ? `Показано <b>${list.length}</b> из ${all}` + (sum ? ` · сумма ТКП с указанными ценами: <b>${money(sum)} руб.</b>` : '') : '';
+      const pending = R.read().filter(e => e.sent === false).length, localN = R.read().length;
+      $('push').hidden = !shared() || !localN;
+      $('push').textContent = 'Отправить записи этого браузера в общий реестр (' + localN + ')';
+      $('rows').innerHTML = list.map(e => `<tr data-id="${esc(e.id)}">
+        <td class="num">${esc(date(e.at))}</td><td>${esc(e.who)}</td><td>${esc(e.product)}</td>
+        <td class="mark">${esc(e.mark)}${(e.extra || []).length ? `<div class="ex">+ ${e.extra.map(x => esc(x.name) + (x.qty > 1 ? ' × ' + x.qty : '')).join('; ')}</div>` : ''}</td>
+        <td class="num">${esc(e.qty)}</td><td class="num">${money(e.price)}</td><td class="num">${money(e.total)}</td>
+        <td><span class="tag${e.fmt === 'Word' ? ' word' : ''}">${esc(e.fmt)}</span>${shared() && e.sent === false ? '<div class="ex" title="Запись есть только в этом браузере">не отправлено</div>' : ''}</td>
+        <td>${e.link ? `<a href="${esc(e.link)}" title="Открыть эту конфигурацию в конфигураторе">Открыть</a> ` : ''}<button class="del" title="Удалить запись" aria-label="Удалить запись">×</button></td></tr>`).join('');
+      if (pending && SH.on) $('sum').innerHTML += ` · <span class="warn">не отправлено: ${pending}</span>`;
+    }
+    $('rows').addEventListener('click', async ev => {
+      const b = ev.target.closest('button.del'); if (!b) return;
+      const id = b.closest('tr').dataset.id, e = source().find(x => x.id === id);
+      if (!e || !confirm('Удалить запись из реестра' + (shared() ? ' (общего, для всех)' : '') + '?')) return;
+      if (shared() && e.sent !== false) {
+        try { await SH.del(pw, e); server = server.filter(x => x.id !== id); } catch (err) { alert('Не удалось удалить: ' + err.message); return; }
+      }
+      R.write(R.read().filter(x => x.id !== id)); render();
+    });
+    ['q', 'prod'].forEach(id => $(id).addEventListener('input', render));
+    $('period').addEventListener('input', () => shared() ? loadServer() : render());
+
+    /* ---------- вход в общий реестр ---------- */
+    $('login').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const v = $('pw').value; if (!v) return;
+      $('loginErr').textContent = 'Проверяю…';
+      try { await SH.ping(v); pw = v; try { sessionStorage.setItem('esq.regPw', v); } catch (e) {} $('loginErr').textContent = ''; $('pw').value = ''; await loadServer(); }
+      catch (e) { $('loginErr').textContent = e.status === 403 ? 'Неверный пароль' : 'Нет связи с общим реестром: ' + e.message; }
+    });
+    $('logout').onclick = () => { pw = null; server = null; try { sessionStorage.removeItem('esq.regPw'); } catch (e) {} $('sharedBar').hidden = true; $('login').hidden = false; render(); };
+    $('reload').onclick = () => loadServer();
+    $('push').onclick = async () => {
+      const mine = R.read(); if (!mine.length) return;
+      if (!confirm('Отправить ' + mine.length + ' записей этого браузера в общий реестр? Уже отправленные не задвоятся.')) return;
+      try {
+        const n = await SH.import(pw, mine, (a, b) => { $('push').textContent = 'Отправляю… ' + a + ' из ' + b; });
+        R.markSent(mine.map(e => e.id)); alert('Отправлено записей: ' + n); await loadServer();
+      } catch (e) { alert('Не удалось отправить: ' + e.message); render(); }
+    };
+
+    /* ---------- CSV: разделитель «;» и BOM — Excel открывает по двойному щелчку с русскими буквами ---------- */
+    const COLS = [['id', 'id'], ['at', 'Дата (ISO)'], ['who', 'Составил'], ['product', 'Изделие'], ['model', 'Модель'], ['mark', 'Маркировка'], ['kv', 'Напряжение, кВ'],
+      ['P', 'Мощность, кВт'], ['I', 'Ток, А'], ['qty', 'Кол-во'], ['price', 'Цена за ед., руб.'], ['total', 'Сумма, руб.'], ['extra', 'Доп. позиции'], ['fmt', 'Формат'], ['link', 'Ссылка на конфигурацию']];
+    const cellOut = (k, v) => k === 'extra' ? (v || []).map(x => x.name + ' — ' + x.qty + ' ' + (x.unit || 'шт') + (x.price ? ' по ' + x.price : '')).join(' | ') : (v ?? '');
+    const q = v => { v = String(v); return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    $('csv').onclick = () => {
+      const list = filtered().reverse();
+      const csv = '﻿' + [COLS.map(c => c[1]).join(';'), ...list.map(e => COLS.map(([k]) => q(cellOut(k, e[k]))).join(';'))].join('\r\n');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      a.download = 'Реестр_ТКП_' + new Date().toISOString().slice(0, 10) + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+    };
+    function parseCsv(t) {
+      const rows = [], row = []; let cur = '', inq = false;
+      for (let i = 0; i < t.length; i++) {
+        const c = t[i];
+        if (inq) { if (c === '"' && t[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') inq = false; else cur += c; }
+        else if (c === '"') inq = true; else if (c === ';') { row.push(cur); cur = ''; }
+        else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(cur); cur = ''; rows.push(row.splice(0)); }
+        else cur += c;
+      }
+      if (cur || row.length) { row.push(cur); rows.push(row.splice(0)); }
+      return rows;
+    }
+    $('imp').onclick = () => $('impFile').click();
+    $('impFile').onchange = async () => {
+      const f = $('impFile').files[0]; if (!f) return;
+      const rows = parseCsv((await f.text()).replace(/^﻿/, ''));
+      const head = rows.shift() || [], idx = COLS.map(([, t]) => head.indexOf(t));
+      if (idx[0] < 0 || idx[5] < 0) { alert('Это не выгрузка реестра ТКП (нет колонок «id» и «Маркировка»).'); return; }
+      const have = new Set(source().map(e => e.id)), add = [];
+      rows.filter(r => r.length > 1).forEach(r => {
+        const e = {}; COLS.forEach(([k], i) => { if (idx[i] >= 0) e[k] = r[idx[i]]; });
+        if (!e.id || have.has(e.id)) return;
+        ['kv', 'P', 'I', 'qty', 'price', 'total'].forEach(k => e[k] = +e[k] || 0);
+        e.extra = e.extra ? e.extra.split(' | ').map(s => { const m = /^(.*) — (\d+) (\S+)(?: по ([\d.]+))?$/.exec(s) || []; return { name: m[1] || s, qty: +m[2] || 1, unit: m[3] || 'шт', price: +m[4] || 0 }; }) : [];
+        add.push(e); have.add(e.id);
+      });
+      $('impFile').value = '';
+      if (shared()) {
+        try { await SH.import(pw, add); alert('Добавлено в общий реестр: ' + add.length); await loadServer(); }
+        catch (e) { alert('Не удалось загрузить: ' + e.message); }
+        return;
+      }
+      R.write(R.read().concat(add).sort((a, b) => a.at < b.at ? -1 : 1));
+      alert('Добавлено записей: ' + add.length + (rows.length - add.length > 0 ? ' (повторы пропущены)' : '')); render();
+    };
+
+    $('login').hidden = !SH.on || !!pw;
+    render();
+    if (SH.on) { R.flush().then(n => { if (n) render(); }); if (pw) loadServer(); }
+  })();
+  </script>
+</body>
+</html>

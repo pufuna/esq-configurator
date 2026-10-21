@@ -1,0 +1,442 @@
+{
+ "ME800|T060|280|EL": {
+  "mark": "ESQ F ME800-0280P034АT060AL30XXX31XXDMRAX-PEN",
+  "mech": {
+   "size": "2025×1325×2480",
+   "weight": "2.0"
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800|T060|280|PF": {
+  "mark": "ESQ F ME800-0280P034АT060AL30XXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "1800×1425×2431",
+   "weight": "1.9"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800|T060|1250|EL": {
+  "mark": "ESQ F ME800-1250P154АT060AL30XXX31XXDMRAX-PEN",
+  "mech": {
+   "size": "2300×1500×2532",
+   "weight": "3.6"
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800|T060|1250|PF": {
+  "mark": "ESQ F ME800-1250P154АT060AL30XXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "2300×1500×2532",
+   "weight": "3.6"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800|T060|1600|EL": {
+  "mark": "ESQ F ME800-1600P192АT060AL30XXX31XXDMRAX-PEN",
+  "mech": {
+   "size": "3500×1600×2731",
+   "weight": "7.0"
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800|T060|1600|PF": {
+  "mark": "ESQ F ME800-1600P192АT060AL30XXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "3500×1600×2731",
+   "weight": "7.0"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800|T060|1800|EL": {
+  "mark": "ESQ F ME800-1800P217АT060AL30SXX31XXDMRAX-PAN",
+  "mech": {
+   "size": "3500×1600×2731",
+   "weight": "6.7"
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800|T060|1800|PF": {
+  "mark": "ESQ F ME800-1800P217АT060AL30SXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "3500×1600×2731",
+   "weight": "6.7"
+  },
+  "starter": "S!",
+  "cap": "PF"
+ },
+ "ME800|T060|4500|EL": {
+  "mark": "ESQ F ME800-4500P558АT060AL30SXX31XXDMRAX-PCN",
+  "mech": {
+   "size": "7434×1600×2916",
+   "weight": "15.5"
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800|T060|4500|PF": {
+  "mark": "ESQ F ME800-4500P558АT060AL30SXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "7434×1600×2916",
+   "weight": "15.5"
+  },
+  "starter": "S!",
+  "cap": "PF"
+ },
+ "ME800|T060|8000|EL": {
+  "mark": "ESQ F ME800-8000P962АT060AL30SXX31XXDMRAX-PDN",
+  "mech": {
+   "size": "9270×1980×3438",
+   "weight": "22.2"
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800|T060|8000|PF": {
+  "mark": "ESQ F ME800-8000P962АT060AL30SXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "9270×1980×3438",
+   "weight": "22.2"
+  },
+  "starter": "S!",
+  "cap": "PF"
+ },
+ "ME800|T100|280|EL": {
+  "mark": "ESQ F ME800-0280P020АT100AL48XXX31XXDMRAX-PEN",
+  "mech": {
+   "size": "2700×1325×2480",
+   "weight": "2.4"
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800|T100|280|PF": {
+  "mark": "ESQ F ME800-0280P020АT100AL48XXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "1800×1425×2431",
+   "weight": "2.2"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800|T100|2650|EL": {
+  "mark": "ESQ F ME800-2650P191АT100AL48XXX31XXDMRAX-PEN",
+  "mech": {
+   "size": "4500×1600×2731",
+   "weight": "5.8"
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800|T100|2650|PF": {
+  "mark": "ESQ F ME800-2650P191АT100AL48XXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "4500×1600×2731",
+   "weight": "5.8"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800|T100|2800|EL": {
+  "mark": "ESQ F ME800-2800P202АT100AL48SXX31XXDMRAX-PAN",
+  "mech": {
+   "size": "7200×1600×2895",
+   "weight": "8.5"
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800|T100|2800|PF": {
+  "mark": "ESQ F ME800-2800P202АT100AL48SXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "7200×1600×2895",
+   "weight": "8.5"
+  },
+  "starter": "S!",
+  "cap": "PF"
+ },
+ "ME800|T100|12500|EL": {
+  "mark": "ESQ F ME800-12500P920АT100AL48SXX31XXDMRAX-PDN",
+  "mech": {
+   "size": "16550×1980×3438",
+   "weight": "42.4"
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800|T100|12500|PF": {
+  "mark": "ESQ F ME800-12500P920АT100AL48SXX31XXDMRAX-PFN",
+  "mech": {
+   "size": "16550×1980×3438",
+   "weight": "42.4"
+  },
+  "starter": "S!",
+  "cap": "PF"
+ },
+ "ME800R|T030|250|EL": {
+  "mark": "ESQ F ME800-R-0250P058АT030AL18XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "2025×1325×2480",
+   "weight": "2.0",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T030|800|EL": {
+  "mark": "ESQ F ME800-R-0800P192АT030AL18XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "2300×1500×2480",
+   "weight": "2.7",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T030|900|EL": {
+  "mark": "ESQ F ME800-R-0900P216АT030AL18SXX31XXDMRAX-EB",
+  "mech": {
+   "size": "2600×1500×2731",
+   "weight": "3.9",
+   "ex": ""
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800R|T030|3300|EL": {
+  "mark": "ESQ F ME800-R-3300P800АT030AL18SXX31XXDMRAX-EB",
+  "mech": {
+   "size": "7382×1980×3438",
+   "weight": "11.2",
+   "ex": ""
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800R|T060|280|EL": {
+  "mark": "ESQ F ME800-R-0280P034АT060AL30XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "2700×1325×2542",
+   "weight": "2.1",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T060|280|PF": {
+  "mark": "ESQ F ME800-R-0280P034АT060AL30XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "1600×1330×2480",
+   "weight": "1.7",
+   "ex": "компактное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T060|630|EL": {
+  "mark": "ESQ F ME800-R-0630P077АT060AL30XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "2700×1325×2542",
+   "weight": "2.8",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T060|630|PF": {
+  "mark": "ESQ F ME800-R-0630P077АT060AL30XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "1600×1330×2480",
+   "weight": "2.3",
+   "ex": "компактное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T060|1500|EL": {
+  "mark": "ESQ F ME800-R-1500P183АT060AL30XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "3000×1500×2542",
+   "weight": "4.4",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T060|1500|PF": {
+  "mark": "ESQ F ME800-R-1500P183АT060AL30XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "2450×1500×2813",
+   "weight": "5.4",
+   "ex": "компактное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T060|1600|EL": {
+  "mark": "ESQ F ME800-R-1600P192АT060AL30XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "3000×1500×2542",
+   "weight": "4.6",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T060|1600|PF": {
+  "mark": "ESQ F ME800-R-1600P192АT060AL30XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "4500×1500×2881",
+   "weight": "5.6",
+   "ex": "раздельное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T060|2800|EL": {
+  "mark": "ESQ F ME800-R-2800P337АT060AL30SXX31XXDMRAX-EB",
+  "mech": {
+   "size": "4705×1600×2895",
+   "weight": "10.2",
+   "ex": ""
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800R|T060|2800|PF": {
+  "mark": "ESQ F ME800-R-2800P337АT060AL30XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "4500×1500×2881",
+   "weight": "7.9",
+   "ex": "раздельное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T060|8000|EL": {
+  "mark": "ESQ F ME800-R-8000P962АT060AL30SXX31XXDMRAX-EB",
+  "mech": {
+   "size": "9270×1980×3438",
+   "weight": "22.2",
+   "ex": ""
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800R|T100|280|EL": {
+  "mark": "ESQ F ME800-R-0280P020АT100AL48XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "2700×1325×2542",
+   "weight": "2.4",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T100|280|PF": {
+  "mark": "ESQ F ME800-R-0280P020АT100AL48XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "1600×1330×2480",
+   "weight": "1.8",
+   "ex": "компактное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T100|1000|EL": {
+  "mark": "ESQ F ME800-R-1000P072АT100AL48XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "2700×1325×2500",
+   "weight": "3.5",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T100|1000|PF": {
+  "mark": "ESQ F ME800-R-1000P072АT100AL48XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "1600×1330×2480",
+   "weight": "2.9",
+   "ex": "компактное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T100|2500|EL": {
+  "mark": "ESQ F ME800-R-2500P182АT100AL48XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "3000×1500×2542",
+   "weight": "5.4",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T100|2500|PF": {
+  "mark": "ESQ F ME800-R-2500P182АT100AL48XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "2450×1500×2813",
+   "weight": "6.1",
+   "ex": "компактное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T100|2650|EL": {
+  "mark": "ESQ F ME800-R-2650P191АT100AL48XXX31XXDMRAX-EB",
+  "mech": {
+   "size": "3000×1500×2542",
+   "weight": "5.8",
+   "ex": ""
+  },
+  "starter": "X",
+  "cap": "EL"
+ },
+ "ME800R|T100|2650|PF": {
+  "mark": "ESQ F ME800-R-2650P191АT100AL48XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "4500×1500×2927",
+   "weight": "6.4",
+   "ex": "раздельное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T100|4500|EL": {
+  "mark": "ESQ F ME800-R-4500P335АT100AL48SXX31XXDMRAX-EB",
+  "mech": {
+   "size": "7200×1600×2895",
+   "weight": "15.2",
+   "ex": ""
+  },
+  "starter": "S!",
+  "cap": "EL"
+ },
+ "ME800R|T100|4500|PF": {
+  "mark": "ESQ F ME800-R-4500P335АT100AL48XXX31XXDMRAX-FB",
+  "mech": {
+   "size": "4500×1500×2927",
+   "weight": "10.5",
+   "ex": "раздельное"
+  },
+  "starter": "X",
+  "cap": "PF"
+ },
+ "ME800R|T100|12500|EL": {
+  "mark": "ESQ F ME800-R-12500P920АT100AL48SXX31XXDMRAX-EB",
+  "mech": {
+   "size": "16550×1980×3438",
+   "weight": "42.4",
+   "ex": ""
+  },
+  "starter": "S!",
+  "cap": "EL"
+ }
+}
