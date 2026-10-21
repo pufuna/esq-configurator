@@ -124,6 +124,19 @@ async def main():
         check(drw[0].endswith('R_F_10_280-1000_M.pdf') and drw[1].endswith('R_E_10_2500-2650_B.pdf') and drw[2] is None, f'чертежи ME800-R по модели: {drw}')
         for fn in [d for d in drw if d]:
             check(os.path.exists(os.path.join(ROOT, fn)), 'файл чертежа есть: ' + fn)
+        # ME800-R, плёночные вне компактного корпуса — корпус G1: файл есть для каждой мощности и комплектации
+        g1 = await page.evaluate("() => { const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('change', {bubbles: true})); };"
+                                 " const out = []; for (const v of ['T060', 'T100']) { set('voltage', v); set('capacitorType', 'PF');"
+                                 " for (const p of [...document.getElementById('power').options].map(o => o.value)) { set('power', p);"
+                                 " for (const b of ['X', 'M', 'A']) for (const s of ['X', 'S']) for (const r of ['X', 'R']) { set('bypass', b); set('starter', s); set('reactor', r);"
+                                 " const d = rDrawing(); out.push([v, p, b + s + r, d && d.file, getMechanicalFor(v, +p).size, document.getElementById('capacitorType').value]); } } }"
+                                 " set('bypass', 'X'); set('starter', 'X'); set('reactor', 'X'); set('voltage', 'T060'); set('capacitorType', 'EL'); return out; }")
+        big = [x for x in g1 if int(x[1]) > (630 if x[0] == 'T060' else 1000) and x[5] == 'PF' and x[4] not in (None, '—')]   # плёночные мощности из таблицы РЭ
+        miss = [x for x in big if not x[3] or not os.path.exists(os.path.join(ROOT, x[3]))]
+        check(big and not miss, f'чертежи G1 ME800-R для всех плёночных вне компактного корпуса ({len(big)} вариантов), нет: {miss[:3]}')
+        ex = {(x[0], x[1], x[2]): x[3] for x in g1}
+        check((ex.get(('T100', '1600', 'MXX')) or '').endswith('R_G1_2450_2537_B.pdf') and (ex.get(('T060', '2000', 'XSX')) or '').endswith('R_G1_4500_2881_0_S.pdf'),
+              f"чертёж G1 по мощности: {ex.get(('T100', '1600', 'MXX'))}, {ex.get(('T060', '2000', 'XSX'))}")
 
         # подбор по двигателю: 6 кВ, 1000 кВт, винтовой компрессор → на ступень выше 1000 кВт
         await page.click('#motorPick summary'); await page.fill('#mpKw', '1000'); await sel('mpLoad', '1')

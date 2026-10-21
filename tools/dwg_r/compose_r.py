@@ -54,6 +54,7 @@ def place(items, src, dst):
         out.append(it.replace(d, nd, 1))
     return out
 
+BODY_H = None                                                    # --body-h: высота корпуса ПЧ, если на листе есть более низкий шкаф (G1: байпас 1999, ПЧ 2099)
 def main(base, code, bypass_drawn=False):
     lines, meta = load(base)
     head = [l for l in lines if l.startswith('<svg') or l.startswith('<style')]
@@ -68,7 +69,7 @@ def main(base, code, bypass_drawn=False):
     fs = statistics.median([float(re.search(r'font-size="([\d.]+)"', t).group(1)) for t in body if t.startswith('<text') and re.search(r'>\d', t)] or [80])
     # высота корпуса ПЧ (без вентиляторов) — наименьший вертикальный размер от низа фасада, больше 1800
     hs = [d['m'] for d in V if min(d['x1'][1], d['x2'][1]) < base_y + 60 and max(d['x1'][1], d['x2'][1]) > base_y + 1500 and d['m'] > 1800]
-    body_h = min(hs) if hs else 2100
+    body_h = BODY_H or (min(hs) if hs else 2100)
     # виды в плане: вертикальные размеры ниже фасада и выше него
     below = [d for d in V if max(d['x1'][1], d['x2'][1]) < base_y - 100]
     above = [d for d in V if min(d['x1'][1], d['x2'][1]) > base_y + body_h + 100]
@@ -161,7 +162,11 @@ def main(base, code, bypass_drawn=False):
     add += vdim(new_left, new_left - fs * 3.2, base_y, base_y + hmax, str(round(hmax)))
     mt = re.match(r'\s*(\d+)', fw.get('text') or '')                               # номинальная длина ПЧ — из подписи размера
     tot = (int(mt.group(1)) if mt else round(fw['m'])) + total_add
-    add += hdim(new_left, x2, base_y, ydim - fs * 3.2, f'{tot} (общая длина)')
+    # общая длина — ниже цепочки размеров; если там уже размеры вида в плане — ближе к цепочке
+    def busy(yl):
+        return any((bb := item_box(it)) and bb[2] > new_left and bb[0] < x2 and bb[3] > yl - fs * 1.3 and bb[1] < yl + fs * 1.6 for it in body)
+    yt = next((ydim - fs * k for k in (3.2, 2.6, 2.2) if not busy(ydim - fs * k)), ydim - fs * 2.2)
+    add += hdim(new_left, x2, base_y, yt, f'{tot} (общая длина)')
 
     allb = [item_box(it) for it in out + add if item_box(it)]
     bx0, by0 = min(b[0] for b in allb), min(b[1] for b in allb); bx1, by1 = max(b[2] for b in allb), max(b[3] for b in allb)
@@ -174,4 +179,5 @@ def main(base, code, bypass_drawn=False):
     print(name, 'добавлено', order, 'общая длина', tot, 'вид(ы) в плане:', [b[0] for b in bands])
 
 if __name__ == '__main__':
+    if '--body-h' in sys.argv: BODY_H = float(sys.argv[sys.argv.index('--body-h') + 1])
     main(sys.argv[1], sys.argv[2], '--bypass-drawn' in sys.argv)

@@ -1230,9 +1230,18 @@
       if (!isR()) return null;
       const v = document.getElementById('voltage').value, p = Number(document.getElementById('power').value);
       const cap = document.getElementById('capacitorType').value, byp = document.getElementById('bypass').value;
-      if (v !== 'T100') return null;
       // доп. шкафы дорисованы на листе (слева от ПЧ: реактор — пусковой — байпас): суффикс _B/_S/_R и их сочетания
       const S = document.getElementById('starter').value === 'S', Rc = document.getElementById('reactor').value === 'R';
+      // плёночные вне компактного шкафа 1600×1330 (6 кВ > 630 кВт, 10 кВ > 1000 кВт) — корпус G1: заводской лист MF5000-G1 (с шкафом
+      // ручного байпаса 650 мм; без байпаса шкаф убран), подписи габаритов — по таблице РЭ (ширина ПЧ и высота с вентиляторами);
+      // для раздельного исполнения 4500 мм вид условный (пометка на листе). Файлы R_G1_<Ш>_<В>_<0|B>[_S|_R|_SR].pdf
+      if (cap === 'PF' && p > ({ T060: 630, T100: 1000 }[v] || Infinity)) {
+        const m = /^(\d+)×\d+×(\d+)/.exec(getMechanicalFor(v, p).size || '');
+        if (!m) return null;
+        const code = (S ? 'S' : '') + (Rc ? 'R' : '');
+        return { file: 'assets/drawings_r/R_G1_' + m[1] + '_' + m[2] + '_' + (byp === 'X' ? '0' : 'B') + (code ? '_' + code : '') + '.pdf', bypassShown: true, g1: true };
+      }
+      if (v !== 'T100') return null;
       if (cap === 'EL') {
         const r = R_DRAW_E10.find(([a, b]) => p >= a && p <= b); if (!r) return null;
         const code = (byp !== 'X' ? 'B' : '') + (S ? 'S' : '') + (Rc ? 'R' : '');
@@ -1247,8 +1256,10 @@
     window.rDrawing = rDrawing;
     // пометка к листу R с дорисованными шкафами (габариты — по п. 5.4 техописания ME800-R)
     function rExtrasNote(){
-      const d = rDrawing(); if (!d || !/_[BSR]+\.pdf$/.test(d.file)) return '';
-      return 'Дополнительные шкафы показаны условно: ширина 800 мм, глубина и высота — как у ПЧ; расположение в ряду уточняется при заказе.';
+      const d = rDrawing(); if (!d) return '';
+      const n = [];
+      if ((d.g1 ? /_[SR]+\.pdf$/ : /_[BSR]+\.pdf$/).test(d.file)) n.push('Дополнительные шкафы показаны условно: ширина 800 мм, глубина и высота — как у ПЧ; расположение в ряду уточняется при заказе.');
+      return n.join(' ');
     }
     window.rExtrasNote = rExtrasNote;
 

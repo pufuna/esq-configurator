@@ -12,7 +12,9 @@ TR = {                                                              # перев
     '1个500风机(风机罩外形尺寸同560)': 'Вентилятор 500 (кожух как у 560)', '1个500风机(风机罩外形尺寸同560风机罩)': 'Вентилятор 500 (кожух как у 560)',
     '上进上出时：低压控制进线位置示意': 'Ввод сверху: ввод цепей управления', '上进上出时：高压输入/输出位置示意': 'Ввод сверху: вход/выход ВН',
     '上进上出时：高压输入位置示意': 'Ввод сверху: вход ВН', '上进上出时：高压输出位置示意': 'Ввод сверху: выход ВН',
-    '下进下出时：低压控制进线位置示意': 'Ввод снизу: ввод цепей управления', '下进下出时：高压输入/输出位置示意': 'Ввод снизу: вход/выход ВН',
+    '上进上出时：低压控制线位置示意': 'Ввод сверху: ввод цепей управления', '下进下出时：低压控制线位置示意': 'Ввод снизу: ввод цепей управления',
+    '下进下出时：低压控制进线位置示意': 'Ввод снизу: ввод цепей управления',
+    '下进下出时：低压控制线位置示意': 'Ввод снизу: ввод цепей управления', '上进上出时：低压控制线位置示意': 'Ввод сверху: ввод цепей управления', '下进下出时：高压输入/输出位置示意': 'Ввод снизу: вход/выход ВН',
     '下进下出时：高压输入位置示意': 'Ввод снизу: вход ВН', '下进下出时：高压输出位置示意': 'Ввод снизу: выход ВН',
     '注：高低压进线孔在柜体顶部和底部都有开孔，用户可自行选择': 'Отверстия для кабелей ВН и цепей управления есть в крыше и в основании шкафов — ввод сверху или снизу по выбору заказчика.',
     # надписи на дверях (мелкие)
@@ -20,7 +22,7 @@ TR = {                                                              # перев
     '本地/远程': 'Местн./дист.', '手动/自动': 'Ручн./авт.', '温控仪': 'Терморегулятор', '电源指示': 'Питание', '高压电源': 'Высокое напряжение',
     '高压带电显示器': 'Индикатор наличия ВН', '工频合闸': 'Вкл. от сети', '变频进线合闸': 'Вкл. вход ПЧ', '变频出线合闸': 'Вкл. выход ПЧ',
 }
-SUFFIX = {'(底座槽钢)': ' (основание)', '(变频器)': ' (ПЧ)', '(开口)': ' (проём)', '（开口）': ' (проём)'}
+SUFFIX = {'（手动旁路柜）': ' (шкаф байпаса)', '(手动旁路柜)': ' (шкаф байпаса)', '（手动旁路柜）': ' (шкаф байпаса)', '(手动旁路柜)': ' (шкаф байпаса)', '(底座槽钢)': ' (основание)', '(变频器)': ' (ПЧ)', '(开口)': ' (проём)', '（开口）': ' (проём)'}
 
 def translate(s):
     s0 = s.strip()
@@ -33,16 +35,25 @@ def translate(s):
     if re.search(r'WARNING|warning|Only qualified', s0): return None
     return s
 
+DROP = []                                                           # зоны, которые нужно убрать (лист без шкафа байпаса)
+CORE = []                                                           # «тело» шкафа байпаса: объект, заходящий внутрь, — тоже убираем (выноски)
+def in_drop(pts): return (any(all(a <= x <= c and b <= y <= d for x, y in pts) and min(x for x, _ in pts) < c - 10 for a, b, c, d in DROP)
+                          or any(any(a <= x <= c and b <= y <= d for x, y in pts) for a, b, c, d in CORE))
+
 class RR(R):
     dims_log = []
     def dim(self, e, M):
         t = e['entity']
+        if DROP and t in ('DIMENSION_LINEAR', 'DIMENSION_ALIGNED'):
+            p1, p2 = self.tp(M, e['xline1_pt']), self.tp(M, e['xline2_pt'])
+            if in_drop([p1]) or in_drop([p2]): return                     # размер привязан к шкафу байпаса
         if t in ('DIMENSION_LINEAR', 'DIMENSION_ALIGNED') and self.depth == 0:
             self.dims_log.append({'m': e.get('act_measurement', 0), 'text': self.dimtext(e), 'x1': list(self.tp(M, e['xline1_pt'])), 'x2': list(self.tp(M, e['xline2_pt'])),
                                   'dp': list(self.tp(M, e['def_pt'])), 'rot': e.get('dim_rotation', 0) if t == 'DIMENSION_LINEAR' else None})
         super().dim(e, M)
     def text(self, M, ins, h, rot, s, align='start'):
         t = translate(s)
+        if t and DROP and 'вход/выход ВН' in t: return                  # ввод ВН показан в шкафу байпаса — без него не нужен
         if t:
             if t.startswith('Отверстия для кабелей'):                  # длинное примечание — в две строки
                 t = 'Примечание: отверстия для кабелей ВН и цепей управления есть в крыше\nи в основании шкафов — ввод сверху или снизу по выбору заказчика.'
@@ -76,9 +87,21 @@ def main(key, name, sheet=1):
     ix0, iy0, ix1, iy1 = x0 + 0.04 * W, y0 + 0.035 * H, x1 - 0.04 * W, y1 - 0.035 * H     # внутри рамки с сеткой
     inside = lambda p: ix0 <= p[0] <= ix1 and iy0 <= p[1] <= iy1 and not any(a <= p[0] <= c and b <= p[1] <= e for a, b, c, e in ex)
     keep, ext = [], [1e18, 1e18, -1e18, -1e18]
+    seen = set()
     for it in r.out:
+        if it in seen: continue                                      # одинаковые объекты (дубли в DWG) — один раз
+        seen.add(it)
         pts = coords(it)
         if not pts or not all(inside(p) for p in pts): continue
+        if DROP and in_drop(pts): continue
+        if DROP and len(pts) == 2 and abs(pts[0][1] - pts[1][1]) < 1 and it.startswith('<path d="M'):
+            # горизонтальная линия, начинающаяся в зоне шкафа байпаса (низ/верх шкафа, выносные): обрезаем по краю ПЧ
+            for a, b, c, d in DROP:
+                (xa, ya), (xb, yb) = sorted(pts)
+                if a <= xa <= c and b <= ya <= d and xb > c + 5:
+                    it = re.sub(r'd="M[-\d.]+,', f'd="M{c - 5:.1f},', it, 1) if pts[0][0] < pts[1][0] else re.sub(r' L[-\d.]+,', f' L{c - 5:.1f},', it, 1)
+                    pts = [(c - 5, ya), (xb, yb)]
+                    break
         keep.append(it)
         for p in pts:
             ext = [min(ext[0], p[0]), min(ext[1], p[1]), max(ext[2], p[0]), max(ext[3], p[1])]
@@ -112,4 +135,9 @@ def main(key, name, sheet=1):
 
 if __name__ == '__main__':
     import os; os.makedirs('out_r', exist_ok=True)
-    main(sys.argv[1], sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 1)
+    if '--drop' in sys.argv:                                         # --drop x0,y0,x1,y1;x0,y0,x1,y1…
+        DROP.extend(tuple(float(v) for v in z.split(',')) for z in sys.argv[sys.argv.index('--drop') + 1].split(';'))
+    if '--core' in sys.argv:
+        CORE.extend(tuple(float(v) for v in z.split(',')) for z in sys.argv[sys.argv.index('--core') + 1].split(';'))
+    args = [a for i, a in enumerate(sys.argv) if a not in ('--drop', '--core') and (i == 0 or sys.argv[i - 1] not in ('--drop', '--core'))]
+    main(args[1], args[2], int(args[3]) if len(args) > 3 else 1)
