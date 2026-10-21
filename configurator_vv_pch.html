@@ -830,6 +830,7 @@
     const NO_DRAWING_3KV = '⚠ Для ПЧ 3 кВ габаритный чертёж не прикладывается (ни на сайте, ни в ТКП) — приложите чертёж к ТКП отдельно.';
     const FILM_BIG_MSG = '⚠ Для плёночного ПЧ этой мощности габаритный чертёж не прикладывается (ни на сайте, ни в ТКП) — габариты уточняются, чертёж приложите к ТКП отдельно.';
     function isFilmBig(){
+      if (isR() && rDrawing()) return false;                         // ME800-R: свой заводской чертёж есть (в т.ч. корпус G1)
       return document.getElementById('capacitorType').value === 'PF' &&
         !isPFNCabinet(document.getElementById('voltage').value, document.getElementById('power').value);
     }
