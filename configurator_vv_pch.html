@@ -381,8 +381,8 @@
           <option value="PC">PC</option>
           <option value="PD">PD</option>
           <option value="PF">PF</option>
-          <option value="F">F</option>
-          <option value="E">E</option>
+          <option value="F">RF</option>
+          <option value="E">RE</option>
         </select>
       </div>
       <div class="param">
@@ -932,7 +932,7 @@
       const lastThree = lastPart.slice(-3);
       const v = document.getElementById('voltage').value;
       const p = document.getElementById('power').value;
-      return `ESQ-ME800${isR() ? '-R' : ''}-${p}-${v}-${lastThree}`;
+      return `ESQ-ME800-${p}-${v}-${lastThree}`;
     }
 
     function buildOldNomenclatureText(){
@@ -972,7 +972,9 @@
     }
 
     /* Тип силовой ячейки в маркировке: ME800 — PE…PD / PF; ME800-R — F (плёночные) / E (электролитические) */
-    function cellCode(){ return document.getElementById('cellSize').value; }
+    function cellCode(){ const c = document.getElementById('cellSize').value; return isR() ? 'R' + c : c; }   // ME800-R: RF / RE
+    function markPrefix(){ return 'ESQ F ME800'; }                     // маркировка у ME800 и ME800-R начинается одинаково; R — в окончании (-REN/-REB/-RFN/-RFB)
+    window.markPrefix = markPrefix;
     window.cellCode = cellCode;
     function updateNomenclature(){
       const params = [
@@ -994,7 +996,7 @@
         '-' + cellCode(),
         document.getElementById('cellBypass').value
       ];
-      document.getElementById('result').textContent = `${modelName()}-${params.join('')}`;
+      document.getElementById('result').textContent = `${markPrefix()}-${params.join('')}`;
       updateCapNote();
       document.getElementById('old-result').textContent = buildOldNomenclatureText();
       renderDecode();
@@ -1011,7 +1013,7 @@
         F: ' — ячейка 690 В с плёночными конденсаторами' + (Number($v('power')) <= (R_DOUBLE_CELL[$v('voltage')] || 0) ? ' (сдвоенная, компактное исполнение)' : ''),
         E: ' — ячейка 690 В с электролитическими конденсаторами' }[$v('cellSize')] || '';
       const seg = [
-        [modelName(), 'Модель ПЧ', 'Высоковольтный преобразователь частоты ' + modelName(), ''],
+        [markPrefix(), 'Серия ПЧ', 'Высоковольтный преобразователь частоты ' + modelName(), ''],
         [$v('power').padStart(4,'0') + 'P', 'Мощность ПЧ, кВт', $v('power') + ' кВт', 'четыре цифры мощности и буква P'],
         [$v('current').padStart(3,'0') + 'А', 'Ток ПЧ, А', $v('current') + ' А', 'три цифры тока и буква А'],
         [$v('voltage'), 'Напряжение ПЧ', $t('voltage'), (R ? 'T030 — 3 кВ; ' : '') + 'T060 — 6 кВ; T100 — 10 кВ'],
@@ -1027,7 +1029,7 @@
         [$v('protocol'), 'Протокол связи', $t('protocol'), 'MR — Modbus RTU; MT — Modbus TCP; PB — ProfibusDP; PN — ProfiNet' + (R ? '' : '; CO — CanOpen; EI — Ethernet/IP')],
         [$v('motor'), 'Тип двигателя', $v('motor') === 'S' ? 'синхронный' : 'асинхронный', 'A — асинхронный; S — синхронный'],
         [$v('sync'), 'Синхронный перевод на сеть', $v('sync') === 'B' ? 'с синхронизацией' : 'без синхронизации', 'X — без синхронизации; B — с синхронизацией'],
-        [cellCode(), 'Тип силовой ячейки', cellCode() + cellDesc, R ? 'F — плёночные конденсаторы; E — электролитические' : 'определяется мощностью и типом конденсаторов'],
+        [cellCode(), 'Тип силовой ячейки', cellCode() + cellDesc, R ? 'RF — плёночные конденсаторы; RE — электролитические' : 'определяется мощностью и типом конденсаторов'],
         [$v('cellBypass'), 'Байпас силовой ячейки', yn($v('cellBypass'), 'B'), R ? 'B — включен (стандартно); N — не включен' : 'B — включен; N — не включен']
       ];
       const sepAfter = {0:'-', 15:'-'};     // дефисы в маркировке: после модели и перед типом ячейки

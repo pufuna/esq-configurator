@@ -114,7 +114,7 @@ async def main():
         for k, v in [('material', 'AL'), ('ip', '31'), ('expansion', 'X'), ('ups', 'U'), ('cable', 'D'), ('protocol', 'MR'), ('motor', 'A'),
                      ('sync', 'X'), ('bypass', 'X'), ('reactor', 'X'), ('starter', 'X'), ('cellBypass', 'B')]: await sel(k, v)
         mark = (await page.text_content('#result')).replace('А', 'A')
-        check(mark == 'ESQ F ME800-R-1250P154AT060AL30XXX31XUDMRAX-FB', 'пример маркировки из техописания ME800-R: ' + mark)
+        check(mark == 'ESQ F ME800-1250P154AT060AL30XXX31XUDMRAX-RFB', 'маркировка ME800-R (как у ME800, окончание RFB): ' + mark)
 
         # ME800-R: свои заводские чертежи (10 кВ)
         drw = await page.evaluate("() => { const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('change', {bubbles: true})); };"
@@ -151,7 +151,7 @@ async def main():
         print('ПЧ: ТКП')
         await page.fill('#tkpAuthor', 'Иванов И.И.'); await page.fill('#tkpPrice', '1000000')
         n, t = await tkp()
-        check(n > 15 and 'ME800-R-1120P135' in t(3), f'ТКП ME800-R: {n} стр., маркировка на листе 3')
+        check(n > 15 and 'ME800-1120P135' in t(3) and 'REB' in t(3), f'ТКП ME800-R: {n} стр., маркировка на листе 3')
         check('150% в течение 2 секунд' in t(13) and 'Русский, английский' in t(14), 'ТКП ME800-R: характеристики по техописанию R')
         await page.evaluate("addExtraRow({name:'Комплект ЗИП', qty:2, unit:'компл.', price:'50000'}, true)")
         n, t = await tkp()
@@ -174,7 +174,7 @@ async def main():
         check(await page.input_value('#tkpAuthor') == 'Иванов И.И.', 'составитель восстановлен')
         check(await page.eval_on_selector_all('#tkpExtras .ex-row', 'r => r.length') == 1, 'доп. строки ТКП восстановлены')
         await page.goto(base + 'configurator_vv_pch.html?cfg=1&model=ME800R&voltage=T100&power=2650&capacitorType=PF'); await page.wait_for_timeout(600)
-        check((await page.text_content('#result')).startswith('ESQ F ME800-R-2650P191'), 'конфигурация открывается по ссылке')
+        check((await page.text_content('#result')).startswith('ESQ F ME800-2650P191'), 'конфигурация открывается по ссылке')
 
         # ---------- УПП ----------
         print('УПП: ТКП')
