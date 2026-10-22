@@ -39,6 +39,7 @@
     r_ctrl: [13, 244.8, 596.6, 566.8, 626.0], r_panel: [14, 242.1, 357.9, 567.8, 377.9], r_lang: [14, 242.1, 377.9, 567.8, 402.5],
     r_dip: [14, 242.1, 430.7, 567.8, 454.1], r_ready: [14, 242.1, 608.9, 567.8, 675.2], r_movl: [15, 232.0, 254.6, 555.0, 278.8]
   };
+  const ENC_ROW = [336.5, 357.9];                                      // стр. 14: строка «Работа с энкодером» (y верх/низ)
   /* ESQ F ME800-R — значения по разделам 1.3, 2.9, 3 техописания ME800-R */
   const R_CELLS = s => Object.assign({
     r_fout: '0–120 Гц',
@@ -169,6 +170,21 @@
       window.__tkpF = F;
       const pg = doc.getPages();
       const M = prepareMasks(doc, pg);
+      // ME800-R: энкодер не поддерживается — строка «Работа с энкодером» (стр. 14) убирается, строки ниже поднимаются
+      let CELL_ = CELL;
+      if (s.isR) {
+        const [e0, e1] = ENC_ROW, END = 698.0, dy = e1 - e0, p14 = pg[14], H14 = p14.getHeight(), X0 = 48, X1 = 566;
+        M.add(14, X0, e0 + 0.6, X1, END);                                  // рамка листа (x 46,5 и 567,5) не трогается
+        const tdoc = await PDFDocument.load(tpl);
+        const ep = await doc.embedPage(tdoc.getPage(14), { left: X0, right: X1, bottom: H14 - END, top: H14 - (e1 - 0.6) });
+        p14.drawPage(ep, { x: X0, y: H14 - END + dy, width: X1 - X0, height: END - (e1 - 0.6) });
+        CELL_ = Object.fromEntries(Object.entries(CELL).map(([k, c]) => [k, c[0] === 14 && c[2] >= e1 - 1 ? [c[0], c[1], c[2] - dy, c[3], c[4] - dy] : c]));
+        // в перенесённой части шаблонный текст ячеек, которые у R заполняются заново, закрываем белым (маски листа на неё не действуют)
+        for (const k of Object.keys(R_CELLS(s))) {
+          const c = CELL_[k]; if (c[0] !== 14 || c[2] < e0) continue;
+          p14.drawRectangle({ x: c[1] + 1.6, y: H14 - (c[4] - 1.4), width: c[3] - c[1] - 3.2, height: c[4] - c[2] - 3, color: rgb(1, 1, 1) });
+        }
+      }
 
       /* ---------- помощники ---------- */
       const rot = p => p.getRotation().angle;
@@ -217,7 +233,7 @@
       /* текст в ячейке: по центру, с переносом; кегль уменьшается, если не помещается */
       const cell = (name, str, o = {}) => {
         VALS[name] = str;
-        const [pi, x0, y0, x1, y1] = CELL[name], p = pg[pi], f = o.f || 'L', pad = 4;
+        const [pi, x0, y0, x1, y1] = CELL_[name], p = pg[pi], f = o.f || 'L', pad = 4;
         let size = o.size || 8.6, ls, ld, h;
         for (;;) { ld = size * 1.24; ls = wrap(str, f, size, x1 - x0 - 2 * pad); h = (ls.length - 1) * ld + size * .72; if (h <= y1 - y0 - 3 || size < 6) break; size -= .2; }
         let y = (y0 + y1) / 2 - h / 2 + size * .72;
@@ -311,7 +327,7 @@
       cell('t_cable', s.cable === 'T' ? 'Сверху' : 'Снизу');
       cell('t_reactor', s.reactor ? 'Присутствует' : 'Отсутствует');
       if (s.isR) for (const [k, v] of Object.entries(R_CELLS(s))) {
-        const [pi, x0, y0, x1, y1] = CELL[k];
+        const [pi, x0, y0, x1, y1] = CELL_[k];
         M.add(pi, x0 + 1.6, y0 + 1.6, x1 - 1.6, y1 - 1.4);              // текст шаблона закрываем, рамку таблицы оставляем
         cell(k, v);
       }

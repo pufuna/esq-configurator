@@ -184,6 +184,7 @@
     };
     const SW = [3500, 6100], specRows = [];
     for (const r of specs) {
+      if (s.isR && /энкодер/i.test(r.label || '')) continue;          // ME800-R: энкодер не поддерживается
       if (r.section) { specRows.push(K.tr([K.td(r.section, { span: 2, align: 'c', bold: true, fill: HEADBG, size: 10 })])); continue; }
       const cells = r.cells.map(c => valueOf(r.page, c)).map(t => t || '—');
       cells.forEach((t, i) => specRows.push(K.tr(i ? [K.td(t, { w: SW[1], align: 'c' })]

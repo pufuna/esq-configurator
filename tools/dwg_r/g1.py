@@ -31,20 +31,30 @@ def main(W, H, byp, extras):
     dims = meta['dims']
     if byp == '0':
         # фасад и планы: всё, что целиком в пределах шкафа байпаса (и размеры левее него)
-        def in_byp(b): return b[0] >= SIDE_R and b[2] <= BYP[1] + 3
+        def in_byp(b): return b[0] >= SIDE_R and b[2] <= BYP[1] - 3       # стенка на границе с ПЧ (x≈4920) — это боковая линия самого ПЧ, оставляем
         # вид сзади: шкаф байпаса — крайний справа
         rear = [item_box(l) for l in body if l.startswith('<path')]
         rear = [b for b in rear if b and b[0] > 11000 and FRONT_Y[0] <= b[1] and b[3] <= FRONT_Y[1]]
         rr = max(b[2] for b in rear)
         def in_rear(b): return b[0] >= rr - 680 and b[2] <= rr + 3 and b[1] >= FRONT_Y[0] - 150 and b[3] <= FRONT_Y[1]
+        # глубина на виде сверху (1519.5 / 1349.5) — была у левого края шкафа байпаса; переносим к левому краю ПЧ
+        from compose_r import shift
+        moved = []
+        for txt in ('1519.5', '1349.5'):
+            k = next((i for i, l in enumerate(body) if l.startswith('<text') and '>' + txt + '</text>' in l), None)
+            if k is None: continue
+            j = k - 1
+            while j >= 0 and body[j].startswith('<path') and k - j <= 5: j -= 1
+            moved += [shift(l, BYP[1] - BYP[0] + 5) for l in body[j + 1:k + 1]]
         keep = []
         for l in body:
             b = item_box(l)
             if l.startswith('<text') and re.search(r'вход/выход ВН|шкаф байпаса', l): continue   # выноски к вводам ВН — они в шкафу байпаса
             if b and l.startswith('<path') and (in_byp(b) or in_rear(b)): continue
+            if b and l.startswith('<path') and 'fill="#000"' in l and b[0] >= SIDE_R and b[2] <= BYP[1] + 3: continue   # стрелки убранных размеров
             if b and l.startswith('<text') and in_byp(b) and re.search(r'>[\d.]+<', l): continue
             keep.append(l)
-        body = drop_dim(keep, '(3100)')
+        body = drop_dim(keep, '(3100)') + moved
         dims = [d for d in dims if not (min(d['x1'][0], d['x2'][0]) >= SIDE_R - 800 and max(d['x1'][0], d['x2'][0]) <= BYP[1] + 3) and d['text'] != '(3100)']
         if W != 2450: body = drop_dim(body, '2266')
     else:
@@ -58,11 +68,11 @@ def main(W, H, byp, extras):
     for d in dims:
         if d['text'] == '2450(变频器)': d['text'] = f'{W}(ПЧ)'
     body = relabel(body, '650 (шкаф байпаса)', '650 (байпас)')
-    if W != 2450:                                                     # раздельное исполнение — вид условный; подпись по центру под листом
+    if W != 2450:                                                     # раздельное исполнение: вид по листу 2450 мм — уточняется
         allb = [item_box(l) for l in body if item_box(l)]
         x0, y0, x1 = min(b[0] for b in allb), min(b[1] for b in allb), max(b[2] for b in allb)
         body.append(f'<text x="{(x0 + x1) / 2:.0f}" y="{-(y0 - 250):.0f}" font-size="120" font-family="Arial, Helvetica, sans-serif" text-anchor="middle">'
-                    f'Внешний вид показан условно; габариты ПЧ (Ш×Г×В) — {W}×1500×{H} мм, по руководству по эксплуатации.</text>')
+                    f'Внешний вид будет уточнён перед заказом.</text>')
     name = f'R_G1_{W}_{H}_{byp}'
     # рамка листа — по содержимому
     allb = [item_box(l) for l in body if item_box(l)]
