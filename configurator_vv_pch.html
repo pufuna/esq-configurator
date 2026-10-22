@@ -425,8 +425,8 @@
       </div>
       <div class="param">
         <label for="tkpUout">Выходное напряжение, кВ</label>
-        <input type="text" id="tkpUout" placeholder="Как входное">
-        <div class="note">Если выход ПЧ отличается от напряжения сети (например, 4,6 кВ при питании 6 кВ).</div>
+        <input type="text" id="tkpUout" placeholder="Как входное" oninput="updateNomenclature()">
+        <div class="note">Если выход ПЧ ниже напряжения сети (например, 4,6 кВ при питании 6 кВ). В маркировке: T060/046.</div>
       </div>
       <div class="param">
         <label for="tkpZip">ЗИП в составе ПЧ</label>
@@ -982,6 +982,14 @@
     }
 
     /* Тип силовой ячейки в маркировке: ME800 — PE…PD / PF; ME800-R — F (плёночные) / E (электролитические) */
+    /* напряжение в маркировке: T060, а если выход ПЧ ниже сети — T060/046 (вход 6 кВ / выход 4,6 кВ) */
+    function uOut(){
+      const kv = { T030: 3, T060: 6, T100: 10 }[document.getElementById('voltage').value];
+      const e = document.getElementById('tkpUout'), u = e ? parseFloat(String(e.value).replace(',', '.')) : NaN;
+      return u > 0 && u < kv ? u : null;
+    }
+    function voltCode(){ const v = document.getElementById('voltage').value, u = uOut(); return u ? v + '/' + String(Math.round(u * 10)).padStart(3, '0') : v; }
+    window.voltCode = voltCode;
     function cellCode(){ const c = document.getElementById('cellSize').value; return isR() ? 'R' + c : c; }   // ME800-R: RF / RE
     function markPrefix(){ return 'ESQ F ME800'; }                     // маркировка у ME800 и ME800-R начинается одинаково; R — в окончании (-REN/-REB/-RFN/-RFB)
     window.markPrefix = markPrefix;
@@ -990,7 +998,7 @@
       const params = [
         document.getElementById('power').value.padStart(4,'0') + 'P',
         document.getElementById('current').value.padStart(3,'0') + 'А',
-        document.getElementById('voltage').value,
+        voltCode(),
         document.getElementById('material').value,
         document.getElementById('pulsation').value,
         document.getElementById('starter').value,
@@ -1026,7 +1034,7 @@
         [markPrefix(), 'Серия ПЧ', 'Высоковольтный преобразователь частоты ' + modelName(), ''],
         [$v('power').padStart(4,'0') + 'P', 'Мощность ПЧ, кВт', $v('power') + ' кВт', 'четыре цифры мощности и буква P'],
         [$v('current').padStart(3,'0') + 'А', 'Ток ПЧ, А', $v('current') + ' А', 'три цифры тока и буква А'],
-        [$v('voltage'), 'Напряжение ПЧ', $t('voltage'), (R ? 'T030 — 3 кВ; ' : '') + 'T060 — 6 кВ; T100 — 10 кВ'],
+        [voltCode(), 'Напряжение ПЧ', uOut() ? 'вход ' + $t('voltage') + ', выход ' + String(uOut()).replace('.', ',') + ' кВ' : $t('voltage'), (R ? 'T030 — 3 кВ; ' : '') + 'T060 — 6 кВ; T100 — 10 кВ'],
         [$v('material'), 'Материал обмоток трансформатора', $t('material').toLowerCase(), 'AL — алюминий; CU — медь'],
         [$v('pulsation'), 'Пульсность схемы выпрямления', $v('pulsation') + '-пульсная, ' + cells + ' ' + cellsWord + ' на фазу', R ? '18 — 3 кВ; 30 — 6 кВ; 48 — 10 кВ' : '6 кВ: 30 или 36; 10 кВ: 48 или 54'],
         [$v('starter'), 'Пусковой шкаф', yn($v('starter'), 'S'), 'S — включен; X — не включен'],

@@ -46,6 +46,7 @@
           el.value = val;
         }
       });
+      if (window.updateNomenclature) window.updateNomenclature();          // маркировка зависит и от текстовых полей (выходное напряжение)
       if (Array.isArray(st.extra) && window.addExtraRow) {
         const box = document.getElementById('tkpExtras');
         if (box && !box.children.length) st.extra.forEach(r => window.addExtraRow(r, true));

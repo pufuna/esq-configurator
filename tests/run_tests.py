@@ -116,6 +116,8 @@ async def main():
         mark = (await page.text_content('#result')).replace('А', 'A')
         check(mark == 'ESQ F ME800-1250P154AT060AL30XXX31XUDMRAX-RFB', 'маркировка ME800-R (как у ME800, окончание RFB): ' + mark)
 
+        uo = await page.evaluate("() => { const e = document.getElementById('tkpUout'); e.value = '4,6'; e.dispatchEvent(new Event('input')); const m = document.getElementById('result').textContent; e.value = ''; e.dispatchEvent(new Event('input')); return m; }")
+        check('AT060/046AL30' in uo.replace('А', 'A'), 'маркировка с выходным напряжением 4,6 кВ: ' + uo)
         # ME800-R: свои заводские чертежи (10 кВ)
         drw = await page.evaluate("() => { const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('change', {bubbles: true})); };"
                                   " set('voltage', 'T100'); set('power', '630'); set('capacitorType', 'PF'); set('bypass', 'M'); const a = rDrawing();"

@@ -135,7 +135,7 @@
     const url = URL.createObjectURL(blob), a = document.createElement('a');
     a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
-  const fileBase = mark => 'TKP_' + mark.replace(/А/g, 'A').replace(/ /g, '_');
+  const fileBase = mark => 'TKP_' + mark.replace(/А/g, 'A').replace(/ /g, '_').replace(/\//g, '-');
   async function ui() { const [logo, footer, frame] = await Promise.all(['elkom', 'footer', 'frame'].map(n => fetchImage('assets/ui/' + n + '.png'))); return { logo, footer, frame }; }
 
   /* ================= ПЧ: ESQ F ME800 / ME800-R =================

@@ -79,7 +79,7 @@
     s.isR = /-R[EF][BN]$/.test(s.mark) || /^ESQ F ME800-R-/.test(s.mark);  // ESQ F ME800-R: окончание -REN/-REB/-RFN/-RFB (старые ТКП — префикс ME800-R)
     s.model = 'ESQ F ME800';                                                 // в документах серия одна — ESQ F ME800 (исполнение R видно по окончанию маркировки)
     // разбор — по общей части маркировки (без «-R» в названии серии), номера групп одинаковы для обеих моделей
-    s.m = /^ESQ F ME800-(\d{4,5})P(\d{3})[AА](T\d{3})(AL|CU)(\d{2})([SX])([AMX])([RX])(\d{2})(2E|E|X)([UX])([DT])(MR|MT|PB|PN|CO|EI)([AS])([XB])-([PR]?[A-F])([BN])$/.exec(s.mark.replace(/^ESQ F ME800-R-/, 'ESQ F ME800-'));
+    s.m = /^ESQ F ME800-(\d{4,5})P(\d{3})[AА](T\d{3}(?:\/\d{3})?)(AL|CU)(\d{2})([SX])([AMX])([RX])(\d{2})(2E|E|X)([UX])([DT])(MR|MT|PB|PN|CO|EI)([AS])([XB])-([PR]?[A-F])([BN])$/.exec(s.mark.replace(/^ESQ F ME800-R-/, 'ESQ F ME800-'));
     s.r = s.isR;                                // ME800-R: на листе габаритного чертежа — примечание о габаритах
     s.g4 = s.film && (!window.isPFNCabinet || window.isPFNCabinet(s.v, s.P));   // компактный корпус G4
     s.g4x = s.g4 && !!(window.pfExtrasCode && window.pfExtrasCode());
@@ -207,7 +207,13 @@
       const W = (str, f, size) => F[f].width(String(str), size);
       const wrap = (str, f, size, maxW) => {
         const out = []; let cur = '';
-        for (const w of String(str).split(' ')) { const t = cur ? cur + ' ' + w : w; if (W(t, f, size) > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
+        // слово длиннее строки (маркировка) — переносим после «/» или «-»; куски одного слова склеиваются без пробела
+        const toks = [];
+        for (const w of String(str).split(' ')) {
+          if (W(w, f, size) <= maxW) { toks.push([w, false]); continue; }
+          w.split(/(?<=[\/-])/).forEach((pc, i) => toks.push([pc, i > 0]));
+        }
+        for (const [w, glue] of toks) { const t = cur ? cur + (glue ? '' : ' ') + w : w; if (W(t, f, size) > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
         out.push(cur); return out;
       };
       /* абзац с выравниванием по ширине; top — верх строки; возвращает низ абзаца */
@@ -351,7 +357,7 @@
       }
       const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
       const link = document.createElement('a'); link.href = url;
-      link.download = 'TKP_' + s.mark.replace(/А/g, 'A').replace(/ /g, '_') + '.pdf';
+      link.download = 'TKP_' + s.mark.replace(/А/g, 'A').replace(/ /g, '_').replace(/\//g, '-') + '.pdf';
       document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
       registry(s, offerContent(s), 'PDF', 'ВВ ПЧ');
     } catch (e) { console.error(e); alert('Не удалось сформировать ТКП: ' + e.message); }
@@ -549,14 +555,14 @@
   }
   function decodeRows(s) {
     const m = s.m;
-    const kv = { T030: 3, T060: 6, T100: 10 }[m[3]] || '', cells = CELLS[m[5]] || '';
+    const kv = { T030: 3, T060: 6, T100: 10 }[m[3].slice(0, 4)] || '', cells = CELLS[m[5]] || '';
     const dbl = s.isR && s.dbl;                                          // ME800-R: сдвоенная ячейка F «два в одном»
     const yes = (on, code, off) => on ? code + ' — включен в комплект' : off + ' — не включен';
     const rows = [
       ['Серия высоковольтных преобразователей частоты', s.model],
       ['Мощность ПЧ, кВт (с буквой P)', m[1] + 'P — ' + (+m[1]) + ' кВт'],
       ['Номинальный выходной ток ПЧ, А (с буквой А)', m[2] + 'А — ' + (+m[2]) + ' А'],
-      ['Номинальное напряжение ПЧ', m[3] + ' — ' + kv + ' кВ'],
+      ['Номинальное напряжение ПЧ', m[3] + ' — ' + (m[3].includes('/') ? 'вход ' + kv + ' кВ, выход ' + String(+m[3].slice(5) / 10).replace('.', ',') + ' кВ' : kv + ' кВ')],
       ['Материал обмоток трансформатора', m[4] === 'CU' ? 'CU — медь' : 'AL — алюминий'],
       ['Пульсность схемы выпрямления', m[5] + ' — ' + m[5] + '-пульсная (' + kv + ' кВ, ' + cellsTxt(cells) + ' в фазе)'],
       ['Пусковой шкаф', yes(m[6] === 'S', 'S', 'X')],
