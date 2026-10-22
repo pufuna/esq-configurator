@@ -153,7 +153,7 @@ async def main():
         print('ПЧ: ТКП')
         await page.fill('#tkpAuthor', 'Иванов И.И.'); await page.fill('#tkpPrice', '1000000')
         n, t = await tkp()
-        check(n > 15 and 'ME800-1120P135' in t(3) and 'REB' in t(3), f'ТКП ME800-R: {n} стр., маркировка на листе 3')
+        check(n > 15 and 'ME800-1120P135' in t(3).replace('- ', '-') and 'REB' in t(3), f'ТКП ME800-R: {n} стр., маркировка на листе 3')
         check('150% в течение 2 секунд' in t(13) and 'Русский, английский' in t(14), 'ТКП ME800-R: характеристики по техописанию R')
         await page.evaluate("addExtraRow({name:'Комплект ЗИП', qty:2, unit:'компл.', price:'50000'}, true)")
         n, t = await tkp()
@@ -166,7 +166,7 @@ async def main():
         check(n > 15 and 'T030AL18' in t(3), 'ТКП ME800-R 3 кВ собирается')
         await sel('model', 'ME800'); await sel('voltage', 'T100'); await sel('power', '1000'); await sel('capacitorType', 'PF')
         n, t = await tkp()
-        check('ESQ F ME800-1000P072' in t(3) and '150% в течение 2 секунд' not in t(13), 'ТКП ME800 (плёночные, корпус G4) собирается, характеристики шаблона ME800')
+        check('ESQ F ME800-1000P072' in t(3).replace('- ', '-') and '150% в течение 2 секунд' not in t(13), 'ТКП ME800 (плёночные, корпус G4) собирается, характеристики шаблона ME800')
 
         # ---------- сохранение формы ----------
         print('Сохранение формы')
