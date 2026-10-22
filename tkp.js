@@ -69,9 +69,14 @@
     // дополнительные позиции к поставке (таблица на стр. 3): [{ name, qty, unit, price }]
     s.extra = (window.getTkpExtras ? window.getTkpExtras() : []).filter(r => r.name);
     s.kv = KV[s.v];
+    // выходное напряжение (если отличается от входного — например, 4,6 кВ при сети 6 кВ)
+    const uo = $('tkpUout') ? parseFloat(String($('tkpUout').value).replace(',', '.')) : NaN;
+    s.uout = uo > 0 && uo < s.kv ? uo : s.kv;
+    s.uoutT = String(s.uout).replace('.', ',');
+    s.kvT = s.uout === s.kv ? s.kv + ' кВ' : 'вход ' + s.kv + ' кВ, выход ' + s.uoutT + ' кВ';
     s.mark = $('result').textContent;
     s.isR = /-R[EF][BN]$/.test(s.mark) || /^ESQ F ME800-R-/.test(s.mark);  // ESQ F ME800-R: окончание -REN/-REB/-RFN/-RFB (старые ТКП — префикс ME800-R)
-    s.model = s.isR ? 'ESQ F ME800-R' : 'ESQ F ME800';
+    s.model = 'ESQ F ME800';                                                 // в документах серия одна — ESQ F ME800 (исполнение R видно по окончанию маркировки)
     // разбор — по общей части маркировки (без «-R» в названии серии), номера групп одинаковы для обеих моделей
     s.m = /^ESQ F ME800-(\d{4,5})P(\d{3})[AА](T\d{3})(AL|CU)(\d{2})([SX])([AMX])([RX])(\d{2})(2E|E|X)([UX])([DT])(MR|MT|PB|PN|CO|EI)([AS])([XB])-([PR]?[A-F])([BN])$/.exec(s.mark.replace(/^ESQ F ME800-R-/, 'ESQ F ME800-'));
     s.r = s.isR;                                // ME800-R: на листе габаритного чертежа — примечание о габаритах
@@ -85,7 +90,7 @@
     const m = window.getMechanicalFor(s.v, s.P);
     s.wT = parseFloat(m.weight);
     s.wFull = window.totalWeightT ? window.totalWeightT(m.weight) : s.wT;
-    s.name = 'Преобразователь частоты ' + s.mark + ', ' + s.kv + ' кВ, ' + s.P + ' кВт, ' + s.I + ' А, IP' + s.ip + ', ' +
+    s.name = 'Преобразователь частоты ' + s.mark + ', ' + s.kvT + ', ' + s.P + ' кВт, ' + s.I + ' А, IP' + s.ip + ', ' +
       (s.cu ? 'медный' : 'алюминиевый') + ' трансформатор, ' + cellsTxt(s.n) + ' на фазу, ' + (s.cb === 'B' ? 'с байпасом' : 'без байпаса') + ' силовой ячейки' +
       (s.starter ? ', пусковой шкаф' : '') + (s.reactor ? ', шкаф реактора' : '') +
       (s.byp !== 'X' ? ', ' + (s.byp === 'A' ? 'автоматический' : 'ручной') + ' шкаф байпаса' : '') +
@@ -288,7 +293,7 @@
       cell('t_u', s.kv * 1000 + (s.isR ? ' В (−35…+15%)' : ' В ±10%'));
       cell('t_p', s.P + ' кВт');
       cell('t_i', s.I + ' А');
-      cell('t_uout', '0–' + s.kv + ' кВ');
+      cell('t_uout', '0–' + s.uoutT + ' кВ');
       cell('t_eff', 'не менее ' + s.eff + '%');
       cell('t_n', cellsTxt(s.n));
       cell('t_mat', 'Материал обмоток — ' + (s.cu ? 'медь' : 'алюминий'));
@@ -332,7 +337,7 @@
   function registry(s, offer, fmt, product) {
     if (!window.TkpRegistry) return;
     const priced = offer.rows.every(r => r.price > 0);
-    window.TkpRegistry.add({ product, model: s.model || 'ESQ F HVS', mark: s.mark.replace(/А/g, 'A'), kv: s.kv, P: +s.P, I: +s.I, who: s.who, qty: s.qty, price: s.price || 0,
+    window.TkpRegistry.add({ product, model: s.model ? (s.isR ? 'ESQ F ME800-R' : s.model) : 'ESQ F HVS', mark: s.mark.replace(/А/g, 'A'), kv: s.kv, P: +s.P, I: +s.I, who: s.who, qty: s.qty, price: s.price || 0,
       total: priced ? offer.rows.reduce((a, r) => a + r.price * r.qty, 0) : 0,
       extra: (s.extra || []).map(r => ({ name: r.name, qty: r.qty, unit: r.unit, price: r.price })), fmt, link: window.TkpRegistry.link() });
   }
@@ -685,7 +690,7 @@
     circ(X, yM, 11);
     T('M', X, yM + 1, { a: 'c', f: 'S', size: 8.5 }); T('~', X, yM + 7.5, { a: 'c', size: 6.5 });
     T('Подключаемый электродвигатель', X + 16, yM - 1.5, { f: 'S' });
-    T(s.kv + ' кВ, до ' + s.P + ' кВт', X + 16, yM + 7);
+    T(s.uoutT + ' кВ, до ' + s.P + ' кВт', X + 16, yM + 7);
 
     /* ---------- питание цепей управления ---------- */
     const C1 = 640, C2 = 560, CB = 600, top = 120;
