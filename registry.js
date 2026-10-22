@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   /* ↓↓↓ адрес функции общего реестра (https://functions.yandexcloud.net/…); пусто — реестр только в браузере */
-  const REGISTRY_FUNCTION_URL = '';
+  const REGISTRY_FUNCTION_URL = 'https://functions.yandexcloud.net/d4evqb70lqivk4dvvq4d';
 
   const URL_ = window.REGISTRY_URL || REGISTRY_FUNCTION_URL;
   const KEY = 'esq.registry', MAX = 2000;
