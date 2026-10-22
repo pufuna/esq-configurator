@@ -263,10 +263,10 @@
             </select></div>
           <button type="button" class="btn btn-line" onclick="pickByMotor()">Подобрать</button>
         </div>
-        <div class="note" id="mpNote">Напряжение берётся из поля «Напряжение» ниже. Ток ПЧ — не меньше тока двигателя (раздел 6 техописания).</div>
+        <div class="note" id="mpNote">Напряжение берётся из поля «Входное напряжение» ниже. Ток ПЧ — не меньше тока двигателя (раздел 6 техописания).</div>
       </details>
       <div class="param">
-        <label for="voltage">1. Напряжение</label>
+        <label for="voltage">1. Входное напряжение</label>
         <select id="voltage" onchange="updatePowerOptions()">
           <option value="T030">3 кВ</option>
           <option value="T060" selected>6 кВ</option>
@@ -274,26 +274,31 @@
         </select>
       </div>
       <div class="param">
-        <label for="power">2. Мощность ПЧ, кВт</label>
+        <label for="tkpUout">2. Выходное напряжение, кВ</label>
+        <input type="text" id="tkpUout" placeholder="Как входное" oninput="updateNomenclature()">
+        <div class="note">Если выход ПЧ ниже напряжения сети (например, 4,6 кВ при питании 6 кВ). В маркировке: T060/046.</div>
+      </div>
+      <div class="param">
+        <label for="power">3. Мощность ПЧ, кВт</label>
         <select id="power" onchange="updateDependencies()"></select>
       </div>
       <div class="param">
-        <label for="current">3. Номинальный ток, А</label>
+        <label for="current">4. Номинальный ток, А</label>
         <input type="text" id="current" readonly>
       </div>
       <div class="param">
-        <label for="material">4. Материал обмоток</label>
+        <label for="material">5. Материал обмоток</label>
         <select id="material" onchange="updateNomenclature()">
           <option value="AL">Алюминий</option>
           <option value="CU">Медь</option>
         </select>
       </div>
       <div class="param">
-        <label for="pulsation">5. Пульсность</label>
+        <label for="pulsation">6. Пульсность</label>
         <select id="pulsation" onchange="updateNomenclature()"></select>
       </div>
       <div class="param">
-        <label for="capacitorType">6. Тип конденсаторов</label>
+        <label for="capacitorType">7. Тип конденсаторов</label>
         <select id="capacitorType" onchange="onCapacitorTypeChange()">
           <option value="EL">Электролитические</option>
           <option value="PF">Пленочные</option>
@@ -306,14 +311,14 @@
       <h2>2. Дополнительные шкафы и опции</h2>
       <p class="lead">Каждый дополнительный шкаф добавляет 0,7 т к массе; на чертеже — слева направо: байпас, пусковой, ПЧ, реактор.</p>
       <div class="param">
-        <label for="starter">7. Пусковой шкаф</label>
+        <label for="starter">8. Пусковой шкаф</label>
         <select id="starter" onchange="updateNomenclature()">
           <option value="X">Отсутствует</option>
           <option value="S">Включен</option>
         </select>
       </div>
       <div class="param">
-        <label for="bypass">8. Шкаф байпаса</label>
+        <label for="bypass">9. Шкаф байпаса</label>
         <select id="bypass" onchange="updateNomenclature()">
           <option value="X">Нет</option>
           <option value="A">Автоматический</option>
@@ -321,14 +326,14 @@
         </select>
       </div>
       <div class="param">
-        <label for="reactor">9. Шкаф реактора</label>
+        <label for="reactor">10. Шкаф реактора</label>
         <select id="reactor" onchange="updateNomenclature()">
           <option value="X">Отсутствует</option>
           <option value="R">Включен</option>
         </select>
       </div>
       <div class="param">
-        <label for="ip">10. Степень защиты</label>
+        <label for="ip">11. Степень защиты</label>
         <select id="ip" onchange="updateNomenclature()">
           <option value="31">IP31</option>
           <option value="41">IP41</option>
@@ -336,7 +341,7 @@
         </select>
       </div>
       <div class="param">
-        <label for="expansion">11. Плата расширения</label>
+        <label for="expansion">12. Плата расширения</label>
         <select id="expansion" onchange="updateNomenclature()">
           <option value="X">Нет</option>
           <option value="E">+8DI/DO</option>
@@ -344,7 +349,7 @@
         </select>
       </div>
       <div class="param">
-        <label for="ups">12. ИБП</label>
+        <label for="ups">13. ИБП</label>
         <select id="ups" onchange="updateNomenclature()">
           <option value="X">Отсутствует</option>
           <option value="U">Присутствует</option>
@@ -355,14 +360,14 @@
     <section class="card">
       <h2>3. Подключение и управление</h2>
       <div class="param">
-        <label for="cable">13. Вводы/выводы</label>
+        <label for="cable">14. Вводы/выводы</label>
         <select id="cable" onchange="updateNomenclature()">
           <option value="D">Снизу</option>
           <option value="T">Сверху</option>
         </select>
       </div>
       <div class="param">
-        <label for="protocol">14. Протокол связи</label>
+        <label for="protocol">15. Протокол связи</label>
         <select id="protocol" onchange="updateNomenclature()">
           <option value="MR">Modbus RTU</option>
           <option value="MT">Modbus TCP</option>
@@ -373,7 +378,7 @@
         </select>
       </div>
       <div class="param">
-        <label for="cellSize">15. Тип силовых ячеек</label>
+        <label for="cellSize">16. Тип силовых ячеек</label>
         <select id="cellSize" onchange="updateNomenclature()" disabled>
           <option value="PE">PE</option>
           <option value="PA">PA</option>
@@ -386,21 +391,21 @@
         </select>
       </div>
       <div class="param">
-        <label for="cellBypass">16. Байпас ячейки</label>
+        <label for="cellBypass">17. Байпас ячейки</label>
         <select id="cellBypass" onchange="updateNomenclature()">
           <option value="N">Отсутствует</option>
           <option value="B">Присутствует</option>
         </select>
       </div>
       <div class="param">
-        <label for="motor">17. Тип двигателя</label>
+        <label for="motor">18. Тип двигателя</label>
         <select id="motor" onchange="updateNomenclature()">
           <option value="A">Асинхронный</option>
           <option value="S">Синхронный</option>
         </select>
       </div>
       <div class="param">
-        <label for="sync">18. Синхронный перевод на сеть</label>
+        <label for="sync">19. Синхронный перевод на сеть</label>
         <select id="sync" onchange="updateNomenclature()">
           <option value="X">Без синхронизации</option>
           <option value="B">С синхронизацией</option>
@@ -422,11 +427,6 @@
       <div class="param">
         <label for="tkpPrice">Цена за ед., руб. (с НДС 22%)</label>
         <input type="text" id="tkpPrice" placeholder="Необязательно">
-      </div>
-      <div class="param">
-        <label for="tkpUout">Выходное напряжение, кВ</label>
-        <input type="text" id="tkpUout" placeholder="Как входное" oninput="updateNomenclature()">
-        <div class="note">Если выход ПЧ ниже напряжения сети (например, 4,6 кВ при питании 6 кВ). В маркировке: T060/046.</div>
       </div>
       <div class="param">
         <label for="tkpZip">ЗИП в составе ПЧ</label>
