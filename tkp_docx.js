@@ -98,16 +98,25 @@
     });
     // секция с текстом: шапка и подвал как у листов ТКП
     const textSection = (children, ui, pageNo) => ({                   // pageNo — номер листа, как в PDF (обложка — 0)
-      properties: { page: { size: { width: TW.w, height: TW.h }, margin: { top: 1500, right: 1000, bottom: 1400, left: 1000, header: 450, footer: 350 },
+      properties: { page: { size: { width: TW.w, height: TW.h }, margin: { top: 1950, right: 1150, bottom: 2350, left: 1150, header: 450, footer: 350 },   // текст — внутри рамки, как в PDF
         pageNumbers: pageNo != null ? { start: pageNo } : undefined } },
       headers: { default: new Header({ children: [new Paragraph({
-        tabStops: [{ type: TabStopType.RIGHT, position: TW.w - 2000 }],
+        tabStops: [{ type: TabStopType.RIGHT, position: TW.w - 2300 }],
         children: [new ImageRun({ type: ui.logo.type, data: ui.logo.data, transformation: { width: Math.round(30 * ui.logo.w / ui.logo.h), height: 30 } }),
+          // рамка листа со скруглёнными углами, как в PDF (за текстом)
+          new ImageRun({ type: ui.frame.type, data: ui.frame.data, transformation: { width: Math.round(523.9 * 96 / 72), height: Math.round(661.7 * 96 / 72) },
+            floating: { horizontalPosition: { relative: HorizontalPositionRelativeFrom.PAGE, offset: Math.round(35.8 * 12700) },
+              verticalPosition: { relative: VerticalPositionRelativeFrom.PAGE, offset: Math.round(74.4 * 12700) },
+              wrap: { type: TextWrappingType.NONE }, behindDocument: true, allowOverlap: true } }),
           new TextRun({ text: '\tТЕХНИКО-КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ   ', font: FONT, size: 20, color: TEAL, characterSpacing: 40 }),
           new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 20, color: TEAL })]
       })] }) },
-      footers: { default: new Footer({ children: [new Paragraph({ children: [new ImageRun({ type: ui.icons.type, data: ui.icons.data,
-        transformation: { width: Math.min(600, Math.round(36 * ui.icons.w / ui.icons.h)), height: Math.round(Math.min(600, 36 * ui.icons.w / ui.icons.h) * ui.icons.h / ui.icons.w) } })] })] }) },
+      // подвал — та же полоса иконок с логотипом ESQ, что в PDF (вырезана из шаблона), на том же месте листа
+      footers: { default: new Footer({ children: [new Paragraph({ children: [new ImageRun({ type: ui.footer.type, data: ui.footer.data,
+        transformation: { width: Math.round(504.7 * 96 / 72), height: Math.round(504.7 * 96 / 72 * ui.footer.h / ui.footer.w) },
+        floating: { horizontalPosition: { relative: HorizontalPositionRelativeFrom.PAGE, offset: Math.round(39.8 * 12700) },
+          verticalPosition: { relative: VerticalPositionRelativeFrom.PAGE, offset: Math.round(757.4 * 12700) },
+          wrap: { type: TextWrappingType.NONE }, allowOverlap: true } })] })] }) },
       children
     });
     return { run, p, h, td, tr, table, imagePage, textSection };
@@ -115,7 +124,7 @@
 
   /* ---------- общие листы ---------- */
   function offerBlock(K, offer, title) {
-    const W = [700, 4900, 1500, 2400];
+    const W = [650, 4900, 1500, 2550];
     const head = K.tr(['№', 'Наименование', 'Кол-во', 'Стоимость за ед.'].map((t, i) => K.td(t, { w: W[i], align: 'c', color: TEAL, size: 10 })), { header: true });
     const rows = offer.rows.map((r, i) => K.tr([
       K.td(String(i + 1), { w: W[0], align: 'c', size: 10 }), K.td(r.name, { w: W[1], size: 10 }),
@@ -127,7 +136,7 @@
     a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
   const fileBase = mark => 'TKP_' + mark.replace(/А/g, 'A').replace(/ /g, '_');
-  async function ui() { const [logo, icons] = await Promise.all([fetchImage('assets/ui/elkom.png'), fetchImage('assets/ui/icons.png')]); return { logo, icons }; }
+  async function ui() { const [logo, footer, frame] = await Promise.all(['elkom', 'footer', 'frame'].map(n => fetchImage('assets/ui/' + n + '.png'))); return { logo, footer, frame }; }
 
   /* ================= ПЧ: ESQ F ME800 / ME800-R =================
      Листы шаблона: 0 обложка, 1 письмо, 2 содержание, 3 предложение, 4 описание, 5 расшифровка, 6–10 схемы и чертёж,
@@ -157,7 +166,7 @@
       if (!n) { markRuns.push(K.run(t, { bold: true, size: 13 })); return; }
       markRuns.push(K.run(t, { bold: true, size: 13, color: k++ % 2 ? ORANGE : TEAL }), K.run(String(n), { size: 7, color: MUTED, sub: true }), K.run(' ', { size: 6 }));
     });
-    const DW = [700, 4000, 5300];
+    const DW = [650, 3800, 5150];
     const decodeChildren = [K.h('Расшифровка обозначения'),
       K.p(markRuns, { align: 'c', after: 2 }),
       K.p('Маркировка преобразователя (цифра у каждой части — номер позиции в таблице)', { size: 8.5, align: 'c', color: MUTED, after: 10 }),
@@ -173,7 +182,7 @@
       if (/Защита срабатывает при уровне напряжения выше/.test(t)) t = t.replace(/выше \d+%/, 'выше 110%');
       return t;
     };
-    const SW = [3600, 6300], specRows = [];
+    const SW = [3500, 6100], specRows = [];
     for (const r of specs) {
       if (r.section) { specRows.push(K.tr([K.td(r.section, { span: 2, align: 'c', bold: true, fill: HEADBG, size: 10 })])); continue; }
       const cells = r.cells.map(c => valueOf(r.page, c)).map(t => t || '—');
