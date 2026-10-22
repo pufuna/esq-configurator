@@ -1610,7 +1610,7 @@
   </script>
 
   <script>
-    /* ===== Скачивание ТКП: обязательны фамилия и инициалы; для фамилии сотрудника — ещё и пароль сотрудника ===== */
+    /* ===== Скачивание ТКП: обязательны фамилия и инициалы; для фамилии сотрудника — ещё и пароль ===== */
     (function () {
       const PRODUCT = 'pch';
       const FUNCTION_URL = window.TZ_FUNCTION_URL || 'https://functions.yandexcloud.net/d4eplvhu1pvut5be24vd';
@@ -1619,10 +1619,19 @@
       const RE_A = new RegExp('^' + SUR + '\\s+' + INI + '$'), RE_B = new RegExp('^' + INI + '\\s*' + SUR + '$');
       const HINT = 'Укажите фамилию и инициалы, например: Иванов И.И.';
       const LOOK = { a: 'а', b: 'в', c: 'с', e: 'е', h: 'н', k: 'к', m: 'м', o: 'о', p: 'р', t: 'т', x: 'х', y: 'у' };
-      function isStaff(s) {
+      // фамилия сотрудника хранится только в виде SHA-256 (кириллица и латиница), сравнивается каждое слово ввода
+      const STAFF = ['4040bc86da4996bde2026601f197160ad02d9674a65f29558713390560c44d92', '22d3ead26bcb1df296c64bfe48feaf89d08d16d580b7017b73e3b7d102131fe1'];
+      async function isStaff(s) {
         const low = s.toLowerCase().replace(/ё/g, 'е');
-        const cyr = low.replace(/[a-z]/g, ch => LOOK[ch] || ch).replace(/[^а-я]/g, '');
-        return cyr.includes('сотрудник') || low.replace(/[^a-z]/g, '').includes('staff');
+        for (const w of low.split(/[\s.,\-]+/)) {
+          const lat = w.replace(/[^a-z]/g, ''), cyr = w.replace(/[a-z]/g, ch => LOOK[ch] || ch).replace(/[^а-я]/g, '');
+          for (const t of [cyr, lat]) {
+            if (t.length < 4 || !(window.crypto && crypto.subtle)) continue;
+            const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+            if (STAFF.includes(Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join(''))) return true;
+          }
+        }
+        return false;
       }
       const input = document.getElementById('tkpAuthor');
       const note = document.getElementById('authorNote');
@@ -1688,7 +1697,7 @@
           return;
         }
         show('');
-        if (isStaff(s) && !okSession && !(await askPassword())) return;
+        if ((await isStaff(s)) && !okSession && !(await askPassword())) return;
         return orig.call(this, e, fmt);
       };
     })();
