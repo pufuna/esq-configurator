@@ -232,7 +232,7 @@
       <h2>Реестр выданных ТКП</h2>
       <p class="lead">Каждое ТКП, скачанное в конфигураторах ПЧ и УПП (PDF или Word), записывается сюда автоматически. <b id="mode"></b></p>
       <form class="login" id="login" hidden>
-        <span>Общий реестр команды</span>
+        <span>Общий реестр</span>
         <input type="text" autocomplete="username" value="ESQ" hidden aria-hidden="true">
         <input type="password" id="pw" placeholder="Пароль сотрудника" autocomplete="current-password">
         <button type="submit" class="btn btn-teal">Войти</button>
@@ -311,7 +311,7 @@
     }
     function render() {
       const list = filtered(), all = source().length;
-      $('mode').textContent = shared() ? 'Общий реестр команды' : (SH.on ? 'Записи этого браузера — войдите, чтобы видеть общий реестр' : 'Записи этого браузера');
+      $('mode').textContent = shared() ? 'Общий реестр' : (SH.on ? 'Записи этого браузера — войдите, чтобы видеть общий реестр' : 'Записи этого браузера');
       $('empty').hidden = !!all; document.querySelector('.reg-wrap').hidden = !all;
       $('localNote').hidden = !!shared();
       const sum = list.reduce((a, e) => a + (e.total || 0), 0);
