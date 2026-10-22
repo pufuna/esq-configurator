@@ -223,7 +223,7 @@
         ? [K.run('•\t', { color: b.teal ? TEAL : INK }), K.run(t[0], { bold: true }), K.run(t[1])] : [K.run('•\t'), K.run(t)], { hanging: 12, after: 2 })));
     });
 
-    const TW2 = [3600, 6300], techRows = [];
+    const TW2 = [3500, 6100], techRows = [];
     tech.rows.forEach(r => {
       if (r.section) techRows.push(K.tr([K.td(r.section, { span: 2, align: 'c', bold: true, fill: HEADBG, size: 10 })]));
       else techRows.push(K.tr([K.td(r.label, { w: TW2[0], align: 'c' }), K.td(Array.isArray(r.value) ? r.value : (r.value || '—'), { w: TW2[1], align: 'c' })]));
