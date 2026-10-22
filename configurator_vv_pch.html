@@ -1251,6 +1251,9 @@
       if (cap === 'PF' && p > ({ T060: 630, T100: 1000 }[v] || Infinity)) {
         const m = /^(\d+)×\d+×(\d+)/.exec(getMechanicalFor(v, p).size || '');
         if (!m) return null;
+        if (m[1] === '4500') {                                         // раздельное исполнение — чертёж производителя «длинный шкаф» 4500 мм (фасад и бок), высота по таблице R
+          return { file: 'assets/drawings_r/R_G1L_' + m[2] + '.pdf', bypassShown: false, g1: true, long: true };
+        }
         const code = (S ? 'S' : '') + (Rc ? 'R' : '');
         return { file: 'assets/drawings_r/R_G1_' + m[1] + '_' + m[2] + '_' + (byp === 'X' ? '0' : 'B') + (code ? '_' + code : '') + '.pdf', bypassShown: true, g1: true };
       }
@@ -1271,6 +1274,13 @@
     function rExtrasNote(){
       const d = rDrawing(); if (!d) return '';
       const n = [];
+      if (d.long) {                                                    // раздельное исполнение 4500 мм
+        n.push('Обслуживание одностороннее (с фасада). Внешний вид будет уточнён перед заказом.');
+        const v = id => document.getElementById(id).value;
+        const ex = [v('bypass') !== 'X' && 'байпаса', v('starter') === 'S' && 'пусковой', v('reactor') === 'R' && 'реактора'].filter(Boolean);
+        if (ex.length) n.push('Шкаф' + (ex.length > 1 ? 'ы ' : ' ') + ex.join(', ') + ' на чертеже не показан' + (ex.length > 1 ? 'ы' : '') + '.');
+        return n.join(' ');
+      }
       if ((d.g1 ? /_[SR]+\.pdf$/ : /_[BSR]+\.pdf$/).test(d.file)) n.push('Дополнительные шкафы показаны условно: ширина 800 мм, глубина и высота — как у ПЧ; расположение в ряду уточняется при заказе.');
       return n.join(' ');
     }

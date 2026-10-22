@@ -139,7 +139,7 @@ async def main():
                                      " set('voltage', 'T060'); set('capacitorType', 'EL'); return r; }")
         check(nowarn[0] is False and 'не прикладывается' not in nowarn[1], f'ME800-R G1: нет предупреждения «чертёж не прикладывается»: {nowarn}')
         ex = {(x[0], x[1], x[2]): x[3] for x in g1}
-        check((ex.get(('T100', '1600', 'MXX')) or '').endswith('R_G1_2450_2537_B.pdf') and (ex.get(('T060', '2000', 'XSX')) or '').endswith('R_G1_4500_2881_0_S.pdf'),
+        check((ex.get(('T100', '1600', 'MXX')) or '').endswith('R_G1_2450_2537_B.pdf') and (ex.get(('T060', '2000', 'XSX')) or '').endswith('R_G1L_2881.pdf'),
               f"чертёж G1 по мощности: {ex.get(('T100', '1600', 'MXX'))}, {ex.get(('T060', '2000', 'XSX'))}")
 
         # подбор по двигателю: 6 кВ, 1000 кВт, винтовой компрессор → на ступень выше 1000 кВт
