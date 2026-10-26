@@ -11,7 +11,7 @@
   • ТКП ПЧ (ME800, ME800-R, 3 кВ, с доп. строками) и ТКП УПП собираются, на листе 3 — нужная маркировка и итог;
   • УПП: подбор по двигателю, ЗИП в строке УПП (PDF и Word);
   • форма восстанавливается после перезагрузки страницы;
-  • общий реестр: пауза после неверного пароля, четыре менеджера одновременно скачивают ТКП;
+  • реестр ТКП — только по паролю, ссылки на него видны лишь вошедшим; пауза после неверного пароля, четыре менеджера одновременно скачивают ТКП;
   • сайт работает без CDN (cdn.jsdelivr.net заблокирован — библиотеки берутся из assets/vendor);
   • в консоли нет ошибок JavaScript.
 """
@@ -60,6 +60,7 @@ async def main():
         browser = await pw.chromium.launch(**kw)
         ctx = await browser.new_context(accept_downloads=True)
         await ctx.route('https://cdn.jsdelivr.net/**', lambda r: r.abort())          # проверяем работу без CDN
+        await ctx.route('https://functions.yandexcloud.net/**', lambda r: r.abort())  # настоящие облачные функции тесты не трогают
         page = await ctx.new_page()
         errors = []
         page.on('pageerror', lambda e: errors.append(str(e)))
@@ -196,24 +197,16 @@ async def main():
         text, nsec = await word()
         check('Шеф-монтаж' in text and 'Функции защиты' in text and 'ESQ F HVS' in text and 'ЗИП: тиристорный блок' in text, 'ТКП УПП в Word: доп. строка, ЗИП и характеристики')
 
-        # ---------- реестр ТКП ----------
+        # ---------- реестр ТКП: только по паролю ----------
         print('Реестр ТКП')
+        recs = await page.evaluate('TkpRegistry.read()')
+        check(len(recs) >= 7 and any(r['fmt'] == 'Word' for r in recs) and any('HVS' in r['mark'] for r in recs), f'все скачанные ТКП записаны в реестр: {len(recs)}')
         await page.goto(base + 'registry.html'); await page.wait_for_timeout(400)
-        n_rows = await page.eval_on_selector_all('#rows tr', 'r => r.length')
-        check(n_rows >= 7, f'все скачанные ТКП записаны в реестр: {n_rows}')
-        check('Word' in await page.inner_text('#rows') and 'ESQ F HVS' in await page.inner_text('#rows'), 'в реестре есть ПЧ и УПП, PDF и Word')
-        async with page.expect_download() as dl:
-            await page.click('#csv')
-        csv_path = await (await dl.value).path()
-        csv_text = open(csv_path, encoding='utf-8-sig').read()
-        check(csv_text.count('\n') >= n_rows and 'Маркировка' in csv_text, 'выгрузка CSV для Excel')
-        await page.set_input_files('#impFile', csv_path); await page.wait_for_timeout(300)
-        check(await page.eval_on_selector_all('#rows tr', 'r => r.length') == n_rows, 'повторная загрузка CSV не дублирует записи')
-        await page.fill('#q', 'HVS'); await page.wait_for_timeout(100)
-        check(0 < await page.eval_on_selector_all('#rows tr', 'r => r.length') < n_rows, 'поиск по реестру')
-        link = await page.get_attribute('#rows tr a', 'href')
-        await page.goto(link); await page.wait_for_timeout(600)
-        check('HVS' in await page.text_content('#result'), 'из реестра открывается конфигурация')
+        check(await page.is_hidden('#regBody') and await page.is_visible('#gate') and await page.eval_on_selector_all('#rows tr', 'r => r.length') == 0,
+              'без пароля реестр не открывается')
+        for u in ['index.html', 'configurator_vv_pch.html', 'vv_upp.html']:
+            await page.goto(base + u); await page.wait_for_timeout(300)
+            check(await page.is_hidden('a.reg-link'), f'{u}: ссылки на реестр нет, пока не вошли')
 
         # ---------- общий реестр (облачная функция cloud/registry на локальном стенде) ----------
         print('Общий реестр')
@@ -229,16 +222,32 @@ async def main():
             check('Неверный пароль' in await page.text_content('#loginErr'), 'неверный пароль не пускает')
             check(await page.is_disabled('#login button'), 'после неверного пароля — пауза перед следующей попыткой')
             await page.fill('#pw', 'test-password'); await page.click('#login button'); await page.wait_for_timeout(1200)
+            check(await page.is_visible('#regBody') and await page.is_hidden('#login') and await page.is_visible('#sharedBar'), 'после входа реестр открыт, форма входа скрыта')
             first = await page.inner_text('#rows tr:first-child')
             check('HVS' in first and 'не отправлено' not in first, 'свежее ТКП уже в общем реестре (ушло на сервер при скачивании)')
+            n_rows = await page.evaluate('TkpRegistry.read().length')
             accept_next['on'] = True
             await page.click('#push'); await page.wait_for_timeout(2500)
             n_shared = await page.eval_on_selector_all('#rows tr', 'r => r.length')
-            check(n_shared == n_rows + 1, f'записи браузера перенесены в общий реестр без дублей: {n_shared}')
+            check(n_shared == n_rows, f'записи браузера перенесены в общий реестр без дублей: {n_shared}')
+            async with page.expect_download() as dl:
+                await page.click('#csv')
+            csv_path = await (await dl.value).path()
+            csv_text = open(csv_path, encoding='utf-8-sig').read()
+            check(csv_text.count('\n') >= n_shared and 'Маркировка' in csv_text, 'выгрузка CSV для Excel')
+            await page.set_input_files('#impFile', csv_path); await page.wait_for_timeout(1200)
+            check(await page.eval_on_selector_all('#rows tr', 'r => r.length') == n_shared, 'повторная загрузка CSV не дублирует записи')
+            await page.fill('#q', 'HVS'); await page.wait_for_timeout(100)
+            check(0 < await page.eval_on_selector_all('#rows tr', 'r => r.length') < n_shared, 'поиск по реестру')
+            await page.fill('#q', '')
             accept_next['on'] = True
             await page.click('#rows tr button.del'); await page.wait_for_timeout(800)
             await page.click('#reload'); await page.wait_for_timeout(800)
             check(await page.eval_on_selector_all('#rows tr', 'r => r.length') == n_shared - 1, 'удаление из общего реестра')
+            link = await page.get_attribute('#rows tr a', 'href')
+            await page.goto(link); await page.wait_for_timeout(600)
+            check(bool(await page.text_content('#result')) and await page.is_visible('a.reg-link'), 'из реестра открывается конфигурация; после входа ссылка на реестр видна')
+            await page.goto(base + 'registry.html'); await page.wait_for_timeout(800)
 
             # несколько менеджеров одновременно — у каждого свой браузер
             print('Несколько сотрудников одновременно')
@@ -264,6 +273,10 @@ async def main():
             await page.click('#reload'); await page.wait_for_timeout(1200)
             rows = await page.inner_text('#rows')
             check(all(w in rows for w, _ in team), 'в общем реестре видны ТКП всех четырёх')
+            await page.click('#logout'); await page.wait_for_timeout(300)
+            check(await page.is_hidden('#regBody'), 'после выхода реестр снова закрыт')
+            await page.goto(base + 'index.html'); await page.wait_for_timeout(300)
+            check(await page.is_hidden('a.reg-link'), 'после выхода ссылка на реестр снова скрыта')
         finally:
             proc.terminate()
 

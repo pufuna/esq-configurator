@@ -58,6 +58,7 @@
     .hero-in{min-height:250px;grid-template-columns:minmax(0,1fr)}
     .wrap{width:100%;max-width:1240px;margin:32px auto 44px;padding:0 24px;flex:1}
     .tool{display:flex;align-items:center;gap:18px;margin-top:16px;padding:18px 22px;background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);text-decoration:none;color:var(--ink);transition:box-shadow .2s,transform .2s}
+    .reg-link[hidden]{display:none!important}      /* реестр ТКП — только для допущенных (registry.js) */
     .tool:hover{box-shadow:0 14px 34px rgba(10,105,114,.14);transform:translateY(-2px)}
     .tool-ico{flex:0 0 auto;width:54px;height:54px;border-radius:14px;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center}
     .tool-txt{flex:1;font-size:14.5px}.tool-txt b{display:block;color:var(--orange);font-weight:600;font-size:19px;margin-bottom:2px}
@@ -173,7 +174,7 @@
       <span class="tool-go">Открыть →</span>
     </a>
 
-    <a class="tool" href="registry.html">
+    <a class="tool reg-link" href="registry.html" hidden>
       <span class="tool-ico" aria-hidden="true" style="background:var(--teal)"><svg viewBox="0 0 24 24" width="28" height="28"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
       <span class="tool-txt"><b style="color:var(--teal)">Реестр выданных ТКП</b>Все ТКП, скачанные в конфигураторах: кто, когда, на какую конфигурацию и сумму. Поиск, выгрузка в Excel, открытие конфигурации в один клик.</span>
       <span class="tool-go">Открыть →</span>
@@ -194,5 +195,6 @@
       <script>document.getElementById('year').textContent = new Date().getFullYear();   // год в подвале — текущий</script>
     </div>
   </footer>
+  <script src="registry.js"></script>
 </body>
 </html>

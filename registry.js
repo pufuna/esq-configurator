@@ -64,6 +64,17 @@
   // ссылка на текущую конфигурацию (formstate.js) — чтобы из реестра открыть то же самое
   const link = () => (window.FormStateLink ? window.FormStateLink() : location.href);
 
-  window.TkpRegistry = { add, read, write, link, flush, markSent, shared, KEY };
+  /* Ссылки «Реестр выданных ТКП» (a.reg-link) скрыты у всех, кроме тех, кто входил в реестр с паролем в этом браузере.
+     Это только видимость: сам реестр без пароля не открывается (registry.html, облачная функция). */
+  const ACCESS = 'esq.regAccess';
+  function access(on) {
+    if (on !== undefined) { try { on ? localStorage.setItem(ACCESS, '1') : localStorage.removeItem(ACCESS); } catch (e) {} }
+    let ok = false; try { ok = localStorage.getItem(ACCESS) === '1'; } catch (e) {}
+    document.querySelectorAll('a.reg-link').forEach(a => { a.hidden = !ok; });
+    return ok;
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => access()); else access();
+
+  window.TkpRegistry = { add, read, write, link, flush, markSent, shared, access, KEY };
   if (URL_) window.addEventListener('load', () => setTimeout(flush, 1500));
 })();

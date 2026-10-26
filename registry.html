@@ -209,6 +209,7 @@
     .reg button.del{border:none;background:none;color:#b42318;font-size:18px;cursor:pointer;line-height:1}
     .empty{padding:24px;text-align:center;color:var(--muted);background:var(--teal-ll);border:1px dashed var(--line);border-radius:12px}
     .note-box{margin-top:14px;font-size:13px;color:var(--muted)}
+    [hidden]{display:none!important}                /* hidden у форм и панелей сильнее их display */
     .login,.shared-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:12px 14px;background:var(--teal-ll);border:1px solid var(--line);border-radius:12px}
     .login span:first-child{font-weight:600;color:var(--teal)}
     .login input{flex:0 1 240px;width:auto}
@@ -232,6 +233,7 @@
     <section class="card">
       <h2>Реестр выданных ТКП</h2>
       <p class="lead">Каждое ТКП, скачанное в конфигураторах ПЧ и УПП (PDF или Word), записывается сюда автоматически. <b id="mode"></b></p>
+      <p class="note-box" id="gate">Реестр доступен ограниченному кругу сотрудников — войдите паролем реестра.</p>
       <form class="login" id="login" hidden>
         <span>Общий реестр</span>
         <input type="text" autocomplete="username" value="ESQ" hidden aria-hidden="true">
@@ -244,6 +246,7 @@
         <button type="button" class="btn btn-line" id="push" hidden></button>
         <a href="#" id="logout">Выйти</a>
       </div>
+      <div id="regBody" hidden>
       <div class="reg-tools">
         <input type="search" id="q" placeholder="Поиск: маркировка, составитель, доп. позиция…">
         <select id="prod"><option value="">Все изделия</option><option>ВВ ПЧ</option><option>ВВ УПП</option></select>
@@ -259,6 +262,7 @@
       </table></div>
       <div class="empty" id="empty" hidden>Пока пусто. Скачайте ТКП в <a href="configurator_vv_pch.html">конфигураторе ПЧ</a> или <a href="vv_upp.html">УПП</a> — оно появится здесь.</div>
       <p class="note-box" id="localNote">Реестр хранится в этом браузере на этом компьютере. Чтобы перенести его или объединить с коллегами — выгрузите CSV и загрузите его на другом компьютере (записи объединятся без повторов).</p>
+      </div>
     </section>
   </main>
 
@@ -284,6 +288,9 @@
     let pw = null, server = null;                                     // server — записи общего реестра, null — не загружены
     try { pw = sessionStorage.getItem('esq.regPw'); } catch (e) {}
     const shared = () => SH.on && pw && server;
+    // реестр видит только тот, кто знает пароль реестра: без входа таблица, поиск и выгрузка скрыты;
+    // после входа ссылки «Реестр выданных ТКП» появляются и в конфигураторах этого браузера (R.access)
+    const allowed = () => !SH.on || shared();
     function source() {
       if (!shared()) return R.read();
       const have = new Set(server.map(e => e.id));
@@ -298,9 +305,9 @@
         $('login').hidden = true; $('sharedBar').hidden = false;
       } catch (e) {
         server = null;
-        if (e.status === 403) { pw = null; try { sessionStorage.removeItem('esq.regPw'); } catch (x) {} $('loginErr').textContent = 'Неверный пароль'; }
+        if (e.status === 403) { pw = null; R.access(false); try { sessionStorage.removeItem('esq.regPw'); } catch (x) {} $('loginErr').textContent = 'Неверный пароль'; }
         else if (e.status === 429) $('loginErr').textContent = e.message;
-        else $('loginErr').textContent = 'Общий реестр недоступен: ' + e.message + '. Показаны записи этого браузера.';
+        else $('loginErr').textContent = 'Общий реестр недоступен: ' + e.message + '. Попробуйте позже.';
         $('login').hidden = false;
       }
       render();
@@ -313,6 +320,8 @@
         .sort((a, b) => (a.at < b.at ? 1 : -1));
     }
     function render() {
+      $('regBody').hidden = !allowed(); $('gate').hidden = allowed();
+      if (!allowed()) { $('mode').textContent = ''; $('rows').innerHTML = ''; return; }
       const list = filtered(), all = source().length;
       $('mode').textContent = shared() ? 'Общий реестр' : (SH.on ? 'Записи этого браузера — войдите, чтобы видеть общий реестр' : 'Записи этого браузера');
       $('empty').hidden = !!all; document.querySelector('.reg-wrap').hidden = !all;
@@ -348,7 +357,7 @@
       ev.preventDefault();
       const v = $('pw').value, btn = $('login').querySelector('button'); if (!v || (btn && btn.disabled)) return;
       $('loginErr').textContent = 'Проверяю…';
-      try { await SH.ping(v); pwFails = 0; pw = v; try { sessionStorage.setItem('esq.regPw', v); } catch (e) {} $('loginErr').textContent = ''; $('pw').value = ''; await loadServer(); }
+      try { await SH.ping(v); pwFails = 0; pw = v; R.access(true); try { sessionStorage.setItem('esq.regPw', v); } catch (e) {} $('loginErr').textContent = ''; $('pw').value = ''; await loadServer(); }
       catch (e) {
         $('loginErr').textContent = e.status === 403 ? 'Неверный пароль' : e.status === 429 ? e.message : 'Нет связи с общим реестром: ' + e.message;
         if ((e.status === 403 || e.status === 429) && btn) {
@@ -358,7 +367,7 @@
         }
       }
     });
-    $('logout').onclick = () => { pw = null; server = null; try { sessionStorage.removeItem('esq.regPw'); } catch (e) {} $('sharedBar').hidden = true; $('login').hidden = false; render(); };
+    $('logout').onclick = () => { pw = null; server = null; R.access(false); try { sessionStorage.removeItem('esq.regPw'); } catch (e) {} $('sharedBar').hidden = true; $('login').hidden = false; render(); };
     $('reload').onclick = () => loadServer();
     $('push').onclick = async () => {
       const mine = R.read(); if (!mine.length) return;

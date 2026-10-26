@@ -207,6 +207,7 @@
     .doc-btn{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;padding:10.5px 12px;white-space:nowrap}
     @media (max-width:360px){.doc-btn{white-space:normal}}
     .doc-btn svg{flex:0 0 auto}
+    .reg-link[hidden]{display:none!important}      /* реестр ТКП — только для допущенных (registry.js) */
   </style>
 </head>
 <body>
@@ -384,7 +385,7 @@
         <div class="btns">
           <a class="btn btn-line doc-btn" href="assets/docs/TO_ESQ_F_HVS.pdf" download><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Скачать техническое описание</a>
           <a class="btn btn-line doc-btn" href="assets/docs/RE_ESQ_F_HVS.pdf" download><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Скачать руководство по эксплуатации</a>
-          <a class="btn btn-line doc-btn" href="registry.html"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>Реестр выданных ТКП</a>
+          <a class="btn btn-line doc-btn reg-link" href="registry.html" hidden><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>Реестр выданных ТКП</a>
         </div>
       </div>
     </aside>
