@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
-    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2'),url('assets/fonts/Inter-Light.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff2') format('woff2'),url('assets/fonts/Inter-Regular.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff2') format('woff2'),url('assets/fonts/Inter-Medium.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff2') format('woff2'),url('assets/fonts/Inter-SemiBold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff2') format('woff2'),url('assets/fonts/Inter-Bold.woff') format('woff')}
     :root{
       --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
       --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
@@ -59,7 +59,7 @@
     .card > h2 + .lead + .param, .card > h2 + .param{border-top:none}
     .param label{font-weight:500;color:var(--ink);font-size:14.5px}
     .param .note{grid-column:1 / -1;color:var(--muted);font-size:12.5px;margin-top:2px}
-    select,input{width:100%;font:inherit;font-size:15px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:42px;outline:none;transition:border-color .15s,box-shadow .15s}
+    select,input,.param textarea{width:100%;font:inherit;font-size:15px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:42px;outline:none;transition:border-color .15s,box-shadow .15s}
     select{appearance:none;-webkit-appearance:none;padding-right:38px;cursor:pointer;
       background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%230a6972' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
       background-repeat:no-repeat;background-position:right 14px center}
@@ -178,6 +178,15 @@
     #summary{font-size:14px;color:var(--ink);overflow-wrap:anywhere;margin:0 0 4px}
     @media (max-width:1100px){.hero .photo.upp{height:230px}}
     @media (max-width:720px){.hero .photo.upp{height:200px}}
+    /* ---------- подбор по двигателю ---------- */
+    .motor-pick{border-top:1px solid var(--teal-l);padding:10px 0 4px}
+    .motor-pick summary{cursor:pointer;color:var(--teal);font-weight:500;font-size:14.5px}
+    .mp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-top:10px;align-items:end}
+    .mp-grid small{display:block;color:var(--muted);font-size:11.5px;margin:0 0 3px 2px}
+    .mp-grid .btn{grid-column:1 / -1;cursor:pointer;font-family:inherit}
+    .motor-pick .note{color:var(--muted);font-size:12.5px;margin-top:8px}
+    .motor-pick .note.ok{color:var(--teal-d);font-weight:500}.motor-pick .note.warn{color:#b54708;font-weight:600}
+
     /* ---------- доп. строки таблицы ТКП ---------- */
     .extras{border-top:1px solid var(--teal-l);padding-top:12px;margin-top:2px}
     .extras-head label{font-weight:500;font-size:14.5px;display:block}
@@ -231,6 +240,15 @@
     <section class="card">
       <h2>1. Основные параметры</h2>
       <p class="lead">Напряжение и мощность двигателя определяют номинальный ток и габариты УПП.</p>
+      <details class="motor-pick" id="motorPick">
+        <summary>Подобрать УПП по данным двигателя</summary>
+        <div class="mp-grid">
+          <div><small>Мощность двигателя, кВт</small><input type="number" id="mpKw" min="0" step="any" placeholder="630"></div>
+          <div><small>Номинальный ток, А</small><input type="number" id="mpA" min="0" step="any" placeholder="необязательно"></div>
+          <button type="button" class="btn btn-line" onclick="pickByMotor()">Подобрать</button>
+        </div>
+        <div class="note" id="mpNote">Напряжение берётся из поля «Напряжение» ниже. Ток УПП — не меньше тока двигателя.</div>
+      </details>
       <div class="param">
         <label for="voltage">1. Напряжение</label>
         <select id="voltage">
@@ -327,6 +345,11 @@
       <div class="param">
         <label for="tkpPrice">Цена за ед., руб. (с НДС 22%)</label>
         <input type="text" id="tkpPrice" placeholder="Необязательно">
+      </div>
+      <div class="param">
+        <label for="tkpZip">ЗИП в составе УПП</label>
+        <textarea id="tkpZip" rows="2" placeholder="Например: 1 тиристорный блок, 1 плата управления"></textarea>
+        <div class="note">Пишется в строке УПП в таблице ТКП («В комплекте ЗИП: …»). Отдельные позиции — в «Дополнительном оборудовании».</div>
       </div>
       <div class="extras">
         <div class="extras-head">
@@ -495,9 +518,14 @@
         who: val('tkpAuthor').trim(), qty: Math.max(1, parseInt(val('tkpQty'), 10) || 1),
         price: parseFloat(String(val('tkpPrice')).replace(/\s/g, '').replace(',', '.')) || 0,
         name: 'Устройство плавного пуска ' + mark + ', ' + kv + ' кВ, ' + m[1] + ' кВт, ' + m[0] + ' А' +
-          (val('package') === 'STD' ? '' : ', ' + PKG[val('package')])
+          (val('package') === 'STD' ? '' : ', ' + PKG[val('package')]) + zipText()
       };
     };
+    // ЗИП в составе позиции УПП (не отдельными строками) — как у ПЧ
+    function zipText(){
+      const zip = val('tkpZip').replace(/\s+/g, ' ').trim().replace(/[.;,]+$/, '');
+      return zip ? '. В комплекте ЗИП: ' + zip + '.' : '';
+    }
 
     /* ===== ТЕХОПИСАНИЕ ===== */
     function buildTechDescriptionHtml(){
@@ -612,6 +640,20 @@
       host.insertBefore(box, host.firstChild);
     }
 
+    /* ===== Подбор по двигателю: наименьшая модель с P ≥ Pдв и I ≥ Iдв при выбранном напряжении ===== */
+    function pickByMotor(){
+      const kw = Number(val('mpKw')) || 0, a = Number(val('mpA')) || 0;
+      const note = $('mpNote'), say = (t, cls) => { note.textContent = t; note.className = 'note ' + (cls || ''); };
+      if (!kw && !a) return say('Укажите мощность и/или ток двигателя.', 'warn');
+      const fit = MODELS[val('voltage')].find(([I, P]) => P >= kw && I >= a);
+      if (!fit) return say('В ряду ESQ F HVS на ' + $('voltage').selectedOptions[0].text + ' нет модели под ' +
+        (kw ? kw + ' кВт' : '') + (kw && a ? ' / ' : '') + (a ? a + ' А' : '') + ' — такие мощности согласовываются отдельно.', 'warn');
+      const power = $('power');
+      power.value = String(fit[0]); power.dispatchEvent(new Event('change', { bubbles: true }));
+      say('Подобрано УПП ' + buildMark() + ': двигатель до ' + fit[1] + ' кВт, ' + fit[0] + ' А.', 'ok');
+    }
+    window.pickByMotor = pickByMotor;
+
     document.addEventListener('DOMContentLoaded', () => {
       updatePowerOptions();
       $('power').value = '75'; update();          // по умолчанию — модель образца ТКП
@@ -646,8 +688,16 @@
       price: parseFloat(String(row.querySelector('.ex-p').value).replace(/\s/g, '').replace(',', '.')) || 0
     }));
   </script>
-  <script src="assets/vendor/pdf-lib.min.js"></script>
-  <script>window.PDFLib || document.write('<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"><\/script>')</script>
+  <script>
+    /* pdf-lib — только для ТКП: загружается при первом скачивании (локальная копия, если её нет — CDN) */
+    window.loadPdfLib = function () {
+      const add = src => new Promise((ok, fail) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => { el.remove(); fail(new Error('не загрузилась библиотека pdf-lib')); }; document.head.appendChild(el); });
+      return window.PDFLib ? Promise.resolve(window.PDFLib) : (window.__pdfLib = window.__pdfLib ||
+        add('assets/vendor/pdf-lib.min.js').catch(() => add('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'))
+          .then(() => { if (!window.PDFLib) throw new Error('не загрузилась библиотека pdf-lib'); return window.PDFLib; })
+          .catch(e => { window.__pdfLib = null; throw e; }));
+    };
+  </script>
   <script src="registry.js"></script>
   <script src="tkp_upp.js"></script>
   <script src="tkp_docx.js"></script>
@@ -746,6 +796,8 @@
       const orig = window.downloadTKP;
       window.downloadTKP = async function (e, fmt) {                     // fmt: 'docx' — ТКП в Word
         if (e && e.preventDefault) e.preventDefault();
+        const btn = e && e.currentTarget;                                // после await у события его уже нет — передаём кнопку дальше
+        if (e) e = { preventDefault() {}, currentTarget: btn };
         const s = norm();
         if (!valid(s)) {
           show(HINT); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => input.focus(), 250);

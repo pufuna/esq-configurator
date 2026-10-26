@@ -7,11 +7,11 @@
   <meta name="robots" content="noindex, nofollow">
   <style>
     /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
-    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2'),url('assets/fonts/Inter-Light.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff2') format('woff2'),url('assets/fonts/Inter-Regular.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff2') format('woff2'),url('assets/fonts/Inter-Medium.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff2') format('woff2'),url('assets/fonts/Inter-SemiBold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff2') format('woff2'),url('assets/fonts/Inter-Bold.woff') format('woff')}
     :root{
       --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
       --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
@@ -175,7 +175,7 @@
       <h1>Разбор ТЗ</h1>
       <div class="sw chips" id="prodSwitch"><a class="chip" data-p="pch" href="tz.html">ВВ ПЧ ESQ F ME800</a><a class="chip" data-p="upp" href="tz.html?p=upp">ВВ УПП ESQ F HVS</a></div>
     </div>
-    <img class="photo" id="heroPhoto" src="assets/ui/pch_g1g3.png" alt="">
+    <img class="photo" id="heroPhoto" src="assets/ui/pch_g1g3.webp" alt="">
   </div>
   <div class="band"><div class="band-in">
     <b>Подбор по техническому заданию</b>
@@ -279,8 +279,6 @@
 
 <script src="assets/vendor/jszip.min.js"></script>
   <script>window.JSZip || document.write('<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"><\/script>')</script>
-<script src="assets/vendor/docx.iife.js"></script>
-  <script>window.docx || document.write('<script src="https://cdn.jsdelivr.net/npm/docx@9.6.1/dist/index.iife.js"><\/script>')</script>
 <script src="tz.js"></script>
 </body>
 </html>

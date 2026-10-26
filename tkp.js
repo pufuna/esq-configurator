@@ -9,6 +9,17 @@
    Координаты — pt от левого верхнего угла страницы «как её видит человек». */
 (function () {
   'use strict';
+  // pdf-lib (~0,5 МБ) нужен только для ТКП: загружается при первом скачивании (window.loadPdfLib на странице), а не вместе со страницей
+  let gen = null;
+  window.downloadTKP = async function (ev, fmt) {
+    if (!gen) {
+      try { await window.loadPdfLib(); } catch (e) { if (ev && ev.preventDefault) ev.preventDefault(); alert('Не удалось сформировать ТКП: ' + e.message); return; }
+      gen = init();
+    }
+    return gen(ev, fmt);
+  };
+
+  function init() {
   // Safari (iPad/iPhone, старые Mac) не умеет перебирать ReadableStream через for await — а pdf.js так читает страницы
   if (typeof ReadableStream !== 'undefined' && !ReadableStream.prototype[Symbol.asyncIterator]) {
     ReadableStream.prototype[Symbol.asyncIterator] = async function* () {
@@ -892,5 +903,6 @@
     page.pushOperators(popGraphicsState());
   }
 
-  window.downloadTKP = generate;
+  return generate;
+  }
 })();

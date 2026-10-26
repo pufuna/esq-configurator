@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
-    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2'),url('assets/fonts/Inter-Light.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff2') format('woff2'),url('assets/fonts/Inter-Regular.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff2') format('woff2'),url('assets/fonts/Inter-Medium.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff2') format('woff2'),url('assets/fonts/Inter-SemiBold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff2') format('woff2'),url('assets/fonts/Inter-Bold.woff') format('woff')}
     :root{
       --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
       --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
@@ -82,10 +82,6 @@
     .tkp-row{display:flex;gap:8px;align-items:stretch}
     .tkp-row .btn{flex:1}
     .tkp-row .btn-word{flex:0 0 auto}
-    .r-chk{display:inline-flex;align-items:center;gap:6px;padding:0 14px;border:1.5px solid var(--orange);border-radius:999px;cursor:pointer;user-select:none;font-weight:600;color:var(--orange);background:#fff}
-    .r-chk input{accent-color:var(--orange);width:16px;height:16px;margin:0;cursor:pointer}
-    .r-chk:has(input:checked){background:var(--orange);color:#fff}
-    .r-chk:has(input:checked) input{accent-color:#fff}
     .btn-word{background:#fff;color:#2b579a;border:1.5px solid #2b579a;padding:10.5px 16px}
     .btn-word:hover{background:#eef3fb}
     .btn-teal{background:var(--teal);color:#fff}
@@ -224,7 +220,7 @@
         <img class="esq" src="assets/ui/esq.png" alt="ESQ — Elcom Standard of Quality">
         <h1>Конфигуратор<br>преобразователя частоты</h1>
       </div>
-      <img class="photo" id="heroPhoto" src="assets/ui/pch_g1g3.png" alt="Преобразователь частоты ESQ F ME800">
+      <img class="photo" id="heroPhoto" src="assets/ui/pch_g1g3.webp" alt="Преобразователь частоты ESQ F ME800">
     </div>
     <div class="band"><div class="band-in">
       <b>Преобразователь частоты</b><span id="heroModel">ESQ F ME800 · 6 и 10 кВ · 280–12 500 кВт</span>
@@ -1519,7 +1515,7 @@
       const g4 = film && isPFNCabinet(v, p);
       const g1 = Number(p) > (v === 'T060' ? 1600 : 2650);
       const img = document.getElementById('heroPhoto'), hs = document.getElementById('heroHousing');
-      if (img) { const src = g4 ? 'assets/ui/pch_g4.png' : 'assets/ui/pch_g1g3.png'; if (!img.src.endsWith(src)) img.src = src; img.alt = 'Преобразователь частоты ' + modelName(); }
+      if (img) { const src = g4 ? 'assets/ui/pch_g4.webp' : 'assets/ui/pch_g1g3.webp'; if (!img.src.endsWith(src)) img.src = src; img.alt = 'Преобразователь частоты ' + modelName(); }
       if (hs) {
         // ME800 — корпус G1/G3/G4; ME800-R — исполнение по таблице техописания (у электролитических — не указывается)
         const ex = isR() ? getMechanicalFor(v, p).ex : '';
@@ -1614,8 +1610,16 @@
       price: parseFloat(String(row.querySelector('.ex-p').value).replace(/\s/g, '').replace(',', '.')) || 0
     }));
   </script>
-  <script src="assets/vendor/pdf-lib.min.js"></script>
-  <script>window.PDFLib || document.write('<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"><\/script>')</script>
+  <script>
+    /* pdf-lib — только для ТКП: загружается при первом скачивании (локальная копия, если её нет — CDN) */
+    window.loadPdfLib = function () {
+      const add = src => new Promise((ok, fail) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => { el.remove(); fail(new Error('не загрузилась библиотека pdf-lib')); }; document.head.appendChild(el); });
+      return window.PDFLib ? Promise.resolve(window.PDFLib) : (window.__pdfLib = window.__pdfLib ||
+        add('assets/vendor/pdf-lib.min.js').catch(() => add('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js'))
+          .then(() => { if (!window.PDFLib) throw new Error('не загрузилась библиотека pdf-lib'); return window.PDFLib; })
+          .catch(e => { window.__pdfLib = null; throw e; }));
+    };
+  </script>
   <script src="registry.js"></script>
   <script src="tkp.js"></script>
   <script src="tkp_docx.js"></script>
@@ -1719,6 +1723,8 @@
       const orig = window.downloadTKP;
       window.downloadTKP = async function (e, fmt) {                     // fmt: 'docx' — ТКП в Word
         if (e && e.preventDefault) e.preventDefault();
+        const btn = e && e.currentTarget;                                // после await у события его уже нет — передаём кнопку дальше
+        if (e) e = { preventDefault() {}, currentTarget: btn };
         const s = norm();
         if (!valid(s)) {
           show(HINT); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => input.focus(), 250);

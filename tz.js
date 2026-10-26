@@ -783,8 +783,14 @@
   }
   function dateRu() { return new Date().toLocaleDateString('ru-RU'); }
 
-  function buildDocx(kindDoc, includeCheck) {
-    const D = window.docx; if (!D) throw new Error('Библиотека docx не загрузилась — проверьте интернет');
+  // библиотека docx (~1,2 МБ) — только для листов соответствия: загружается при первом формировании, а не вместе со страницей
+  const addScript = src => new Promise((ok, fail) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => { el.remove(); fail(); }; document.head.appendChild(el); });
+  async function docxLib() {
+    if (!window.docx) await addScript('assets/vendor/docx.iife.js').catch(() => addScript('https://cdn.jsdelivr.net/npm/docx@9.6.1/dist/index.iife.js')).catch(() => {});
+    return window.docx;
+  }
+  async function buildDocx(kindDoc, includeCheck) {
+    const D = await docxLib(); if (!D) throw new Error('Библиотека docx не загрузилась — проверьте интернет');
     const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, PageOrientation, BorderStyle, ShadingType, VerticalAlign } = D;
     const m = meta();
     const FONT = 'Arial';

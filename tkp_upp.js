@@ -11,6 +11,17 @@
    Координаты — pt от левого верхнего угла листа «как его видит человек». */
 (function () {
   'use strict';
+  // pdf-lib (~0,5 МБ) нужен только для ТКП: загружается при первом скачивании (window.loadPdfLib на странице), а не вместе со страницей
+  let gen = null;
+  window.downloadTKP = async function (ev, fmt) {
+    if (!gen) {
+      try { await window.loadPdfLib(); } catch (e) { if (ev && ev.preventDefault) ev.preventDefault(); alert('Не удалось сформировать ТКП: ' + e.message); return; }
+      gen = init();
+    }
+    return gen(ev, fmt);
+  };
+
+  function init() {
   const { PDFDocument, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, rectangle, clipEvenOdd, endPath } = window.PDFLib;
   const WHITE = rgb(1, 1, 1), DARK = rgb(35 / 255, 31 / 255, 33 / 255), TEAL = rgb(10 / 255, 105 / 255, 114 / 255),
     ORANGE = rgb(242 / 255, 105 / 255, 40 / 255), LINE = rgb(12 / 255, 106 / 255, 115 / 255), BAND = rgb(.0392, .412, .447),
@@ -888,6 +899,7 @@
       y = dash(p2, t, y);
   }
 
-  window.downloadTKP = generate;
   window.UPP_DRAW = { makeFonts, makeG, figInstall, figLift, drawScheme };   // для tools/pdf_figs.js (замена рисунков в ТО и РЭ)
+  return generate;
+  }
 })();

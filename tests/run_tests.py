@@ -9,6 +9,7 @@
   • маркировки, ток, габариты и пусковой шкаф ESQ F ME800 и ME800-R на наборе конфигураций — против эталона tests/expected.json;
   • пример маркировки из техописания ME800-R (п. 5.1);
   • ТКП ПЧ (ME800, ME800-R, 3 кВ, с доп. строками) и ТКП УПП собираются, на листе 3 — нужная маркировка и итог;
+  • УПП: подбор по двигателю, ЗИП в строке УПП (PDF и Word);
   • форма восстанавливается после перезагрузки страницы;
   • сайт работает без CDN (cdn.jsdelivr.net заблокирован — библиотеки берутся из assets/vendor);
   • в консоли нет ошибок JavaScript.
@@ -181,12 +182,18 @@ async def main():
         # ---------- УПП ----------
         print('УПП: ТКП')
         await page.goto(base + 'vv_upp.html'); await page.wait_for_timeout(500)
+        check(await page.evaluate('!window.PDFLib'), 'pdf-lib не грузится вместе со страницей (только при скачивании ТКП)')
+        await page.evaluate("document.getElementById('motorPick').open = true")
+        await page.fill('#mpKw', '600'); await page.fill('#mpA', '80'); await page.click('#motorPick .btn')
+        check(await page.input_value('#power') == '120', 'УПП: подбор по двигателю 600 кВт / 80 А → 120 А (1000 кВт)')
         await page.fill('#tkpAuthor', 'Иванов И.И.')
+        await page.fill('#tkpZip', 'тиристорный блок')
         await page.evaluate("addExtraRow({name:'Шеф-монтаж', qty:1, unit:'усл.'}, true)")
         n, t = await tkp()
         check(n > 8 and 'ESQ F HVS' in t(3) and 'Шеф-монтаж' in t(3), f'ТКП УПП: {n} стр., доп. строка на листе 3')
+        check('ЗИП: тиристорный блок' in t(3), 'ТКП УПП: ЗИП в строке УПП на листе 3')
         text, nsec = await word()
-        check('Шеф-монтаж' in text and 'Функции защиты' in text and 'ESQ F HVS' in text, 'ТКП УПП в Word: доп. строка и характеристики')
+        check('Шеф-монтаж' in text and 'Функции защиты' in text and 'ESQ F HVS' in text and 'ЗИП: тиристорный блок' in text, 'ТКП УПП в Word: доп. строка, ЗИП и характеристики')
 
         # ---------- реестр ТКП ----------
         print('Реестр ТКП')
