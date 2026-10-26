@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Конфигуратор преобразователя частоты ESQ F ME800</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <style>
     /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
     @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2'),url('assets/fonts/Inter-Light.woff') format('woff')}
@@ -486,7 +487,8 @@
     <div class="footer-in">
       <img class="icons" src="assets/ui/icons.png" alt="">
       <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
-      <p><a href="tz.html" class="ft-link" tabindex="-1" aria-hidden="true">©</a> 2026 ESQ · ООО «Элком»</p>
+      <p><a href="tz.html" class="ft-link" tabindex="-1" aria-hidden="true">©</a> <span id="year">2026</span> ESQ · ООО «Элком»</p>
+      <script>document.getElementById('year').textContent = new Date().getFullYear();   // год в подвале — текущий</script>
     </div>
   </footer>
 
@@ -1691,6 +1693,12 @@
       document.head.appendChild(st);
 
       let okSession = false; try { okSession = sessionStorage.getItem('tkpPwOk') === '1'; } catch (e) {}
+      let pwFails = 0;                                                    // неверные пароли в этой вкладке: после каждого — пауза 2, 4, 8 … 60 с
+      function hold(btn, sec, done) {
+        btn.disabled = true;
+        const tick = () => { if (sec <= 0) { btn.textContent = 'Скачать'; btn.disabled = false; return done(); } btn.textContent = 'Подождите ' + sec-- + ' с'; setTimeout(tick, 1000); };
+        tick();
+      }
       function askPassword() {
         return new Promise(resolve => {
           const ov = document.createElement('div'); ov.className = 'pw-ov';
@@ -1703,6 +1711,7 @@
           const onKey = e => { if (e.key === 'Escape') close(false); };
           document.addEventListener('keydown', onKey);
           async function submit() {
+            if (go.disabled) return;                                       // идёт проверка или пауза после неверного пароля (Enter)
             if (!pw.value) { err.textContent = 'Введите пароль'; return; }
             go.disabled = true; err.style.color = '#6b787c'; err.textContent = 'Проверяю…';
             try {
@@ -1710,6 +1719,7 @@
               let j = null; try { j = await r.json(); } catch (e) {}
               if (r.ok && j && j.ok) { try { sessionStorage.setItem('tkpPwOk', '1'); } catch (e) {} okSession = true; close(true); return; }
               err.style.color = '#b42318'; err.textContent = (j && j.error) ? j.error : 'Не удалось проверить пароль (код ' + r.status + ')';
+              if (r.status === 403 || r.status === 429) { pwFails++; return hold(go, Math.min(60, 2 ** pwFails), () => pw.select()); }
             } catch (e) { err.style.color = '#b42318'; err.textContent = 'Нет связи с сервером проверки — попробуйте позже'; }
             go.disabled = false; pw.select();
           }

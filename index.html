@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Конфигураторы оборудования ESQ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <style>
     /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
     @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2'),url('assets/fonts/Inter-Light.woff') format('woff')}
@@ -189,7 +190,8 @@
     <div class="footer-in">
       <img class="icons" src="assets/ui/icons.png" alt="">
       <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
-      <p>© 2026 ESQ · ООО «Элком»</p>
+      <p>© <span id="year">2026</span> ESQ · ООО «Элком»</p>
+      <script>document.getElementById('year').textContent = new Date().getFullYear();   // год в подвале — текущий</script>
     </div>
   </footer>
 </body>

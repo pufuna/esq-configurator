@@ -63,10 +63,19 @@
 
   // ===== 1. ДОСТУП =====
   if (store.get('tzpw')) { $('pw').value = store.get('tzpw'); $('authMsg').textContent = 'Пароль сохранён до закрытия браузера'; }
+  let pwFails = 0;                                                   // после каждого отказа в доступе — пауза 2, 4, 8 … 60 с
   $('btnLogin').onclick = async () => {
+    const b = $('btnLogin'); if (b.disabled) return;
     const m = $('authMsg'); m.className = 'msg'; m.innerHTML = '<span class="spin"></span>Проверяю…';
-    try { await api('ping'); store.set('tzpw', $('pw').value); m.className = 'msg ok'; m.textContent = 'Доступ есть'; }
-    catch (e) { m.className = 'msg err'; m.textContent = e.message; }
+    try { await api('ping'); pwFails = 0; store.set('tzpw', $('pw').value); m.className = 'msg ok'; m.textContent = 'Доступ есть'; }
+    catch (e) {
+      m.className = 'msg err'; m.textContent = e.message;
+      if (/парол|попыт/i.test(e.message)) {
+        let sec = Math.min(60, 2 ** ++pwFails); const label = b.textContent; b.disabled = true;
+        const tick = () => { if (sec <= 0) { b.textContent = label; b.disabled = false; return; } b.textContent = 'Подождите ' + sec-- + ' с'; setTimeout(tick, 1000); };
+        tick();
+      }
+    }
   };
   $('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('btnLogin').click(); });
   $('btnDiag').onclick = async () => {

@@ -11,6 +11,7 @@
   • ТКП ПЧ (ME800, ME800-R, 3 кВ, с доп. строками) и ТКП УПП собираются, на листе 3 — нужная маркировка и итог;
   • УПП: подбор по двигателю, ЗИП в строке УПП (PDF и Word);
   • форма восстанавливается после перезагрузки страницы;
+  • общий реестр: пауза после неверного пароля, четыре менеджера одновременно скачивают ТКП;
   • сайт работает без CDN (cdn.jsdelivr.net заблокирован — библиотеки берутся из assets/vendor);
   • в консоли нет ошибок JavaScript.
 """
@@ -226,6 +227,7 @@ async def main():
             check(await page.is_visible('#login'), 'страница реестра предлагает войти в общий реестр')
             await page.fill('#pw', 'wrong'); await page.click('#login button'); await page.wait_for_timeout(500)
             check('Неверный пароль' in await page.text_content('#loginErr'), 'неверный пароль не пускает')
+            check(await page.is_disabled('#login button'), 'после неверного пароля — пауза перед следующей попыткой')
             await page.fill('#pw', 'test-password'); await page.click('#login button'); await page.wait_for_timeout(1200)
             first = await page.inner_text('#rows tr:first-child')
             check('HVS' in first and 'не отправлено' not in first, 'свежее ТКП уже в общем реестре (ушло на сервер при скачивании)')
@@ -237,6 +239,31 @@ async def main():
             await page.click('#rows tr button.del'); await page.wait_for_timeout(800)
             await page.click('#reload'); await page.wait_for_timeout(800)
             check(await page.eval_on_selector_all('#rows tr', 'r => r.length') == n_shared - 1, 'удаление из общего реестра')
+
+            # несколько менеджеров одновременно — у каждого свой браузер
+            print('Несколько сотрудников одновременно')
+            team = [('Петров П.П.', 'configurator_vv_pch.html'), ('Сидоров С.С.', 'vv_upp.html'),
+                    ('Кузнецова А.В.', 'configurator_vv_pch.html'), ('Смирнов Д.А.', 'vv_upp.html')]
+            async def manager(who, url):
+                c = await browser.new_context(accept_downloads=True)
+                await c.route('https://cdn.jsdelivr.net/**', lambda r: r.abort())
+                await c.add_init_script(f"window.REGISTRY_URL = '{fn_url}'")
+                p = await c.new_page(); errs = []
+                p.on('pageerror', lambda e: errs.append(str(e)))
+                await p.goto(base + url); await p.wait_for_timeout(500)
+                await p.fill('#tkpAuthor', who)
+                async with p.expect_download(timeout=180000) as dl:
+                    await p.click('a.btn-primary')
+                ok = (await dl.value).suggested_filename.endswith('.pdf')
+                await p.wait_for_timeout(1500)
+                unsent = await p.evaluate("TkpRegistry.read().filter(e => e.sent === false).length")
+                await c.close()
+                return ok and unsent == 0 and not errs
+            res = await asyncio.gather(*(manager(w, u) for w, u in team))
+            check(all(res), f'4 менеджера одновременно скачали ТКП, всё ушло в общий реестр: {res}')
+            await page.click('#reload'); await page.wait_for_timeout(1200)
+            rows = await page.inner_text('#rows')
+            check(all(w in rows for w, _ in team), 'в общем реестре видны ТКП всех четырёх')
         finally:
             proc.terminate()
 

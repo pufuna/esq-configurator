@@ -9,7 +9,12 @@
    Переменные окружения функции:
      BUCKET             — имя бакета (обязательно);
      REGISTRY_PASSWORD  — пароль сотрудника для просмотра, удаления и импорта (обязательно);
-     ALLOW_ORIGIN       — с какого сайта разрешены запросы, например https://pufuna.github.io (по умолчанию — с любого).
+     ALLOW_ORIGIN       — с какого сайта разрешены запросы, например https://portal.elcom.ru (по умолчанию — с любого).
+
+   Защита от подбора пароля: после AUTH_MAX_FAILS (по умолчанию 10) неверных паролей с одного адреса за 15 минут
+   адрес блокируется на 15 минут, при повторе — на 30, 60 … до 24 часов; верный пароль сбрасывает счётчик.
+   Порог с запасом: у сотрудников в офисе обычно один внешний адрес на всех, опечатки коллег складываются.
+   Счётчики — объекты a/<хэш адреса>.json в том же бакете (сам адрес не хранится).
 
    Запрос — POST, тело JSON { action, ... }:
      ping            { password }                  → { ok }               проверка пароля
@@ -18,6 +23,7 @@
      registry_delete { password, id, at }          → { ok }
      registry_import { password, entries: [...] }  → { ok, added }        перенос записей из браузеров (до 500 за раз) */
 'use strict';
+const crypto = require('crypto');
 
 const S3 = process.env.S3_ENDPOINT || 'https://storage.yandexcloud.net';   // S3_ENDPOINT — только для автотеста
 const MAX_BODY = 200 * 1024;                        // одна запись — меньше 10 КБ; импорт — до 200 КБ за запрос
@@ -87,6 +93,35 @@ function s3(token) {
   };
 }
 
+/* ---------- защита от подбора пароля ---------- */
+const AUTH_WINDOW = 15 * 60e3, AUTH_LOCK = 15 * 60e3, AUTH_LOCK_MAX = 24 * 3600e3;
+const authMax = () => Math.max(3, Number(process.env.AUTH_MAX_FAILS) || 10);
+const sha = s => crypto.createHash('sha256').update(String(s)).digest();
+function sourceIp(event) {
+  const h = event.headers || {}, xff = h['X-Forwarded-For'] || h['x-forwarded-for'] || '';
+  return (event.requestContext && event.requestContext.identity && event.requestContext.identity.sourceIp) || xff.split(',')[0].trim() || 'unknown';
+}
+function passwordOk(given) {                                        // сравнение за постоянное время
+  return typeof given === 'string' && given !== '' && crypto.timingSafeEqual(sha(given), sha(process.env.REGISTRY_PASSWORD));
+}
+function guard(st, ip) {
+  const key = 'a/' + sha('esq-auth:' + ip).toString('hex').slice(0, 32) + '.json';
+  let rec = null;
+  const load = async () => rec || (rec = await st.get(key).catch(() => ({ fails: 0, first: 0, until: 0, locks: 0 })));
+  return {
+    async lockedFor() { const r = await load(); return Math.max(0, r.until - Date.now()); },
+    async fail() {
+      const r = await load(), now = Date.now();
+      if (now - r.first > AUTH_WINDOW) { r.fails = 0; r.first = now; }
+      r.fails++;
+      if (r.fails >= authMax()) { r.locks++; r.until = now + Math.min(AUTH_LOCK * 2 ** (r.locks - 1), AUTH_LOCK_MAX); r.fails = 0; r.first = 0; }
+      await st.put(key, r).catch(e => console.error(e));
+    },
+    async ok() { const r = await load(); if (r.fails || r.locks || r.until) await st.del(key).catch(() => {}); }
+  };
+}
+const minutes = ms => Math.ceil(ms / 60e3);
+
 // префиксы месяцев за последние days дней (0 — весь реестр)
 function monthPrefixes(days) {
   if (!days) return ['e/'];
@@ -103,6 +138,27 @@ async function pool(items, n, fn) {                                 // не бо
   return out;
 }
 
+/* Записи по месяцам с кэшем: c/ГГГГ-ММ.json — все записи месяца одним объектом.
+   Источник правды — сами объекты e/…: кэш проверяется по списку ключей, недостающее дочитывается поштучно,
+   удалённое выбрасывается, и кэш перезаписывается. Так реестр компании за годы открывается за секунды,
+   а не за тысячи отдельных чтений. */
+async function monthEntries(st, keys) {
+  const byMonth = {};
+  keys.forEach(k => (byMonth[k.slice(2, 9)] = byMonth[k.slice(2, 9)] || []).push(k));
+  const parts = await pool(Object.keys(byMonth), 4, async m => {
+    const ks = byMonth[m], cacheKey = 'c/' + m + '.json';
+    const cache = await st.get(cacheKey).catch(() => ({}));
+    const miss = ks.filter(k => !cache[k]);
+    const got = await pool(miss, 32, k => st.get(k));
+    const fresh = {};
+    ks.forEach(k => { if (cache[k]) fresh[k] = cache[k]; });
+    miss.forEach((k, i) => { if (got[i]) fresh[k] = got[i]; });
+    if (miss.length || Object.keys(cache).length !== Object.keys(fresh).length) await st.put(cacheKey, fresh).catch(e => console.error(e));
+    return Object.values(fresh);
+  });
+  return parts.flat();
+}
+
 module.exports.handler = async function (event, context) {
   if ((event.httpMethod || '').toUpperCase() === 'OPTIONS') return reply(204, {});
   if (!process.env.BUCKET || !process.env.REGISTRY_PASSWORD) return reply(500, { ok: false, error: 'Функция не настроена: задайте BUCKET и REGISTRY_PASSWORD' });
@@ -114,10 +170,20 @@ module.exports.handler = async function (event, context) {
   if (raw.length > MAX_BODY) return reply(413, { ok: false, error: 'Слишком большой запрос' });
   let q; try { q = JSON.parse(raw || '{}'); } catch (e) { return reply(400, { ok: false, error: 'Тело запроса — не JSON' }); }
 
-  const authed = q.password && q.password === process.env.REGISTRY_PASSWORD;
-  const need = () => reply(403, { ok: false, error: 'Неверный пароль' });
   const st = s3(token);
+  let authed = false, need = () => reply(403, { ok: false, error: 'Неверный пароль' });
   try {
+    if (q.action !== 'registry_add') {                              // всё, кроме записи о ТКП, — по паролю
+      const g = guard(st, sourceIp(event)), wait = await g.lockedFor();
+      if (wait) return reply(429, { ok: false, error: 'Слишком много неверных паролей. Повторите через ' + minutes(wait) + ' мин.' });
+      authed = passwordOk(q.password);
+      if (authed) await g.ok();
+      else if (q.password) {
+        await g.fail();
+        const left = await g.lockedFor();
+        if (left) need = () => reply(429, { ok: false, error: 'Слишком много неверных паролей. Повторите через ' + minutes(left) + ' мин.' });
+      }
+    }
     switch (q.action) {
       case 'ping':
         return authed ? reply(200, { ok: true }) : need();
@@ -133,7 +199,7 @@ module.exports.handler = async function (event, context) {
         if (!authed) return need();
         const days = Math.max(0, Math.min(3650, Number(q.days) || 0));
         const keys = (await Promise.all(monthPrefixes(days).map(p => st.list(p)))).flat();
-        const entries = (await pool(keys, 32, k => st.get(k))).filter(Boolean)
+        const entries = (await monthEntries(st, keys)).filter(Boolean)
           .filter(e => !days || new Date(e.at) >= new Date(Date.now() - days * 864e5))
           .sort((a, b) => (a.at < b.at ? -1 : 1));
         return reply(200, { ok: true, entries });

@@ -1,0 +1,14 @@
+# Конфигураторы ESQ на Apache: типы файлов и проверка свежести страниц и скриптов.
+# Кладётся в папку сайта рядом с index.html (нужен AllowOverride FileInfo, для заголовков — mod_headers).
+AddType text/javascript .mjs
+AddType image/webp .webp
+AddType font/woff2 .woff2
+AddType application/json .json
+DirectoryIndex index.html
+
+<IfModule mod_headers.c>
+  # страницы, скрипты и данные — всегда сверять с сервером, чтобы после обновления никто не работал со старой версией
+  <FilesMatch "\.(html|js|mjs|json)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

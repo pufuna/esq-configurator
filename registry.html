@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Реестр выданных ТКП — ESQ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
   <style>
     /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
     @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2'),url('assets/fonts/Inter-Light.woff') format('woff')}
@@ -265,7 +266,8 @@
     <div class="footer-in">
       <img class="icons" src="assets/ui/icons.png" alt="">
       <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
-      <p>© 2026 ESQ · ООО «Элком»</p>
+      <p>© <span id="year">2026</span> ESQ · ООО «Элком»</p>
+      <script>document.getElementById('year').textContent = new Date().getFullYear();   // год в подвале — текущий</script>
     </div>
   </footer>
   <script src="registry.js"></script>
@@ -297,6 +299,7 @@
       } catch (e) {
         server = null;
         if (e.status === 403) { pw = null; try { sessionStorage.removeItem('esq.regPw'); } catch (x) {} $('loginErr').textContent = 'Неверный пароль'; }
+        else if (e.status === 429) $('loginErr').textContent = e.message;
         else $('loginErr').textContent = 'Общий реестр недоступен: ' + e.message + '. Показаны записи этого браузера.';
         $('login').hidden = false;
       }
@@ -340,12 +343,20 @@
     $('period').addEventListener('input', () => shared() ? loadServer() : render());
 
     /* ---------- вход в общий реестр ---------- */
+    let pwFails = 0;                                                  // после каждого неверного пароля — пауза 2, 4, 8 … 60 с
     $('login').addEventListener('submit', async ev => {
       ev.preventDefault();
-      const v = $('pw').value; if (!v) return;
+      const v = $('pw').value, btn = $('login').querySelector('button'); if (!v || (btn && btn.disabled)) return;
       $('loginErr').textContent = 'Проверяю…';
-      try { await SH.ping(v); pw = v; try { sessionStorage.setItem('esq.regPw', v); } catch (e) {} $('loginErr').textContent = ''; $('pw').value = ''; await loadServer(); }
-      catch (e) { $('loginErr').textContent = e.status === 403 ? 'Неверный пароль' : 'Нет связи с общим реестром: ' + e.message; }
+      try { await SH.ping(v); pwFails = 0; pw = v; try { sessionStorage.setItem('esq.regPw', v); } catch (e) {} $('loginErr').textContent = ''; $('pw').value = ''; await loadServer(); }
+      catch (e) {
+        $('loginErr').textContent = e.status === 403 ? 'Неверный пароль' : e.status === 429 ? e.message : 'Нет связи с общим реестром: ' + e.message;
+        if ((e.status === 403 || e.status === 429) && btn) {
+          let sec = Math.min(60, 2 ** ++pwFails); const label = btn.textContent; btn.disabled = true;
+          const tick = () => { if (sec <= 0) { btn.textContent = label; btn.disabled = false; return; } btn.textContent = 'Подождите ' + sec-- + ' с'; setTimeout(tick, 1000); };
+          tick();
+        }
+      }
     });
     $('logout').onclick = () => { pw = null; server = null; try { sessionStorage.removeItem('esq.regPw'); } catch (e) {} $('sharedBar').hidden = true; $('login').hidden = false; render(); };
     $('reload').onclick = () => loadServer();
