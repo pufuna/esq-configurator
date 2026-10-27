@@ -11,6 +11,7 @@
   • ТКП ПЧ (ME800, ME800-R, 3 кВ, с доп. строками) и ТКП УПП собираются, на листе 3 — нужная маркировка и итог;
   • УПП: подбор по двигателю, ЗИП в строке УПП (PDF и Word);
   • габариты и масса, вписанные вручную (ПЧ и УПП), — в техописании и ТКП;
+  • ТКП ПЧ на несколько моделей (PDF и Word);
   • форма восстанавливается после перезагрузки страницы;
   • реестр ТКП — только по паролю, ссылки на него видны лишь вошедшим; пауза после неверного пароля, четыре менеджера одновременно скачивают ТКП;
   • сайт работает без CDN (cdn.jsdelivr.net заблокирован — библиотеки берутся из assets/vendor);
@@ -178,6 +179,22 @@ async def main():
         await sel('model', 'ME800'); await sel('voltage', 'T100'); await sel('power', '1000'); await sel('capacitorType', 'PF')
         n, t = await tkp()
         check('ESQ F ME800-1000P072' in t(3).replace('- ', '-') and '150% в течение 2 секунд' not in t(13), 'ТКП ME800 (плёночные, корпус G4) собирается, характеристики шаблона ME800')
+        # ТКП на несколько моделей: общая часть + по модели расшифровка, схема коммутации, чертёж, характеристики
+        for pw_ in ['315', '800']:
+            for i_, v_ in [('model', 'ME800R'), ('voltage', 'T060'), ('power', pw_), ('capacitorType', 'PF')]: await sel(i_, v_)
+            await page.click('.md-add')
+        await sel('model', 'ME800'); await sel('voltage', 'T100'); await sel('power', '1000'); await sel('capacitorType', 'PF')
+        keep = await page.text_content('#result')
+        async with page.expect_download(timeout=300000) as dl:
+            await page.click('a.btn-primary')
+        d_ = await dl.value
+        n_ = pdf_pages(open(await d_.path(), 'rb').read())
+        check(n_ == 27 and d_.suggested_filename == 'TKP_ESQ_F_ME800_315-800kW.pdf' and await page.text_content('#result') == keep,
+              f'ТКП на 2 модели: {n_} листов (5 общих + по модели 2+2+1+3, топология 1+2, 9 общих), форма вернулась к своей конфигурации')
+        text, nsec = await word()
+        check(nsec == 23 and '0315P038' in text and '0800P096' in text and text.count('Расшифровка обозначения') == 2 and 'Всего позиций:' in text,
+              f'ТКП на 2 модели в Word: {nsec} разделов, обе модели')
+        while await page.query_selector('#tkpModels .md-del'): await page.click('#tkpModels .md-del')
         # габариты и масса, вписанные вручную, — в техописании и ТКП
         await page.fill('#tkpDims', '2700x1400 x 2500'); await page.fill('#tkpMass', '3,1')
         check('2700×1400×2500' in await page.text_content('#dimsNote'), 'ручные габариты распознаны: ' + await page.text_content('#dimsNote'))

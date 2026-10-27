@@ -193,6 +193,13 @@
     .ex-row small{display:block;color:var(--muted);font-size:11.5px;margin:0 0 3px 2px}
     .add-row{width:100%;cursor:pointer;font-family:inherit}
     @media (max-width:720px){.ex-row{grid-template-columns:1fr 1fr 38px}.ex-row .ex-name{grid-column:1 / -1}}
+    .models{margin-top:14px}
+    .md-row{display:grid;grid-template-columns:minmax(0,1fr) 78px 140px 38px;gap:8px;align-items:end;padding:10px;margin-bottom:10px;background:var(--orange-l);border:1px solid #f6c7ae;border-radius:12px}
+    .md-row .md-mark{font-weight:600;color:var(--teal);font-size:14px;overflow-wrap:anywhere;align-self:center}
+    .md-row .md-mark small{display:block;font-weight:400;color:var(--muted);font-size:12px;margin-top:2px}
+    .md-row small{display:block;color:var(--muted);font-size:11.5px;margin:0 0 3px 2px}
+    .md-row .md-del{min-height:42px;border:1.5px solid var(--line);background:#fff;border-radius:10px;color:#b42318;font-size:20px;line-height:1;cursor:pointer}
+    @media (max-width:720px){.md-row{grid-template-columns:1fr 1fr 38px}.md-row .md-mark{grid-column:1 / -1}}
 
     /* ---------- документация ---------- */
     .docs-card{background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);padding:16px 18px 18px}
@@ -445,6 +452,15 @@
         </div>
         <div id="tkpExtras"></div>
         <button type="button" class="btn btn-line add-row" onclick="addExtraRow()">+ Добавить строку</button>
+      </div>
+      <div class="extras models">
+        <div class="extras-head">
+          <label>Несколько моделей в одном ТКП</label>
+          <span class="note" id="mdNote">Настройте модель выше и нажмите «Добавить в ТКП», затем следующую. Если список не пуст, ТКП собирается по нему:
+            каждая модель — своей строкой в предложении, со своими расшифровкой, схемой коммутации, чертежом и характеристиками.</span>
+        </div>
+        <div id="tkpModels"></div>
+        <button type="button" class="btn btn-line add-row md-add" onclick="addModelToTkp()">+ Добавить текущую модель в ТКП</button>
       </div>
     </section>
 
@@ -1611,6 +1627,45 @@
       if (!noFocus) row.querySelector('.ex-n').focus();
     }
     window.addExtraRow = addExtraRow;
+    /* ===== Несколько моделей в одном ТКП: снимок конфигурации (formstate.js) + количество и цена ===== */
+    function addTkpModelRow(m){
+      const box = document.getElementById('tkpModels'), row = document.createElement('div');
+      row.className = 'md-row';
+      row.dataset.cfg = JSON.stringify(m.cfg || {});
+      row.dataset.mark = m.mark || '';
+      row.innerHTML = '<div class="md-mark"></div>' +
+        '<div><small>Кол-во</small><input type="number" class="md-q" min="1" value="1"></div>' +
+        '<div><small>Цена за ед., руб.</small><input type="text" class="md-p" placeholder="Необязательно"></div>' +
+        '<div><button type="button" class="md-del" title="Убрать модель из ТКП" aria-label="Убрать модель из ТКП">×</button></div>';
+      row.querySelector('.md-mark').textContent = m.mark || '';
+      if (m.summary) { const sm = document.createElement('small'); sm.textContent = m.summary; row.querySelector('.md-mark').appendChild(sm); }
+      row.dataset.summary = m.summary || '';
+      if (m.qty) row.querySelector('.md-q').value = m.qty;
+      if (m.price) row.querySelector('.md-p').value = m.price;
+      row.querySelector('.md-del').onclick = () => { row.remove(); updateModelsNote(); };
+      box.appendChild(row);
+      updateModelsNote();
+    }
+    function updateModelsNote(){
+      const n = document.querySelectorAll('#tkpModels .md-row').length, b = document.querySelector('.md-add');
+      if (b) b.textContent = n ? '+ Добавить текущую модель в ТКП (в списке: ' + n + ')' : '+ Добавить текущую модель в ТКП';
+    }
+    function addModelToTkp(){
+      updateNomenclature();
+      const cfg = window.FormStateSnapshot ? window.FormStateSnapshot() : {};
+      ['tkpAuthor', 'tkpQty', 'tkpPrice', 'mpKw', 'mpA', 'mpLoad'].forEach(k => delete cfg[k]);   // составитель общий, кол-во и цена — в строке списка
+      const mark = document.getElementById('result').textContent.trim();
+      if ([...document.querySelectorAll('#tkpModels .md-row')].some(r => r.dataset.mark === mark && !confirm('Модель ' + mark + ' уже в списке. Добавить ещё раз?'))) return;
+      const qty = Math.max(1, parseInt(document.getElementById('tkpQty').value, 10) || 1);
+      const price = document.getElementById('tkpPrice').value.trim();
+      addTkpModelRow({ cfg, mark, qty, price, summary: document.getElementById('old-result').textContent.trim() });
+    }
+    window.addTkpModelRow = addTkpModelRow; window.addModelToTkp = addModelToTkp;
+    window.getTkpModels = () => Array.from(document.querySelectorAll('#tkpModels .md-row')).map(row => ({
+      cfg: JSON.parse(row.dataset.cfg || '{}'), mark: row.dataset.mark, summary: row.dataset.summary,
+      qty: Math.max(1, parseInt(row.querySelector('.md-q').value, 10) || 1),
+      price: String(row.querySelector('.md-p').value).trim()
+    }));
     window.getTkpExtras = () => Array.from(document.querySelectorAll('#tkpExtras .ex-row')).map(row => ({
       name: row.querySelector('.ex-n').value.replace(/\s+/g, ' ').trim(),
       qty: Math.max(1, parseInt(row.querySelector('.ex-q').value, 10) || 1),

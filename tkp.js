@@ -170,197 +170,222 @@
     };
   }
 
+  /* Сборка ТКП по состоянию s (комплектация из формы — readState). o — для ТКП на несколько моделей:
+     offer — строки предложения, coverMarks — маркировки на обложке, coverG4 — фото обложки, descS — комплектация для описания,
+     stamp — подпись в штампе листа {лист: текст}, pageNo — номера листов {лист: номер}, toc — номера в содержании, say — куда напоминания */
+  async function build(s, o = {}) {
+    const say = o.say || (t => alert(t));
+    const get = u => fetch(u).then(r => { if (!r.ok) throw new Error('Не найден файл ' + u); return r; });
+    const [tpl, GL] = await Promise.all([get('assets/template.pdf').then(r => r.arrayBuffer()), get('assets/glyphs.json').then(r => r.json())]);
+    const doc = await PDFDocument.load(tpl);
+    const F = makeFonts(GL);
+    window.__tkpF = F;
+    const pg = doc.getPages();
+    const M = prepareMasks(doc, pg);
+    // ME800-R: энкодер не поддерживается — строка «Работа с энкодером» (стр. 14) убирается, строки ниже поднимаются
+    let CELL_ = CELL;
+    if (s.isR) {
+      const [e0, e1] = ENC_ROW, END = 698.0, dy = e1 - e0, p14 = pg[14], H14 = p14.getHeight(), X0 = 48, X1 = 566;
+      M.add(14, X0, e0 + 0.6, X1, END);                                  // рамка листа (x 46,5 и 567,5) не трогается
+      const tdoc = await PDFDocument.load(tpl);
+      const ep = await doc.embedPage(tdoc.getPage(14), { left: X0, right: X1, bottom: H14 - END, top: H14 - (e1 - 0.6) });
+      p14.drawPage(ep, { x: X0, y: H14 - END + dy, width: X1 - X0, height: END - (e1 - 0.6) });
+      CELL_ = Object.fromEntries(Object.entries(CELL).map(([k, c]) => [k, c[0] === 14 && c[2] >= e1 - 1 ? [c[0], c[1], c[2] - dy, c[3], c[4] - dy] : c]));
+      // в перенесённой части шаблонный текст ячеек, которые у R заполняются заново, закрываем белым (маски листа на неё не действуют)
+      for (const k of Object.keys(R_CELLS(s))) {
+        const c = CELL_[k]; if (c[0] !== 14 || c[2] < e0) continue;
+        p14.drawRectangle({ x: c[1] + 1.6, y: H14 - (c[4] - 1.4), width: c[3] - c[1] - 3.2, height: c[4] - c[2] - 3, color: rgb(1, 1, 1) });
+      }
+    }
+
+    /* ---------- помощники ---------- */
+    const rot = p => p.getRotation().angle;
+    /* vx — якорь по горизонтали, vy — базовая линия; o.f — шрифт L | R | S; o.a — l | c | r; o.maxW — сжать по ширине; o.ang — поворот, град. против часовой */
+    const LOG = window.__tkpLog = [], VALS = {};                         // VALS — значения ячеек характеристик (для Word)                                    // что выведено на листы — для автопроверки (tests/)
+    const put = (p, str, vx, vy, size, o = {}) => {
+      str = String(str); LOG.push([pg.indexOf(p), str]);
+      const f = F[o.f || 'L'], w0 = f.width(str, size);
+      let hs = 1; if (o.maxW && w0 > o.maxW) hs = o.maxW / w0;
+      const w = w0 * hs, r = rot(p), H = p.getHeight(), th = ((o.ang || 0) + r) * Math.PI / 180;
+      const cs = Math.cos(th), sn = Math.sin(th);
+      const off = o.a === 'c' ? -w / 2 : o.a === 'r' ? -w : 0;
+      let ux = r === 90 ? vy : vx, uy = r === 90 ? vx : H - vy;
+      ux += off * cs; uy += off * sn;
+      p.pushOperators(pushGraphicsState(), concatTransformationMatrix(cs * hs, sn * hs, -sn, cs, ux, uy));
+      p.drawSvgPath(f.path(str), { x: 0, y: 0, scale: size / f.upm, color: o.c || DARK, borderWidth: 0 });
+      p.pushOperators(popGraphicsState());
+      return w;
+    };
+    const W = (str, f, size) => F[f].width(String(str), size);
+    const wrap = (str, f, size, maxW) => {
+      const out = []; let cur = '';
+      // слово длиннее строки (маркировка) — переносим после «/» или «-»; куски одного слова склеиваются без пробела
+      const toks = [];
+      for (const w of String(str).split(' ')) {
+        if (W(w, f, size) <= maxW) { toks.push([w, false]); continue; }
+        w.split(/(?<=[\/-])/).forEach((pc, i) => toks.push([pc, i > 0]));
+      }
+      for (const [w, glue] of toks) { const t = cur ? cur + (glue ? '' : ' ') + w : w; if (W(t, f, size) > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
+      out.push(cur); return out;
+    };
+    /* абзац с выравниванием по ширине; top — верх строки; возвращает низ абзаца */
+    const para = (p, x0, x1, top, str, o = {}) => {
+      const f = o.f || 'L', size = o.size || 9.6, lead = o.lead || size * 1.375, ind = o.indent || 0, c = o.c || DARK;
+      const words = String(str).split(' '), lines = []; let cur = [];
+      for (const w of words) {
+        const lim = x1 - x0 - (lines.length ? 0 : ind), t = cur.concat(w).join(' ');
+        if (cur.length && W(t, f, size) > lim) { lines.push(cur); cur = [w]; } else cur.push(w);
+      }
+      lines.push(cur);
+      let y = top + size * .95;
+      lines.forEach((ln, k) => {
+        const xs = x0 + (k ? 0 : ind), avail = x1 - xs;
+        if (o.justify !== false && k < lines.length - 1 && ln.length > 1) {
+          const ww = ln.reduce((a, w) => a + W(w, f, size), 0), gap = (avail - ww) / (ln.length - 1);
+          let xx = xs; for (const w of ln) { if (!o.dry) put(p, w, xx, y, size, { f, c }); xx += W(w, f, size) + gap; }
+        } else if (!o.dry) put(p, ln.join(' '), xs, y, size, { f, c });
+        y += lead;
+      });
+      return y - lead + size * .3;
+    };
+    /* текст в ячейке: по центру, с переносом; кегль уменьшается, если не помещается */
+    const cell = (name, str, o = {}) => {
+      VALS[name] = str;
+      const [pi, x0, y0, x1, y1] = CELL_[name], p = pg[pi], f = o.f || 'L', pad = 4;
+      let size = o.size || 8.6, ls, ld, h;
+      for (;;) { ld = size * 1.24; ls = wrap(str, f, size, x1 - x0 - 2 * pad); h = (ls.length - 1) * ld + size * .72; if (h <= y1 - y0 - 3 || size < 6) break; size -= .2; }
+      let y = (y0 + y1) / 2 - h / 2 + size * .72;
+      for (const l of ls) { put(p, l, (x0 + x1) / 2, y, size, { f, a: 'c' }); y += ld; }
+    };
+    const stamp = i => { const [cx, base, mw] = STAMP[i]; put(pg[i], (o.stamp && o.stamp[i]) || s.mark, cx, base, 9, { f: 'R', a: 'c', maxW: mw }); };
+
+    /* ---------- обложка: фото по типу корпуса, маркировка, автор, дата ---------- */
+    if (o.coverG4 === undefined ? !s.g4 : !o.coverG4) {
+      try {
+        const jpg = await doc.embedPng(await get('assets/cover_g1g3.png').then(r => r.arrayBuffer()));   // фон фото прозрачный — рисунок обложки виден
+        M.add(0, 20, 194.2, 279, 513.6);                                   // фото шкафа G4 из шаблона
+        const H0 = pg[0].getHeight();
+        pg[0].drawImage(jpg, { x: 44.3, y: H0 - 484.6, width: 331.9, height: 297.7 });
+      } catch (e) { console.warn('Фото корпуса G1/G3 не найдено — на обложке остаётся фото шаблона', e); }
+    }
+    if (o.coverMarks && o.coverMarks.length > 1) {                       // несколько моделей — маркировки столбиком в плашке обложки
+      const n = o.coverMarks.length, lh = Math.min(15, 34 / n), size = Math.min(11, lh * .86);
+      o.coverMarks.forEach((mk, i) => put(pg[0], mk.replace(/А/g, 'A'), 38.6, 742 - (n - 1 - i) * lh, size, { f: 'R', c: WHITE, maxW: 518 }));
+    } else put(pg[0], s.mark.replace(/А/g, 'A'), 38.6, 727.5, 15.5, { f: 'R', c: WHITE, maxW: 518 });
+    if (s.who) put(pg[0], s.who, 37.6 + W('Составил:', 'R', 12.5) + 7, 758.7, 12.5, { f: 'R', c: WHITE, maxW: 330 });
+    put(pg[0], new Date().toLocaleDateString('ru-RU'), 443.5 + W('ДАТА:', 'R', 12.5) + 6, 758.7, 12.5, { f: 'R', c: WHITE });
+
+    /* ---------- стр. 3: предложение ---------- */
+    if (!s.extra.length && !s.offer) {
+      wrap(s.name, 'L', 9.6, 240).forEach((l, i) => put(pg[3], l, 102.4, 162.5 + i * 12.3, 9.6));
+      put(pg[3], s.qty + ' шт', 375.85, 243, 10.2, { a: 'c' });
+      if (s.price) put(pg[3], money(s.price), 470.9, 243, 10.2, { a: 'c' });
+      put(pg[3], 'Всего позиций: 1, на сумму ' + (s.price ? money(s.price * s.qty) : '______________') + ' рублей, включая НДС 22 %', 58.6, 361.5, 10.6);
+    } else {
+      M.add(3, 55, 146.6, 545, 482);                                    // тело таблицы, итог и абзац о гарантии шаблона — рисуем заново
+      drawOfferTable(pg[3], s, put, W, wrap, para);
+    }
+
+    /* ---------- стр. 4: описание + выбранные опции ---------- */
+    drawDescription(pg[4], o.descS || s, para, put, W);
+
+    /* ---------- стр. 5: расшифровка обозначения ---------- */
+    drawDecode(pg[5], s, put, W, wrap);
+
+    /* ---------- стр. 6: схема коммутации (рисуется по комплектации) ---------- */
+    drawSwitching(pg[6], s, put, W);
+
+    /* ---------- условия эксплуатации: −5…+40 °С при работе, −20…+70 °С при хранении (как в РЭ) ---------- */
+    M.add(13, 250, 433.7, 562, 444.5);                                 // стр. 13, таблица: строка с температурой
+    put(pg[13], 'окружающего воздуха от ' + (s.isR ? '0' : '−5') + ' °С до +40 °С и относительной влажности не', 405.8, 442.2, 8.6, { a: 'c' });
+    M.add(15, 236, 173.5, 551, 184.4);                                 // стр. 15, защиты: порог повышенного напряжения — 110 % (как в РЭ)
+    put(pg[15], 'Защита срабатывает при уровне напряжения выше 110% от номинального', 237.3, 182.0, 8.6);
+    // ME800-R раздельного исполнения (4500 мм): обслуживание одностороннее — текст стр. 18 и без расстояния ≥400 мм до стены сзади
+    const rd = s.isR && window.rDrawing ? window.rDrawing() : null;
+    if (rd && rd.long) {
+      M.add(18, 49, 134.5, 563, 176);
+      para(pg[18], 50, 562, 136.3, 'Обслуживание преобразователя частоты одностороннее — с фасада. Ниже, на рис. 6, показаны требуемые расстояния между преобразователем частоты и стенами помещения, в котором он будет установлен.', { indent: 22 });
+      M.add(18, 378.6, 323.5, 429.2, 338.5);                           // размер «≥400 мм» (вид сбоку)
+    }
+    M.add(17, 68.5, 660.6, 545, 686.6);                                // стр. 17, раздел 7: две строки с температурами
+    put(pg[17], 'температура воздуха при хранении и транспортировке — от минус 20 °С до плюс 70 °С;', 70.1, 670.2, 9.6);
+    put(pg[17], 'температура окружающего воздуха — от ' + (s.isR ? '0 °С' : 'минус 5 °С') + ' до плюс 40 °С;', 70.1, 683.7, 9.6);
+    for (const i of [6, 7, 8, 9, 10]) stamp(i);
+
+    /* ---------- стр. 7–9, 12: схемы из техописания ---------- */
+    const SCH = new URL(window.SCHEMES_BASE || 'assets/schemes/', document.baseURI).href;
+    // топология ячейки: сдвоенная «два в одном» — только в компактном корпусе (ME800 — G4; ME800-R — ячейки F до 630 кВт (6 кВ) / 1000 кВт (10 кВ));
+    // иначе — одиночная ячейка (cell_el: выпрямитель — звено постоянного тока — H-мост, одинакова для обоих типов конденсаторов)
+    const schFiles = { 7: 'struct_' + s.n + '.pdf', 8: (s.dbl ? 'cell_pf' : 'cell_el') + '.pdf', 9: 'ext.pdf', 12: 'sine.pdf' };
+    const ZONE = { 7: [82, 150, 522, 692], 8: [112, 103, 719, 487], 9: [82, 146.5, 522, 692], 12: [70, 234, 525, 416] };
+    for (const [i, f] of Object.entries(schFiles)) {
+      try { const r = await fetch(SCH + f); if (r.ok) await drawScheme(doc, pg[+i], await r.arrayBuffer(), ZONE[i]); }
+      catch (e) { console.warn('Схема не найдена: ' + f, e); }
+    }
+
+    /* ---------- стр. 10: вес и чертёж ---------- */
+    const kgOf = t => isNaN(t) ? '—' : String(Math.round(t * 1000));
+    put(pg[10], kgOf(s.wT), 508.2, 472.5, 8.4, { f: 'R', a: 'c', c: TEAL });
+    put(pg[10], kgOf(s.wFull), 557.0, 472.5, 8.4, { f: 'R', a: 'c', c: TEAL, maxW: 24 });
+    const hasRDraw = s.isR && window.rDrawing && window.rDrawing();
+    if (!hasRDraw && s.film && !s.g4) say('Напоминание: для плёночного ПЧ этой мощности габаритный чертёж в ТКП не вставляется — страница чертежа останется пустой. Приложите чертёж к ТКП отдельно.');
+    else if (s.kv === 3) say('Напоминание: для ПЧ 3 кВ габаритный чертёж в ТКП не вставляется — страница чертежа останется пустой. Приложите чертёж к ТКП отдельно.');
+    else await drawDrawing(doc, pg[10], say);
+    // ME800-R: свой чертёж есть — пометка о неточных габаритах не нужна; доп. шкафы, которых нет на листе, — перечисляем
+    const rNote = s.isR && window.rDrawing && window.rDrawing() ? (window.rExtrasNote ? window.rExtrasNote() : '') : (s.r ? 'фактические габариты могут отличаться и будут уточнены после заказа' : '');
+    if (rNote) put(pg[10], '*' + rNote, 128, 472.5, 8.4, { c: DARK, maxW: 330 });
+    if (s.dimsCustom) put(pg[10], 'Габариты (Ш×Г×В) по согласованию: ' + s.dimsCustom + ' мм; на чертеже — стандартное исполнение.', 128, rNote ? 461 : 472.5, 8.4, { f: 'R', c: TEAL, maxW: 330 });
+
+    /* ---------- стр. 13–15: значения характеристик ---------- */
+    cell('t_name', s.mark);
+    cell('t_u', s.kv * 1000 + (s.isR ? ' В (−35…+15%)' : ' В ±10%'));
+    cell('t_p', s.P + ' кВт');
+    cell('t_i', s.I + ' А');
+    cell('t_uout', '0–' + s.uoutT + ' кВ');
+    cell('t_eff', 'не менее ' + s.eff + '%');
+    cell('t_n', cellsTxt(s.n));
+    cell('t_mat', 'Материал обмоток — ' + (s.cu ? 'медь' : 'алюминий'));
+    cell('t_cb', s.cb === 'B' ? 'Присутствует' : 'Отсутствует');
+    cell('t_ip', 'IP' + s.ip);
+    cell('t_life', 'Стандартно ' + s.life + ' часов (температура, нагрузка и время непрерывного использования имеют большое влияние на срок службы конденсаторов)');
+    cell('t_cap', s.film ? 'Пленочные' : 'Электролитические');
+    cell('t_ups', s.ups ? 'Присутствует' : 'Отсутствует');
+    cell('t_proto', s.proto);
+    const tn = t => String(t).replace('.', ',');
+    cell('t_w', isNaN(s.wT) ? '—' : (s.wFull > s.wT ? 'ПЧ — ' + tn(s.wT) + ' т; с дополнительными шкафами — ' + tn(s.wFull) + ' т' : tn(s.wT) + ' т'));
+    cell('t_cable', s.cable === 'T' ? 'Сверху' : 'Снизу');
+    cell('t_reactor', s.reactor ? 'Присутствует' : 'Отсутствует');
+    if (s.isR) for (const [k, v] of Object.entries(R_CELLS(s))) {
+      const [pi, x0, y0, x1, y1] = CELL_[k];
+      M.add(pi, x0 + 1.6, y0 + 1.6, x1 - 1.6, y1 - 1.4);              // текст шаблона закрываем, рамку таблицы оставляем
+      cell(k, v);
+    }
+    cell('t_taps', 'На первичной обмотке есть встроенные отпайки для переключения на напряжение ' + ({ 3: '2,85 и 3,15', 6: '5,7 и 6,3', 10: '9,5 и 10,5' }[s.kv]) + ' кВ при повышенном напряжении в питающей сети');
+
+    // номера листов и содержание — когда ТКП собирается из нескольких моделей (листы идут в другом порядке)
+    for (const [i, num] of Object.entries(o.pageNo || {})) {
+      const P = PAGE_NO[i]; if (!P) continue;
+      M.add(+i, ...P.mask);
+      put(pg[+i], String(num), P.x, P.y, P.size, { f: 'R', c: P.c, a: P.a, ang: P.ang });
+    }
+    for (const [t, num] of Object.entries(o.toc || {})) {
+      const y = TOC_Y[t]; if (!y) continue;
+      M.add(2, 523.5, y - 9.5, 537.5, y + 3);
+      put(pg[2], String(num), 536.0, y, 11, { a: 'r' });
+    }
+    M.apply();
+    return { doc, VALS };
+  }
+
   async function generate(ev, fmt) {                                  // fmt: 'docx' — ТКП в Word, иначе PDF
     if (ev) ev.preventDefault();
     const btn = ev && ev.currentTarget; if (btn) btn.style.opacity = .6;
     try {
+      const models = window.getTkpModels ? window.getTkpModels() : [];
+      if (models.length) return await generateMulti(models, fmt);
       const s = readState();
       if (!s.m) throw new Error('не удалось разобрать маркировку: ' + s.mark);
-      const get = u => fetch(u).then(r => { if (!r.ok) throw new Error('Не найден файл ' + u); return r; });
-      const [tpl, GL] = await Promise.all([get('assets/template.pdf').then(r => r.arrayBuffer()), get('assets/glyphs.json').then(r => r.json())]);
-      const doc = await PDFDocument.load(tpl);
-      const F = makeFonts(GL);
-      window.__tkpF = F;
-      const pg = doc.getPages();
-      const M = prepareMasks(doc, pg);
-      // ME800-R: энкодер не поддерживается — строка «Работа с энкодером» (стр. 14) убирается, строки ниже поднимаются
-      let CELL_ = CELL;
-      if (s.isR) {
-        const [e0, e1] = ENC_ROW, END = 698.0, dy = e1 - e0, p14 = pg[14], H14 = p14.getHeight(), X0 = 48, X1 = 566;
-        M.add(14, X0, e0 + 0.6, X1, END);                                  // рамка листа (x 46,5 и 567,5) не трогается
-        const tdoc = await PDFDocument.load(tpl);
-        const ep = await doc.embedPage(tdoc.getPage(14), { left: X0, right: X1, bottom: H14 - END, top: H14 - (e1 - 0.6) });
-        p14.drawPage(ep, { x: X0, y: H14 - END + dy, width: X1 - X0, height: END - (e1 - 0.6) });
-        CELL_ = Object.fromEntries(Object.entries(CELL).map(([k, c]) => [k, c[0] === 14 && c[2] >= e1 - 1 ? [c[0], c[1], c[2] - dy, c[3], c[4] - dy] : c]));
-        // в перенесённой части шаблонный текст ячеек, которые у R заполняются заново, закрываем белым (маски листа на неё не действуют)
-        for (const k of Object.keys(R_CELLS(s))) {
-          const c = CELL_[k]; if (c[0] !== 14 || c[2] < e0) continue;
-          p14.drawRectangle({ x: c[1] + 1.6, y: H14 - (c[4] - 1.4), width: c[3] - c[1] - 3.2, height: c[4] - c[2] - 3, color: rgb(1, 1, 1) });
-        }
-      }
-
-      /* ---------- помощники ---------- */
-      const rot = p => p.getRotation().angle;
-      /* vx — якорь по горизонтали, vy — базовая линия; o.f — шрифт L | R | S; o.a — l | c | r; o.maxW — сжать по ширине; o.ang — поворот, град. против часовой */
-      const LOG = window.__tkpLog = [], VALS = {};                         // VALS — значения ячеек характеристик (для Word)                                    // что выведено на листы — для автопроверки (tests/)
-      const put = (p, str, vx, vy, size, o = {}) => {
-        str = String(str); LOG.push([pg.indexOf(p), str]);
-        const f = F[o.f || 'L'], w0 = f.width(str, size);
-        let hs = 1; if (o.maxW && w0 > o.maxW) hs = o.maxW / w0;
-        const w = w0 * hs, r = rot(p), H = p.getHeight(), th = ((o.ang || 0) + r) * Math.PI / 180;
-        const cs = Math.cos(th), sn = Math.sin(th);
-        const off = o.a === 'c' ? -w / 2 : o.a === 'r' ? -w : 0;
-        let ux = r === 90 ? vy : vx, uy = r === 90 ? vx : H - vy;
-        ux += off * cs; uy += off * sn;
-        p.pushOperators(pushGraphicsState(), concatTransformationMatrix(cs * hs, sn * hs, -sn, cs, ux, uy));
-        p.drawSvgPath(f.path(str), { x: 0, y: 0, scale: size / f.upm, color: o.c || DARK, borderWidth: 0 });
-        p.pushOperators(popGraphicsState());
-        return w;
-      };
-      const W = (str, f, size) => F[f].width(String(str), size);
-      const wrap = (str, f, size, maxW) => {
-        const out = []; let cur = '';
-        // слово длиннее строки (маркировка) — переносим после «/» или «-»; куски одного слова склеиваются без пробела
-        const toks = [];
-        for (const w of String(str).split(' ')) {
-          if (W(w, f, size) <= maxW) { toks.push([w, false]); continue; }
-          w.split(/(?<=[\/-])/).forEach((pc, i) => toks.push([pc, i > 0]));
-        }
-        for (const [w, glue] of toks) { const t = cur ? cur + (glue ? '' : ' ') + w : w; if (W(t, f, size) > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
-        out.push(cur); return out;
-      };
-      /* абзац с выравниванием по ширине; top — верх строки; возвращает низ абзаца */
-      const para = (p, x0, x1, top, str, o = {}) => {
-        const f = o.f || 'L', size = o.size || 9.6, lead = o.lead || size * 1.375, ind = o.indent || 0, c = o.c || DARK;
-        const words = String(str).split(' '), lines = []; let cur = [];
-        for (const w of words) {
-          const lim = x1 - x0 - (lines.length ? 0 : ind), t = cur.concat(w).join(' ');
-          if (cur.length && W(t, f, size) > lim) { lines.push(cur); cur = [w]; } else cur.push(w);
-        }
-        lines.push(cur);
-        let y = top + size * .95;
-        lines.forEach((ln, k) => {
-          const xs = x0 + (k ? 0 : ind), avail = x1 - xs;
-          if (o.justify !== false && k < lines.length - 1 && ln.length > 1) {
-            const ww = ln.reduce((a, w) => a + W(w, f, size), 0), gap = (avail - ww) / (ln.length - 1);
-            let xx = xs; for (const w of ln) { if (!o.dry) put(p, w, xx, y, size, { f, c }); xx += W(w, f, size) + gap; }
-          } else if (!o.dry) put(p, ln.join(' '), xs, y, size, { f, c });
-          y += lead;
-        });
-        return y - lead + size * .3;
-      };
-      /* текст в ячейке: по центру, с переносом; кегль уменьшается, если не помещается */
-      const cell = (name, str, o = {}) => {
-        VALS[name] = str;
-        const [pi, x0, y0, x1, y1] = CELL_[name], p = pg[pi], f = o.f || 'L', pad = 4;
-        let size = o.size || 8.6, ls, ld, h;
-        for (;;) { ld = size * 1.24; ls = wrap(str, f, size, x1 - x0 - 2 * pad); h = (ls.length - 1) * ld + size * .72; if (h <= y1 - y0 - 3 || size < 6) break; size -= .2; }
-        let y = (y0 + y1) / 2 - h / 2 + size * .72;
-        for (const l of ls) { put(p, l, (x0 + x1) / 2, y, size, { f, a: 'c' }); y += ld; }
-      };
-      const stamp = i => { const [cx, base, mw] = STAMP[i]; put(pg[i], s.mark, cx, base, 9, { f: 'R', a: 'c', maxW: mw }); };
-
-      /* ---------- обложка: фото по типу корпуса, маркировка, автор, дата ---------- */
-      if (!s.g4) {
-        try {
-          const jpg = await doc.embedPng(await get('assets/cover_g1g3.png').then(r => r.arrayBuffer()));   // фон фото прозрачный — рисунок обложки виден
-          M.add(0, 20, 194.2, 279, 513.6);                                   // фото шкафа G4 из шаблона
-          const H0 = pg[0].getHeight();
-          pg[0].drawImage(jpg, { x: 44.3, y: H0 - 484.6, width: 331.9, height: 297.7 });
-        } catch (e) { console.warn('Фото корпуса G1/G3 не найдено — на обложке остаётся фото шаблона', e); }
-      }
-      put(pg[0], s.mark.replace(/А/g, 'A'), 38.6, 727.5, 15.5, { f: 'R', c: WHITE, maxW: 518 });
-      if (s.who) put(pg[0], s.who, 37.6 + W('Составил:', 'R', 12.5) + 7, 758.7, 12.5, { f: 'R', c: WHITE, maxW: 330 });
-      put(pg[0], new Date().toLocaleDateString('ru-RU'), 443.5 + W('ДАТА:', 'R', 12.5) + 6, 758.7, 12.5, { f: 'R', c: WHITE });
-
-      /* ---------- стр. 3: предложение ---------- */
-      if (!s.extra.length) {
-        wrap(s.name, 'L', 9.6, 240).forEach((l, i) => put(pg[3], l, 102.4, 162.5 + i * 12.3, 9.6));
-        put(pg[3], s.qty + ' шт', 375.85, 243, 10.2, { a: 'c' });
-        if (s.price) put(pg[3], money(s.price), 470.9, 243, 10.2, { a: 'c' });
-        put(pg[3], 'Всего позиций: 1, на сумму ' + (s.price ? money(s.price * s.qty) : '______________') + ' рублей, включая НДС 22 %', 58.6, 361.5, 10.6);
-      } else {
-        M.add(3, 55, 146.6, 545, 482);                                    // тело таблицы, итог и абзац о гарантии шаблона — рисуем заново
-        drawOfferTable(pg[3], s, put, W, wrap, para);
-      }
-
-      /* ---------- стр. 4: описание + выбранные опции ---------- */
-      drawDescription(pg[4], s, para, put, W);
-
-      /* ---------- стр. 5: расшифровка обозначения ---------- */
-      drawDecode(pg[5], s, put, W, wrap);
-
-      /* ---------- стр. 6: схема коммутации (рисуется по комплектации) ---------- */
-      drawSwitching(pg[6], s, put, W);
-
-      /* ---------- условия эксплуатации: −5…+40 °С при работе, −20…+70 °С при хранении (как в РЭ) ---------- */
-      M.add(13, 250, 433.7, 562, 444.5);                                 // стр. 13, таблица: строка с температурой
-      put(pg[13], 'окружающего воздуха от ' + (s.isR ? '0' : '−5') + ' °С до +40 °С и относительной влажности не', 405.8, 442.2, 8.6, { a: 'c' });
-      M.add(15, 236, 173.5, 551, 184.4);                                 // стр. 15, защиты: порог повышенного напряжения — 110 % (как в РЭ)
-      put(pg[15], 'Защита срабатывает при уровне напряжения выше 110% от номинального', 237.3, 182.0, 8.6);
-      // ME800-R раздельного исполнения (4500 мм): обслуживание одностороннее — текст стр. 18 и без расстояния ≥400 мм до стены сзади
-      const rd = s.isR && window.rDrawing ? window.rDrawing() : null;
-      if (rd && rd.long) {
-        M.add(18, 49, 134.5, 563, 176);
-        para(pg[18], 50, 562, 136.3, 'Обслуживание преобразователя частоты одностороннее — с фасада. Ниже, на рис. 6, показаны требуемые расстояния между преобразователем частоты и стенами помещения, в котором он будет установлен.', { indent: 22 });
-        M.add(18, 378.6, 323.5, 429.2, 338.5);                           // размер «≥400 мм» (вид сбоку)
-      }
-      M.add(17, 68.5, 660.6, 545, 686.6);                                // стр. 17, раздел 7: две строки с температурами
-      put(pg[17], 'температура воздуха при хранении и транспортировке — от минус 20 °С до плюс 70 °С;', 70.1, 670.2, 9.6);
-      put(pg[17], 'температура окружающего воздуха — от ' + (s.isR ? '0 °С' : 'минус 5 °С') + ' до плюс 40 °С;', 70.1, 683.7, 9.6);
-      for (const i of [6, 7, 8, 9, 10]) stamp(i);
-
-      /* ---------- стр. 7–9, 12: схемы из техописания ---------- */
-      const SCH = new URL(window.SCHEMES_BASE || 'assets/schemes/', document.baseURI).href;
-      // топология ячейки: сдвоенная «два в одном» — только в компактном корпусе (ME800 — G4; ME800-R — ячейки F до 630 кВт (6 кВ) / 1000 кВт (10 кВ));
-      // иначе — одиночная ячейка (cell_el: выпрямитель — звено постоянного тока — H-мост, одинакова для обоих типов конденсаторов)
-      const schFiles = { 7: 'struct_' + s.n + '.pdf', 8: (s.dbl ? 'cell_pf' : 'cell_el') + '.pdf', 9: 'ext.pdf', 12: 'sine.pdf' };
-      const ZONE = { 7: [82, 150, 522, 692], 8: [112, 103, 719, 487], 9: [82, 146.5, 522, 692], 12: [70, 234, 525, 416] };
-      for (const [i, f] of Object.entries(schFiles)) {
-        try { const r = await fetch(SCH + f); if (r.ok) await drawScheme(doc, pg[+i], await r.arrayBuffer(), ZONE[i]); }
-        catch (e) { console.warn('Схема не найдена: ' + f, e); }
-      }
-
-      /* ---------- стр. 10: вес и чертёж ---------- */
-      const kgOf = t => isNaN(t) ? '—' : String(Math.round(t * 1000));
-      put(pg[10], kgOf(s.wT), 508.2, 472.5, 8.4, { f: 'R', a: 'c', c: TEAL });
-      put(pg[10], kgOf(s.wFull), 557.0, 472.5, 8.4, { f: 'R', a: 'c', c: TEAL, maxW: 24 });
-      const hasRDraw = s.isR && window.rDrawing && window.rDrawing();
-      if (!hasRDraw && s.film && !s.g4) alert('Напоминание: для плёночного ПЧ этой мощности габаритный чертёж в ТКП не вставляется — страница чертежа останется пустой. Приложите чертёж к ТКП отдельно.');
-      else if (s.kv === 3) alert('Напоминание: для ПЧ 3 кВ габаритный чертёж в ТКП не вставляется — страница чертежа останется пустой. Приложите чертёж к ТКП отдельно.');
-      else await drawDrawing(doc, pg[10]);
-      // ME800-R: свой чертёж есть — пометка о неточных габаритах не нужна; доп. шкафы, которых нет на листе, — перечисляем
-      const rNote = s.isR && window.rDrawing && window.rDrawing() ? (window.rExtrasNote ? window.rExtrasNote() : '') : (s.r ? 'фактические габариты могут отличаться и будут уточнены после заказа' : '');
-      if (rNote) put(pg[10], '*' + rNote, 128, 472.5, 8.4, { c: DARK, maxW: 330 });
-      if (s.dimsCustom) put(pg[10], 'Габариты (Ш×Г×В) по согласованию: ' + s.dimsCustom + ' мм; на чертеже — стандартное исполнение.', 128, rNote ? 461 : 472.5, 8.4, { f: 'R', c: TEAL, maxW: 330 });
-
-      /* ---------- стр. 13–15: значения характеристик ---------- */
-      cell('t_name', s.mark);
-      cell('t_u', s.kv * 1000 + (s.isR ? ' В (−35…+15%)' : ' В ±10%'));
-      cell('t_p', s.P + ' кВт');
-      cell('t_i', s.I + ' А');
-      cell('t_uout', '0–' + s.uoutT + ' кВ');
-      cell('t_eff', 'не менее ' + s.eff + '%');
-      cell('t_n', cellsTxt(s.n));
-      cell('t_mat', 'Материал обмоток — ' + (s.cu ? 'медь' : 'алюминий'));
-      cell('t_cb', s.cb === 'B' ? 'Присутствует' : 'Отсутствует');
-      cell('t_ip', 'IP' + s.ip);
-      cell('t_life', 'Стандартно ' + s.life + ' часов (температура, нагрузка и время непрерывного использования имеют большое влияние на срок службы конденсаторов)');
-      cell('t_cap', s.film ? 'Пленочные' : 'Электролитические');
-      cell('t_ups', s.ups ? 'Присутствует' : 'Отсутствует');
-      cell('t_proto', s.proto);
-      const tn = t => String(t).replace('.', ',');
-      cell('t_w', isNaN(s.wT) ? '—' : (s.wFull > s.wT ? 'ПЧ — ' + tn(s.wT) + ' т; с дополнительными шкафами — ' + tn(s.wFull) + ' т' : tn(s.wT) + ' т'));
-      cell('t_cable', s.cable === 'T' ? 'Сверху' : 'Снизу');
-      cell('t_reactor', s.reactor ? 'Присутствует' : 'Отсутствует');
-      if (s.isR) for (const [k, v] of Object.entries(R_CELLS(s))) {
-        const [pi, x0, y0, x1, y1] = CELL_[k];
-        M.add(pi, x0 + 1.6, y0 + 1.6, x1 - 1.6, y1 - 1.4);              // текст шаблона закрываем, рамку таблицы оставляем
-        cell(k, v);
-      }
-      cell('t_taps', 'На первичной обмотке есть встроенные отпайки для переключения на напряжение ' + ({ 3: '2,85 и 3,15', 6: '5,7 и 6,3', 10: '9,5 и 10,5' }[s.kv]) + ' кВ при повышенном напряжении в питающей сети');
-
-      M.apply();
+      const { doc, VALS } = await build(s);
       const out = await doc.save();
       if (fmt === 'docx') {
         if (!window.TkpDocx) throw new Error('не загружен модуль Word (tkp_docx.js)');
@@ -369,14 +394,109 @@
         registry(s, offerContent(s), 'Word', 'ВВ ПЧ');
         return;
       }
-      const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
-      const link = document.createElement('a'); link.href = url;
-      link.download = 'TKP_' + s.mark.replace(/А/g, 'A').replace(/ /g, '_').replace(/\//g, '-') + '.pdf';
-      document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+      download(out, 'TKP_' + fileMark(s.mark) + '.pdf');
       registry(s, offerContent(s), 'PDF', 'ВВ ПЧ');
     } catch (e) { console.error(e); alert('Не удалось сформировать ТКП: ' + e.message); }
     finally { if (btn) btn.style.opacity = 1; }
   }
+  const fileMark = m => m.replace(/А/g, 'A').replace(/ /g, '_').replace(/\//g, '-');
+  function download(bytes, name) {
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    const link = document.createElement('a'); link.href = url; link.download = name;
+    document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  /* Номера листов шаблона: книжные — справа вверху (Inter 13, бирюзовый), листы схем 6–10 — повёрнутые в кружке.
+     mask — что закрыть (x0, y0, x1, y1); x, y — точка вывода (как put), a/ang — выравнивание и поворот. */
+  const NUM_C = rgb(26 / 255, 94 / 255, 112 / 255);
+  const PAGE_NO = Object.fromEntries([...Array(20).keys()].slice(1).map(i => [i,
+    [6, 8, 10].includes(i) ? { mask: [44.6, 49.6, 56.3, 61.2], x: 53.6, y: 55.4, size: 8.7, c: NUM_C, a: 'c', ang: 90 }
+      : [7, 9].includes(i) ? { mask: [536.6, 45.2, 546.4, 56.6], x: 541.0, y: 54.2, size: 11, c: NUM_C, a: 'c' }
+        : i >= 13 ? { mask: [534, 41.3, 552, 58.2], x: 534.7, y: 54.5, size: 13, c: TEAL }
+          : { mask: [534, 44.1, 552, 61], x: 534.7, y: 57.3, size: 13, c: TEAL }]));
+  // содержание (стр. 2): базовая линия номера страницы для раздела, начинающегося с листа шаблона t
+  const TOC_Y = { 3: 175.0, 4: 203.95, 6: 232.9, 7: 261.85, 8: 290.8, 9: 319.75, 10: 348.7, 11: 377.65, 12: 406.6, 13: 435.55, 16: 464.5, 17: 493.45, 18: 522.4, 19: 551.35 };
+
+  /* ===== ТКП на несколько моделей =====
+     Общие листы — обложка (все маркировки), письмо, содержание, предложение (все модели строками), описание,
+     схема цепей управления, влияние на сеть, форма напряжения, такелаж, обслуживание, клиенты.
+     У каждой модели — свои расшифровка, схема коммутации, габаритный чертёж и характеристики (3 листа);
+     топология ПЧ и силовой ячейки — по листу на вариант. Каждая модель собирается по своей конфигурации
+     (форма временно переключается на неё и потом возвращается), листы складываются в один документ. */
+  async function generateMulti(models, fmt) {
+    if (!window.FormStateSnapshot || !window.FormStateApply) throw new Error('нет модуля сохранения формы (formstate.js)');
+    const orig = window.FormStateSnapshot(), author = $('tkpAuthor').value, notes = [];
+    const priceOf = p => parseFloat(String(p || '').replace(/\s/g, '').replace(',', '.')) || 0;
+    const stateOf = md => {
+      window.FormStateApply(md.cfg); $('tkpAuthor').value = author;
+      const s = readState();
+      if (s.mark !== md.mark) throw new Error('конфигурация ' + md.mark + ' не восстановилась (получилось ' + s.mark + ') — удалите её из списка и добавьте заново');
+      if (!s.m) throw new Error('не удалось разобрать маркировку: ' + s.mark);
+      s.qty = md.qty; s.price = priceOf(md.price);
+      return s;
+    };
+    let S, built = [], plan, extra, descS;
+    try {
+      S = models.map(stateOf);
+      extra = (window.getTkpExtras ? window.getTkpExtras() : []).filter(r => r.name);
+      // план листов: [модель, лист шаблона]; топология — по варианту (число ячеек, сдвоенные ячейки)
+      plan = [0, 1, 2, 3, 4].map(p => [0, p]);
+      S.forEach((_, k) => plan.push([k, 5]));
+      S.forEach((_, k) => plan.push([k, 6]));
+      const groups = {};
+      for (const [p, key] of [[7, s => s.n], [8, s => s.dbl]]) {
+        const seen = new Map();
+        S.forEach((s, k) => { const v = String(key(s)); if (!seen.has(v)) seen.set(v, []); seen.get(v).push(k); });
+        for (const ks of seen.values()) { plan.push([ks[0], p]); groups[ks[0] + ':' + p] = ks; }
+      }
+      plan.push([0, 9]);
+      S.forEach((_, k) => plan.push([k, 10]));
+      plan.push([0, 11], [0, 12]);
+      S.forEach((_, k) => plan.push([k, 13], [k, 14], [k, 15]));
+      [16, 17, 18, 19].forEach(p => plan.push([0, p]));
+      const toc = {};
+      for (const t of Object.keys(TOC_Y)) toc[t] = plan.findIndex(([, p]) => p === +t);
+      const powers = ks => 'ESQ F ME800 — ' + ks.map(k => S[k].P).join(', ') + ' кВт';
+      const rows = S.map(s => ({ name: s.name, qty: s.qty, unit: 'шт', price: s.price })).concat(extra);
+      const any = f => S.some(f);
+      descS = Object.assign({}, S[0], {
+        starter: any(s => s.starter), starterReq: any(s => s.starterReq), reactor: any(s => s.reactor), ups: any(s => s.ups),
+        byp: (S.find(s => s.byp !== 'X') || S[0]).byp, exp: (S.find(s => s.exp === '2E') || S.find(s => s.exp === 'E') || S[0]).exp,
+        sync: any(s => s.sync === 'B') ? 'B' : 'X', motor: any(s => s.motor === 'S') ? 'S' : 'A', cu: any(s => s.cu),
+        cable: any(s => s.cable === 'T') ? 'T' : 'D', cb: any(s => s.cb === 'B') ? 'B' : 'N' });
+      for (let k = 0; k < S.length; k++) {
+        const s = stateOf(models[k]);
+        const pageNo = {}, stamp = {};
+        plan.forEach(([kk, p], i) => {
+          if (kk !== k) return;
+          pageNo[p] = i;
+          if (p === 9) stamp[p] = powers(S.map((_, j) => j));
+          else if (p === 7 || p === 8) stamp[p] = powers(groups[k + ':' + p]);
+        });
+        const o = { pageNo, stamp, say: t => notes.push(s.mark + ': ' + t.replace(/^Напоминание: /, '')) };
+        if (k === 0) Object.assign(o, { toc, descS, coverMarks: S.map(x => x.mark), coverG4: S.every(x => x.g4) });
+        s.offer = offerContent(Object.assign({}, s, { offerRows: rows }));
+        built.push(await build(s, o));
+        S[k] = s;
+      }
+    } finally {
+      window.FormStateApply(orig); $('tkpAuthor').value = author;
+      if (window.updateNomenclature) window.updateNomenclature();
+    }
+    const out = await PDFDocument.create();
+    for (const [k, p] of plan) { const [cp] = await out.copyPages(built[k].doc, [p]); out.addPage(cp); }
+    const bytes = await out.save();
+    if (notes.length) alert('Напоминание:\n' + [...new Set(notes)].join('\n'));
+    const name = 'TKP_ESQ_F_ME800_' + S.map(s => s.P).join('-') + 'kW';
+    const offer = S[0].offer;
+    if (fmt === 'docx') {
+      if (!window.TkpDocx) throw new Error('не загружен модуль Word (tkp_docx.js)');
+      await window.TkpDocx.pch({ pdf: bytes, s: S[0], cell: CELL, offer, desc: descContent(descS), plan, fileName: name,
+        models: S.map((s, k) => ({ s, vals: built[k].VALS, decode: { segments: decodeSegments(s), rows: decodeRows(s) } })) });
+    } else download(bytes, name + '.pdf');
+    S.forEach((s, k) => registry(Object.assign({}, s, { extra: k ? [] : extra }), { rows: [{ name: s.name, qty: s.qty, price: s.price }].concat(k ? [] : extra) }, fmt === 'docx' ? 'Word' : 'PDF', 'ВВ ПЧ'));
+  }
+
 
 
   /* запись в реестр выданных ТКП (registry.js) */
@@ -393,7 +513,8 @@
      Колонки — по шапке шаблона; если не помещается до низа рамки, кегль уменьшается. */
   const WARRANTY = 'Гарантийный срок на преобразователь составляет 2 года со дня начала эксплуатации при условии гарантийной наработки 10 000 ч., но не более 36 месяцев с даты продажи при условии соблюдения Покупателем правил эксплуатации изделия, изложенных в инструкции по эксплуатации. Информация о ценах, содержащихся в данном документе, является конфиденциальной и действительна только при заказе оборудования и услуг. Данное предложение носит информационный характер и не является публичной офертой (согласно ст. 435 ГК РФ).';
   function offerContent(s) {                                          // таблица предложения — общая для PDF и Word
-    const rows = [{ name: s.name, qty: s.qty, unit: 'шт', price: s.price }].concat(s.extra);
+    if (s.offer) return s.offer;
+    const rows = s.offerRows || [{ name: s.name, qty: s.qty, unit: 'шт', price: s.price }].concat(s.extra);
     const allPriced = rows.every(r => r.price > 0), sum = rows.reduce((a, r) => a + (r.price || 0) * r.qty, 0);
     const total = 'Всего позиций: ' + rows.length + ', на сумму ' + (allPriced ? money(sum) : '______________') + ' рублей, включая НДС 22 %';
     return { rows, total, warranty: WARRANTY, money };
@@ -839,9 +960,9 @@
     return { box, tb };
   }
 
-  async function drawDrawing(doc, page) {
+  async function drawDrawing(doc, page, say = t => alert(t)) {
     const url = await window.findFirstExisting(window.buildDrawingCandidates());
-    if (!url) { alert('Габаритный чертёж для этой мощности не найден в assets/ — поле чертежа в ТКП оставлено пустым.'); return; }
+    if (!url) { say('Габаритный чертёж для этой мощности не найден в assets/ — поле чертежа в ТКП оставлено пустым.'); return; }
     const buf = await (await fetch(url)).arrayBuffer();
     const A = [116, 105, 714, 411], aw = A[2] - A[0], ah = A[3] - A[1], H = page.getHeight();
     const fit = (w, h) => { const k = Math.min(aw / w, ah / h); return { k, dw: w * k, dh: h * k, X: A[0] + (aw - w * k) / 2, Y: A[1] + (ah - h * k) / 2 }; };

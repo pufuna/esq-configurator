@@ -141,9 +141,13 @@
   /* ================= ПЧ: ESQ F ME800 / ME800-R =================
      Листы шаблона: 0 обложка, 1 письмо, 2 содержание, 3 предложение, 4 описание, 5 расшифровка, 6–10 схемы и чертёж,
      11–12 влияние на сеть и форма напряжения, 13–15 характеристики, 16–17 такелаж, 18 обслуживание, 19 клиенты. */
-  async function pch({ pdf, s, vals, cell, offer, desc, decode }) {
+  async function pch({ pdf, s, vals, cell, offer, desc, decode, plan, models, fileName }) {
     const D = await docxLib(), K = kit(D);
-    const IMG = [0, 1, 2, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18, 19];
+    // plan — [модель, лист шаблона] для каждого листа PDF (ТКП на несколько моделей); без него — один ПЧ, листы по порядку
+    plan = plan || [...Array(20).keys()].map(p => [0, p]);
+    models = models || [{ s, vals, decode }];
+    const TEXT = new Set([3, 4, 5, 13, 14, 15]);
+    const IMG = plan.map(([, p], i) => TEXT.has(p) ? -1 : i).filter(i => i >= 0);
     const [img, U, specs] = await Promise.all([renderPages(pdf, IMG), ui(), fetch('assets/tkp/pch_specs.json').then(r => r.json())]);
 
     // описание
@@ -161,6 +165,7 @@
 
     // расшифровка
     // маркировка: части по очереди бирюзовым и оранжевым, номер позиции — маленьким индексом после части
+    const decodeOf = decode => {
     const markRuns = []; let k = 0;
     decode.segments.forEach(([t, n]) => {
       if (!n) { markRuns.push(K.run(t, { bold: true, size: 13 })); return; }
@@ -172,8 +177,11 @@
       K.p('Маркировка преобразователя (цифра у каждой части — номер позиции в таблице)', { size: 8.5, align: 'c', color: MUTED, after: 10 }),
       K.table([K.tr(['Поз.', 'Параметр', 'Обозначение'].map((t, i) => K.td(t, { w: DW[i], align: 'c', bold: true, fill: GRAY, line: INK })), { header: true }),
         ...decode.rows.map((r, i) => K.tr([K.td(String(i + 1), { w: DW[0], align: 'c', bold: true, line: INK }), K.td(r[0], { w: DW[1], line: INK }), K.td(r[1], { w: DW[2], line: INK })]))], DW)];
+    return decodeChildren;
+    };
 
     // характеристики: постоянный текст — из шаблона (assets/tkp/pch_specs.json), значения комплектации — те же, что в PDF
+    const specOf = (s, vals) => {
     const keyFor = (page, y0) => Object.keys(cell).find(k => cell[k][0] === page && Math.abs(cell[k][2] - y0) < 2.5);
     const valueOf = (page, c) => {
       const key = keyFor(page, c.y0);
@@ -190,19 +198,22 @@
       cells.forEach((t, i) => specRows.push(K.tr(i ? [K.td(t, { w: SW[1], align: 'c' })]
         : [K.td(r.label, { w: SW[0], align: 'c', rows: cells.length > 1 ? cells.length : undefined }), K.td(t, { w: SW[1], align: 'c' })])));
     }
-    const specChildren = [K.h('5. Основные технические характеристики предлагаемого оборудования'), K.table(specRows, SW)];
+    return [K.h('5. Основные технические характеристики предлагаемого оборудования'), K.table(specRows, SW)];
+    };
 
+    // листы — по плану: текстом — предложение, описание, расшифровка и характеристики (по модели), остальное — картинками листов PDF
     const sections = [];
-    [0, 1, 2].forEach(i => sections.push(K.imagePage(img[i])));
-    sections.push(K.textSection(offerBlock(K, offer, '1. Технико-коммерческое предложение'), U, 3));
-    sections.push(K.textSection(descChildren, U, 4));
-    sections.push(K.textSection(decodeChildren, U, 5));
-    [6, 7, 8, 9, 10, 11, 12].forEach(i => sections.push(K.imagePage(img[i])));
-    sections.push(K.textSection(specChildren, U, 13));
-    [16, 17, 18, 19].forEach(i => sections.push(K.imagePage(img[i])));
+    plan.forEach(([k, p], i) => {
+      if (p === 3) sections.push(K.textSection(offerBlock(K, offer, '1. Технико-коммерческое предложение'), U, i));
+      else if (p === 4) sections.push(K.textSection(descChildren, U, i));
+      else if (p === 5) sections.push(K.textSection(decodeOf(models[k].decode), U, i));
+      else if (p === 13) sections.push(K.textSection(specOf(models[k].s, models[k].vals), U, i));
+      else if (p === 14 || p === 15) { /* характеристики — одной таблицей с листа 13 */ }
+      else sections.push(K.imagePage(img[i]));
+    });
 
-    const doc = new D.Document({ creator: s.who || 'ООО «Элком»', title: 'ТКП ' + s.mark, styles: { default: { document: { run: { font: FONT, size: 20 } } } }, sections });
-    save(await D.Packer.toBlob(doc), fileBase(s.mark) + '.docx');
+    const doc = new D.Document({ creator: s.who || 'ООО «Элком»', title: 'ТКП ' + (models.length > 1 ? models.map(m => m.s.mark).join('; ') : s.mark), styles: { default: { document: { run: { font: FONT, size: 20 } } } }, sections });
+    save(await D.Packer.toBlob(doc), (fileName || fileBase(s.mark)) + '.docx');
   }
 
   /* ================= УПП: ESQ F HVS =================

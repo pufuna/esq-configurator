@@ -27,6 +27,7 @@
       const st = { v: {} };
       fields().forEach(el => { st.v[el.id] = el.value; });
       if (window.getTkpExtras) st.extra = window.getTkpExtras();
+      if (window.getTkpModels) st.models = window.getTkpModels();
       return st;
     }
 
@@ -51,7 +52,19 @@
         const box = document.getElementById('tkpExtras');
         if (box && !box.children.length) st.extra.forEach(r => window.addExtraRow(r, true));
       }
+      if (Array.isArray(st.models) && window.addTkpModelRow) {
+        const box = document.getElementById('tkpModels');
+        if (box && !box.children.length) st.models.forEach(m => window.addTkpModelRow(m));
+      }
     }
+
+    // снимок конфигурации и её применение — для ТКП на несколько моделей (tkp.js). Применяется дважды:
+    // поля зависят друг от друга (модель → напряжение → мощность → тип конденсаторов → пульсность …)
+    window.FormStateSnapshot = () => collect().v;
+    window.FormStateApply = v => {
+      const was = restoring; restoring = true;
+      try { apply({ v }); apply({ v }); } finally { restoring = was; }
+    };
 
     let restoring = false, t = null;
     const save = () => { if (restoring) return; clearTimeout(t); t = setTimeout(() => store.set(collect()), 150); };
@@ -70,7 +83,7 @@
 
     scope.addEventListener('change', save);
     scope.addEventListener('input', save);
-    scope.addEventListener('click', e => { if (e.target.closest('.ex-del, .add-row')) setTimeout(save, 0); });
+    scope.addEventListener('click', e => { if (e.target.closest('.ex-del, .add-row, .md-del, .md-add')) setTimeout(save, 0); });
     save();
 
     // ссылка на текущую конфигурацию (её же сохраняет реестр ТКП)
