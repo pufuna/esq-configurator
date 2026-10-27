@@ -42,8 +42,9 @@
           if (!opt || opt.disabled) return;
           el.value = val;
           el.dispatchEvent(new Event('change', { bubbles: true }));
-        } else {
+        } else if (el.value !== val) {
           el.value = val;
+          el.dispatchEvent(new Event('input', { bubbles: true }));             // подсказки у полей (габариты, масса) пересчитываются
         }
       });
       if (window.updateNomenclature) window.updateNomenclature();          // маркировка зависит и от текстовых полей (выходное напряжение)

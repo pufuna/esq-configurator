@@ -28,6 +28,14 @@ FNT = pymupdf.Font(fontfile=FONT)
 
 
 # ---------- разбор листа ----------
+def hit(r, z):
+    """Пересечение рамок, включая линии нулевой толщины (у PyMuPDF они «пустые» и не пересекаются)."""
+    return r.x0 <= z.x1 and r.x1 >= z.x0 and r.y0 <= z.y1 and r.y1 >= z.y0
+
+
+def inside(r, z):
+    return r.x0 >= z.x0 and r.x1 <= z.x1 and r.y0 >= z.y0 and r.y1 <= z.y1
+
 def texts(page):
     out = []
     for b in page.get_text('dict')['blocks']:
@@ -138,7 +146,7 @@ def grow(group, allit, ok):
     for it in group[1:]: r |= it[1]
     while True:
         rr = r + (-1, -1, 1, 1)
-        add = [it for it in pool if it[1].intersects(rr)]
+        add = [it for it in pool if hit(it[1], rr)]
         if not add: return group
         group += add
         for it in add: r |= it[1]
@@ -183,9 +191,9 @@ def template():
     rv = rear_view(g)
     rrect = pymupdf.Rect(rv['rr'] - TPL_W * k, rv['rbase'] - TPL_H * k, rv['rr'], rv['rbase'])
     tol = 2 * k
-    front = [d for d in g['D'] if d['rect'] in fr + (-tol, -tol, tol, tol)]
+    front = [d for d in g['D'] if inside(d['rect'], fr + (-tol, -tol, tol, tol))]
     # вид сзади — вместе с цоколем (ниже пола до 200 мм)
-    rear = [d for d in g['D'] if d['rect'] in rrect + (-tol, -tol, tol, 200 * k)]
+    rear = [d for d in g['D'] if inside(d['rect'], rrect + (-tol, -tol, tol, 200 * k))]
     return (front, fr), (rear, rrect), k
 
 
@@ -207,6 +215,11 @@ class Pen:
         sh.draw_polyline([self.P(*a) for a in pts])
         sh.finish(color=(0, 0, 0), fill=fill, width=self.lw, closePath=bool(fill))
         self.boxes.append(pymupdf.Rect(min(a[0] for a in pts), min(a[1] for a in pts), max(a[0] for a in pts), max(a[1] for a in pts)))
+
+    def seg(self, a, b, width, color):
+        self.sh.draw_line(self.P(*a), self.P(*b))
+        self.sh.finish(color=color, width=width)
+        self.boxes.append(pymupdf.Rect(min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1])))
 
     def rect(self, a, b, c, d):
         self.line([(a, b), (c, b), (c, d), (a, d), (a, b)])
@@ -285,11 +298,15 @@ class Pen:
         self.boxes.append(dst)
 
 
-def only(base_pdf, R):
-    """Копия листа, где оставлено только то, что заходит в R (чтобы не встраивать лист в PDF второй раз целиком)."""
+def only(base_pdf, R, drop=()):
+    """Копия листа, где оставлено только то, что заходит в R (чтобы не встраивать лист в PDF второй раз целиком);
+       drop — рамки объектов, которые убрать и из R (их рисуют заново)."""
     d = pymupdf.open(base_pdf)
     p = d[0]
     W, H = p.rect.width, p.rect.height
+    for r in drop:
+        p.add_redact_annot(r + (-0.4, -0.4, 0.4, 0.4), fill=False)
+        p.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_NONE, graphics=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_COVERED, text=pymupdf.PDF_REDACT_TEXT_REMOVE)
     for strip in (pymupdf.Rect(-5, -5, W + 5, R.y0), pymupdf.Rect(-5, R.y1, W + 5, H + 5),
                   pymupdf.Rect(-5, -5, R.x0, H + 5), pymupdf.Rect(R.x1, -5, W + 5, H + 5)):
         if strip.is_empty: continue
@@ -337,19 +354,52 @@ def compose(base_pdf, code, out_pdf):
         r = pymupdf.Rect(lst[0][1])
         for it in lst[1:]: r |= it[1]
         return r
+
+    # виды сверху и снизу: подписи и размеры слева от вида мешают дорисовать шкафы — уводим их влево вместе с боковым видом,
+    # а выносные и линии-выноски, идущие от вида, удлиняем (левый конец уходит влево, правый остаётся на виде)
+    edge = x1 - 60 * k                                                           # левее — уже не выступы самого вида
+    def occupied(lo, hi):
+        return any(it[1].x1 < x1 - 120 * k and it[1].x1 > new_left - 50 * k and it[1].y1 > lo - 50 * k and it[1].y0 < hi + 50 * k for it in allit)
+    stretch, retext, plan_forced = [], [], set()
+    left_ids = {id(it[2]) for it in left}
+    for kind, lo, hi in bands:
+        if not occupied(lo, hi): continue
+        zy0, zy1 = lo - 250 * k, hi + 250 * k
+        if kind == 'above': zy1 = min(zy1, band_f[0] - 1)
+        else: zy0 = max(zy0, g['ydim'] + fs * 1.5)
+        zone = pymupdf.Rect(-1e4, zy0, edge, zy1)
+        grp = [it for it in allit if it[1].x1 < edge and hit(it[1], zone) and id(it[2]) not in left_ids]
+        # подписи, начинающиеся левее вида и заходящие на него, — набираются заново на новом месте
+        retext += [it for it in allit if it[0] == 't' and it[1].x0 < edge - 60 * k <= edge <= it[1].x1 and hit(it[1], zone)]
+        if not grp: continue
+        left += grp; left_ids |= {id(it[2]) for it in grp}
+        for d in g['D']:                                                         # линии, пересекающие край
+            r = d['rect']
+            if id(d) in left_ids or not (r.x0 < edge < r.x1) or not hit(r, zone) or any(it[0] != 'l' for it in d['items']):
+                continue
+            stretch.append(d)
+        plan_forced.add(kind)
+    if plan_forced:                                                              # всё, что целиком попало в общую рамку, — тоже переносится
+        while True:
+            Rb = bbox(left)
+            more = [it for it in allit if id(it[2]) not in left_ids and inside(it[1], Rb + (-0.5, -0.5, 0.5, 0.5))]
+            if not more: break
+            left += more; left_ids |= {id(it[2]) for it in more}
+        sids = {id(d) for d in stretch} | {id(it[2]) for it in retext}
+        allit = [it for it in allit if id(it[2]) not in sids]
     Lr = bbox(left) + (-0.5, -0.5, 0.5, 0.5) if left else None
     Rr = bbox(right) + (-0.5, -0.5, 0.5, 0.5) if right else None
     for name, R_, lst in (('слева', Lr, left), ('справа', Rr, right)):          # в переносимую область не должно попадать чужое
         if R_:
             mine = {id(it[2]) for it in lst}
-            alien = [it for it in allit if id(it[2]) not in mine and it[1].intersects(R_) and not it[1] in R_]
+            alien = [it for it in allit if id(it[2]) not in mine and hit(it[1], R_) and not inside(it[1], R_)]
             if alien:
                 print(f'  внимание: область {name} задевает {len(alien)} объект(ов)', [a[2]['t'] if a[0] == 't' else tuple(round(v) for v in a[1]) for a in alien][:4])
 
     # рабочая копия листа без переносимых областей
     work = pymupdf.open(base_pdf)
     wp = work[0]
-    for R_ in [Lr, Rr] + (fan['redact'] if fan else []):                          # по одной: пачкой MuPDF удаляет не всё
+    for R_ in [Lr, Rr] + (fan['redact'] if fan else []) + [d['rect'] + (-0.4, -0.4, 0.4, 0.4) for d in stretch] + [it[1] for it in retext]:   # по одной: пачкой MuPDF удаляет не всё
         if not R_: continue
         wp.add_redact_annot(R_, fill=False)
         wp.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_NONE, graphics=pymupdf.PDF_REDACT_LINE_ART_REMOVE_IF_COVERED, text=pymupdf.PDF_REDACT_TEXT_REMOVE)
@@ -362,9 +412,16 @@ def compose(base_pdf, code, out_pdf):
     oy = 100
     clip = content + (-1, -1, 1, 1)
     cp.show_pdf_page(clip + (ox, oy, ox, oy), work, 0, clip=clip)
-    if Lr: cp.show_pdf_page(Lr + (ox + dl, oy, ox + dl, oy), only(base_pdf, Lr), 0, clip=Lr)
+    if Lr: cp.show_pdf_page(Lr + (ox + dl, oy, ox + dl, oy), only(base_pdf, Lr, [d['rect'] for d in stretch] + [it[1] for it in retext]), 0, clip=Lr)
     if Rr: cp.show_pdf_page(Rr + (ox + dr, oy, ox + dr, oy), only(base_pdf, Rr), 0, clip=Rr)
     pen = Pen(cp, ox, oy, g['lw'], fs)
+    for d in stretch:                                                            # удлинённые выносные линии
+        for it in d['items']:
+            a, b = [(p.x + (dl if p.x < edge else 0), p.y) for p in (it[1], it[2])]
+            pen.seg(a, b, d.get('width') or g['lw'], d.get('color') or (0, 0, 0))
+    for it in retext:                                                            # подписи — тем же шрифтом и кеглем
+        t = it[2]
+        pen.text(t['r'].x0 + dl, t['r'].y1 - t['size'] * 0.23, t['t'], size=t['size'], anchor='start')
     placed = [content]
     if Lr: placed.append(Lr + (dl, 0, dl, 0))
     if Rr: placed.append(Rr + (dr, 0, dr, 0))
@@ -390,8 +447,7 @@ def compose(base_pdf, code, out_pdf):
         pen.text((a + b) / 2, base_y - h * k - fs * 0.5, name, fs * 0.8)
         pen.hdim(a, b, base_y, g['ydim'], str(w))
         for kind, lo, hi in bands:
-            free = not any(it[1].x1 < x1 - 120 * k and it[1].x1 > new_left - 50 * k and it[1].y1 > lo - 50 * k and it[1].y0 < hi + 50 * k for it in allit)
-            if not free: continue
+            if kind not in plan_forced and occupied(lo, hi): continue
             fy0, fy1 = (lo, lo + dpt * k) if kind == 'below' else (hi - dpt * k, hi)       # передняя кромка — ближе к фасаду
             pen.rect(a, fy0, b, fy1)
             pen.text((a + b) / 2, (fy0 + fy1) / 2 + fs * 0.3, short, fs * 0.9)

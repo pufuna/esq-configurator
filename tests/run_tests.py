@@ -10,6 +10,7 @@
   • пример маркировки из техописания ME800-R (п. 5.1);
   • ТКП ПЧ (ME800, ME800-R, 3 кВ, с доп. строками) и ТКП УПП собираются, на листе 3 — нужная маркировка и итог;
   • УПП: подбор по двигателю, ЗИП в строке УПП (PDF и Word);
+  • габариты и масса, вписанные вручную (ПЧ и УПП), — в техописании и ТКП;
   • форма восстанавливается после перезагрузки страницы;
   • реестр ТКП — только по паролю, ссылки на него видны лишь вошедшим; пауза после неверного пароля, четыре менеджера одновременно скачивают ТКП;
   • сайт работает без CDN (cdn.jsdelivr.net заблокирован — библиотеки берутся из assets/vendor);
@@ -177,6 +178,16 @@ async def main():
         await sel('model', 'ME800'); await sel('voltage', 'T100'); await sel('power', '1000'); await sel('capacitorType', 'PF')
         n, t = await tkp()
         check('ESQ F ME800-1000P072' in t(3).replace('- ', '-') and '150% в течение 2 секунд' not in t(13), 'ТКП ME800 (плёночные, корпус G4) собирается, характеристики шаблона ME800')
+        # габариты и масса, вписанные вручную, — в техописании и ТКП
+        await page.fill('#tkpDims', '2700x1400 x 2500'); await page.fill('#tkpMass', '3,1')
+        check('2700×1400×2500' in await page.text_content('#dimsNote'), 'ручные габариты распознаны: ' + await page.text_content('#dimsNote'))
+        await page.click('a.techdesc-btn'); await page.wait_for_timeout(300)
+        td = await page.text_content('#techdesc')
+        check('2700×1400×2500' in td and 'по согласованию' in td and ('3.1' in td or '3,1' in td), 'техописание: ручные габариты и масса')
+        await page.click('a.techdesc-btn')
+        n, t = await tkp()
+        check('2700×1400×2500' in t(10) and '3100' in t(10) and '3,1' in t(14), 'ТКП: ручные габариты на листе чертежа, масса 3100 кг и в характеристиках')
+        await page.fill('#tkpDims', ''); await page.fill('#tkpMass', '')
 
         # ---------- сохранение формы ----------
         print('Сохранение формы')
@@ -197,10 +208,13 @@ async def main():
         check(await page.input_value('#power') == '120', 'УПП: подбор по двигателю 600 кВт / 80 А → 120 А (1000 кВт)')
         await page.fill('#tkpAuthor', 'Иванов И.И.')
         await page.fill('#tkpZip', 'тиристорный блок')
+        await page.fill('#tkpDims', '1100*1600*2400'); await page.fill('#tkpMass', '950')
         await page.evaluate("addExtraRow({name:'Шеф-монтаж', qty:1, unit:'усл.'}, true)")
         n, t = await tkp()
         check(n > 8 and 'ESQ F HVS' in t(3) and 'Шеф-монтаж' in t(3), f'ТКП УПП: {n} стр., доп. строка на листе 3')
         check('ЗИП: тиристорный блок' in t(3), 'ТКП УПП: ЗИП в строке УПП на листе 3')
+        tu = ' '.join(t(i) for i in range(n))
+        check('1100×1600×2400' in tu and '950 кг' in tu and 'по согласованию' in tu, 'ТКП УПП: ручные габариты и масса')
         text, nsec = await word()
         check('Шеф-монтаж' in text and 'Функции защиты' in text and 'ESQ F HVS' in text and 'ЗИП: тиристорный блок' in text, 'ТКП УПП в Word: доп. строка, ЗИП и характеристики')
 

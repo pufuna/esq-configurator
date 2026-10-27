@@ -100,8 +100,10 @@
     s.life = s.film ? '200 000' : '100 000';
     s.sec = s.isR ? 690 : (s.film ? 710 : 690); // ME800-R: ячейки 690 В у обоих типов
     const m = window.getMechanicalFor(s.v, s.P);
-    s.wT = parseFloat(m.weight);
-    s.wFull = window.totalWeightT ? window.totalWeightT(m.weight) : s.wT;
+    const cM = window.customMassT ? window.customMassT() : NaN;                 // масса и габариты, вписанные вручную
+    s.wT = isNaN(cM) ? parseFloat(m.weight) : cM;
+    s.wFull = window.totalWeightT ? window.totalWeightT(s.wT) : s.wT;
+    s.dimsCustom = window.customDims ? window.customDims() : '';
     s.name = 'Преобразователь частоты ' + s.mark + ', ' + s.kvT + ', ' + s.P + ' кВт, ' + s.I + ' А, IP' + s.ip + ', ' +
       (s.cu ? 'медный' : 'алюминиевый') + ' трансформатор, ' + cellsTxt(s.n) + ' на фазу, ' + (s.cb === 'B' ? 'с байпасом' : 'без байпаса') + ' силовой ячейки' +
       (s.starter ? ', пусковой шкаф' : '') + (s.reactor ? ', шкаф реактора' : '') +
@@ -330,6 +332,7 @@
       // ME800-R: свой чертёж есть — пометка о неточных габаритах не нужна; доп. шкафы, которых нет на листе, — перечисляем
       const rNote = s.isR && window.rDrawing && window.rDrawing() ? (window.rExtrasNote ? window.rExtrasNote() : '') : (s.r ? 'фактические габариты могут отличаться и будут уточнены после заказа' : '');
       if (rNote) put(pg[10], '*' + rNote, 128, 472.5, 8.4, { c: DARK, maxW: 330 });
+      if (s.dimsCustom) put(pg[10], 'Габариты (Ш×Г×В) по согласованию: ' + s.dimsCustom + ' мм; на чертеже — стандартное исполнение.', 128, rNote ? 461 : 472.5, 8.4, { f: 'R', c: TEAL, maxW: 330 });
 
       /* ---------- стр. 13–15: значения характеристик ---------- */
       cell('t_name', s.mark);

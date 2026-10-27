@@ -427,6 +427,16 @@
         <input type="text" id="tkpPrice" placeholder="Необязательно">
       </div>
       <div class="param">
+        <label for="tkpDims">Габариты (Ш×Г×В), мм</label>
+        <input type="text" id="tkpDims" placeholder="Стандартные" oninput="updateDimsHint()">
+        <div class="note" id="dimsNote"></div>
+      </div>
+      <div class="param">
+        <label for="tkpMass">Масса ПЧ, т</label>
+        <input type="text" id="tkpMass" placeholder="Стандартная" inputmode="decimal" oninput="updateDimsHint()">
+        <div class="note" id="massNote"></div>
+      </div>
+      <div class="param">
         <label for="tkpZip">ЗИП в составе ПЧ</label>
         <textarea id="tkpZip" rows="2" placeholder="Например: 1 силовая ячейка, 1 комплект фильтров"></textarea>
         <div class="note">Пишется в строке ПЧ в таблице ТКП («В комплекте ЗИП: …»). Отдельные позиции — в «Дополнительном оборудовании».</div>
@@ -831,6 +841,33 @@
       const b = parseFloat(baseWeight);
       return isNaN(b) ? NaN : Math.round((b + EXTRA_CABINET_T * extraCabinetsCount()) * 10) / 10;
     }
+    /* Габариты и масса, вписанные вручную (поля «Данные для ТКП»): если отличаются от стандартных.
+       Пусто — стандартные по модели. На выбор чертежа не влияют: на листе остаётся стандартное исполнение. */
+    function customDims(){
+      const n = (document.getElementById('tkpDims').value.match(/\d+(?:[.,]\d+)?/g) || []);
+      return n.length === 3 ? n.join('×') : '';
+    }
+    function customMassT(){
+      const t = parseFloat(String(document.getElementById('tkpMass').value).replace(/\s/g, '').replace(',', '.'));
+      return t > 0 ? t : NaN;
+    }
+    window.customDims = customDims; window.customMassT = customMassT;
+    function updateDimsHint(){
+      const v = document.getElementById('voltage').value, p = document.getElementById('power').value, m = getMechanicalFor(v, p);
+      const di = document.getElementById('tkpDims'), dn = document.getElementById('dimsNote');
+      const mi = document.getElementById('tkpMass'), mn = document.getElementById('massNote');
+      di.placeholder = 'Стандартные: ' + m.size;
+      mi.placeholder = 'Стандартная: ' + String(m.weight).replace('.', ',');
+      const bad = di.value.trim() && !customDims();
+      dn.textContent = bad ? 'Впишите три числа: ширина, глубина и высота, например 2600×1330×2480.'
+        : customDims() ? 'В техописании и ТКП будет ' + customDims() + ' мм; габаритный чертёж — стандартного исполнения, с пометкой.'
+        : 'Если габариты отличаются от стандартных — впишите их: попадут в техописание и ТКП.';
+      dn.style.color = bad ? '#b42318' : '';
+      const badM = mi.value.trim() && isNaN(customMassT());
+      mn.textContent = badM ? 'Впишите массу числом, например 2,4.' : 'Без доп. шкафов; каждый доп. шкаф добавляет ' + String(EXTRA_CABINET_T).replace('.', ',') + ' т.';
+      mn.style.color = badM ? '#b42318' : '';
+    }
+    window.updateDimsHint = updateDimsHint;
     function pfExtrasCode(){                                  // доп. шкафы рядом с ПЧ: B — байпас, S — пусковой, R — реактор
       return (document.getElementById('bypass').value !== 'X' ? 'B' : '') +
              (document.getElementById('starter').value === 'S' ? 'S' : '') +
@@ -1169,17 +1206,20 @@
       const upsYN = yn(upsVal === 'U');
       const bypassMode = (bypassVal === 'A') ? 'Автоматический' : (bypassVal === 'M' ? 'Ручной' : 'Нет');
 
-      // Габариты/масса показываем только при отсутствии шкафа байпаса
+      // Габариты/масса показываем при отсутствии шкафа байпаса или если они вписаны вручную
       let mechBlock = '';
-      if (bypassVal === 'X') {
-        const mech = getMechanicalFor(voltageCode, powerVal);
+      const cD = customDims(), cM = customMassT();
+      if (bypassVal === 'X' || cD || !isNaN(cM)) {
+        const mech = Object.assign({}, getMechanicalFor(voltageCode, powerVal));
+        if (cD) mech.size = cD;
+        if (!isNaN(cM)) mech.weight = String(cM);
         mechBlock = `
           <h3>Габариты и масса</h3>
           <table>
             <tr><th>Параметр</th><th>Значение</th></tr>
             <tr><td>Мощность</td><td>${esc(powerVal)} кВт</td></tr>
             ${mech.ex ? `<tr><td>Исполнение</td><td>${esc(mech.ex)}</td></tr>` : ''}
-            <tr><td>Габариты (Ш×Г×В), мм</td><td>${esc(mech.size)}${R ? ' <span class="muted">(высота — с вентиляторами)</span>' : ''}</td></tr>
+            <tr><td>Габариты (Ш×Г×В), мм</td><td>${esc(mech.size)}${cD ? ' <span class="muted">(по согласованию)</span>' : R ? ' <span class="muted">(высота — с вентиляторами)</span>' : ''}</td></tr>
             <tr><td>Масса, т</td><td>${(() => { const n = extraCabinetsCount(), t = totalWeightT(mech.weight);
               return n && !isNaN(t) ? esc(String(t).replace('.', ',')) + ' <span class="muted">(ПЧ ' + esc(String(mech.weight).replace('.', ',')) + ' + доп. шкафы ' + n + ' × 0,7)</span>' : esc(mech.weight); })()}</td></tr>
           </table>
@@ -1516,6 +1556,7 @@
 
     /* ===== Обложка страницы: фото и исполнение корпуса по выбранной модели ===== */
     function updateHero(){
+      updateDimsHint();
       const v = document.getElementById('voltage').value, p = document.getElementById('power').value;
       const film = document.getElementById('capacitorType').value === 'PF';
       const g4 = film && isPFNCabinet(v, p);

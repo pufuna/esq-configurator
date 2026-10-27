@@ -349,6 +349,16 @@
         <input type="text" id="tkpPrice" placeholder="Необязательно">
       </div>
       <div class="param">
+        <label for="tkpDims">Габариты (Ш×Г×В), мм</label>
+        <input type="text" id="tkpDims" placeholder="Стандартные" oninput="updateDimsHint()">
+        <div class="note" id="dimsNote"></div>
+      </div>
+      <div class="param">
+        <label for="tkpMass">Масса, кг</label>
+        <input type="text" id="tkpMass" placeholder="Стандартная" inputmode="decimal" oninput="updateDimsHint()">
+        <div class="note" id="massNote"></div>
+      </div>
+      <div class="param">
         <label for="tkpZip">ЗИП в составе УПП</label>
         <textarea id="tkpZip" rows="2" placeholder="Например: 1 тиристорный блок, 1 плата управления"></textarea>
         <div class="note">Пишется в строке УПП в таблице ТКП («В комплекте ЗИП: …»). Отдельные позиции — в «Дополнительном оборудовании».</div>
@@ -451,6 +461,23 @@
       return I >= 400 ? 'STD1200' : 'STD1000';
     }
     function dims(){ const k = drawingKey(); return k ? DRAW[k].dims : null; }
+    /* Габариты и масса, вписанные вручную (поля «Данные для ТКП») — если отличаются от стандартных; пусто — стандартные */
+    function customDims(){ const n = val('tkpDims').match(/\d+(?:[.,]\d+)?/g) || []; return n.length === 3 ? n.join('×') : ''; }
+    function customMassKg(){ const m = parseFloat(String(val('tkpMass')).replace(/\s/g, '').replace(',', '.')); return m > 0 ? m : NaN; }
+    const dimsOut = () => customDims() || dims();
+    const massOut = () => isNaN(customMassKg()) ? MASS_KG : customMassKg();
+    function updateDimsHint(){
+      $('tkpDims').placeholder = dims() ? 'Стандартные: ' + dims() : 'Стандартные — по запросу';
+      $('tkpMass').placeholder = 'Стандартная: ' + MASS_KG;
+      const bad = val('tkpDims').trim() && !customDims(), badM = val('tkpMass').trim() && isNaN(customMassKg());
+      $('dimsNote').textContent = bad ? 'Впишите три числа: ширина, глубина и высота, например 1000×1500×2300.'
+        : customDims() ? 'В техописании и ТКП будет ' + customDims() + ' мм; эскиз — стандартного исполнения, с пометкой.'
+        : 'Если габариты отличаются от стандартных — впишите их: попадут в техописание и ТКП.';
+      $('dimsNote').style.color = bad ? '#b42318' : '';
+      $('massNote').textContent = badM ? 'Впишите массу числом, например 850.' : '';
+      $('massNote').style.color = badM ? '#b42318' : '';
+    }
+    window.updateDimsHint = updateDimsHint;
     function noDrawing(){ return !drawingKey(); }
     // частота пусков (РЭ): 6 кВ до 2500 кВт и 10 кВ до 4000 кВт — 1–6 в час, выше — 1–3
     function startsPerHour(){ const m = model(); return m[1] > (val('voltage') === '06' ? 2500 : 4000) ? 3 : 6; }
@@ -486,6 +513,7 @@
       renderDecode();
       const hs = $('heroHousing');
       if (hs) hs.textContent = dims() ? 'Габариты ' + dims() + ' мм' : 'Габариты по запросу';
+      updateDimsHint();
     }
 
     /* ===== Расшифровка маркировки ===== */
@@ -517,7 +545,7 @@
       const m = model(), mark = buildMark(), kv = val('voltage') === '06' ? 6 : 10;
       return {
         mark, kv, I: m[0], P: m[1], pkg: val('package'), motor: val('motor'), ip: val('ip'), ctl: val('ctl'),
-        cable: val('cable'), srv: val('service'), proto: val('protocol'), noDrawing: noDrawing(), dims: dims(), drawing: drawingKey(), startsH: startsPerHour(), massKg: MASS_KG,
+        cable: val('cable'), srv: val('service'), proto: val('protocol'), noDrawing: noDrawing(), dims: dimsOut(), dimsCustom: customDims(), drawing: drawingKey(), startsH: startsPerHour(), massKg: massOut(),
         who: val('tkpAuthor').trim(), qty: Math.max(1, parseInt(val('tkpQty'), 10) || 1),
         price: parseFloat(String(val('tkpPrice')).replace(/\s/g, '').replace(',', '.')) || 0,
         name: 'Устройство плавного пуска ' + mark + ', ' + kv + ' кВ, ' + m[1] + ' кВт, ' + m[0] + ' А' +
@@ -587,7 +615,7 @@
         <h3>Габариты и масса</h3>
         <table>
           <tr><th>Параметр</th><th>Значение</th></tr>
-          ${rows((dims() ? [['Габариты (Ш×Г×В), мм', dims()]] : []).concat([['Масса', MASS_KG + ' кг']]))}
+          ${rows((dimsOut() ? [['Габариты (Ш×Г×В), мм', dimsOut() + (customDims() ? ' (по согласованию)' : '')]] : []).concat([['Масса', massOut() + ' кг']]))}
         </table>
         ${noDrawing()
           ? '<div class="drawing-empty">' + noDrawingMsg() + '</div>'
