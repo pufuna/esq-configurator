@@ -1264,17 +1264,15 @@
         const code = (S ? 'S' : '') + (Rc ? 'R' : '');
         return { file: 'assets/drawings_r/R_G1_' + m[1] + '_' + m[2] + '_' + (byp === 'X' ? '0' : 'B') + (code ? '_' + code : '') + '.pdf', bypassShown: true, g1: true };
       }
-      if (v !== 'T100') return null;
-      if (cap === 'EL') {
-        const r = R_DRAW_E10.find(([a, b]) => p >= a && p <= b); if (!r) return null;
-        const code = (byp !== 'X' ? 'B' : '') + (S ? 'S' : '') + (Rc ? 'R' : '');
-        return { file: 'assets/drawings_r/R_E_10_' + r[2] + (code ? '_' + code : '') + '.pdf', bypassShown: true };
-      }
-      if (p <= 1000) {
+      // плёночные в компактном шкафу 1600×1330 (6 кВ до 630 кВт, 10 кВ до 1000 кВт) — один и тот же заводской чертёж на 6 и 10 кВ
+      if (cap === 'PF' && (v === 'T060' || v === 'T100')) {
         const code = (S ? 'S' : '') + (Rc ? 'R' : '');
         return { file: 'assets/drawings_r/R_F_10_280-1000_' + ({ A: 'A', M: 'M' }[byp] || '0') + (code ? '_' + code : '') + '.pdf', bypassShown: true };
       }
-      return null;
+      if (v !== 'T100' || cap !== 'EL') return null;
+      const r = R_DRAW_E10.find(([a, b]) => p >= a && p <= b); if (!r) return null;
+      const code = (byp !== 'X' ? 'B' : '') + (S ? 'S' : '') + (Rc ? 'R' : '');
+      return { file: 'assets/drawings_r/R_E_10_' + r[2] + (code ? '_' + code : '') + '.pdf', bypassShown: true };
     }
     window.rDrawing = rDrawing;
     // пометка к листу R с дорисованными шкафами (габариты — по п. 5.4 техописания ME800-R)
@@ -1288,7 +1286,12 @@
         if (ex.length) n.push('Шкаф' + (ex.length > 1 ? 'ы ' : ' ') + ex.join(', ') + ' на чертеже не показан' + (ex.length > 1 ? 'ы' : '') + '.');
         return n.join(' ');
       }
-      if ((d.g1 ? /_[SR]+\.pdf$/ : /_[BSR]+\.pdf$/).test(d.file)) n.push('Дополнительные шкафы показаны условно: ширина 800 мм, глубина и высота — как у ПЧ; расположение в ряду уточняется при заказе.');
+      // дорисованные шкафы — буквы в конце имени файла (у G1 «_B» без доп. шкафов — заводской шкаф байпаса)
+      const m = /_([BSR]+)\.pdf$/.exec(d.file), drawn = m && !(d.g1 && m[1] === 'B') ? m[1] : '';
+      if (drawn.includes('R')) n.push('Шкаф реактора — 1000×1300×2100 мм (Ш×Г×В).');
+      const other = [drawn.includes('S') && 'пусковой шкаф', drawn.includes('B') && 'шкаф байпаса'].filter(Boolean);
+      if (other.length) n.push(other.join(' и ').replace(/^./, c => c.toUpperCase()) + ' показан' + (other.length > 1 ? 'ы' : '') + ' условно: ширина 800 мм, глубина и высота — как у ПЧ.');
+      if (drawn) n.push('Расположение в ряду уточняется при заказе.');
       return n.join(' ');
     }
     window.rExtrasNote = rExtrasNote;

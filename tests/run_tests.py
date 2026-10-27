@@ -127,6 +127,13 @@ async def main():
                                   " set('capacitorType', 'EL'); set('power', '2500'); const b = rDrawing(); set('voltage', 'T060'); const c = rDrawing(); set('bypass', 'X');"
                                   " return [a && a.file, b && b.file, c]; }")
         check(drw[0].endswith('R_F_10_280-1000_M.pdf') and drw[1].endswith('R_E_10_2500-2650_B.pdf') and drw[2] is None, f'чертежи ME800-R по модели: {drw}')
+        # компактные (плёночные 1600×1330): 6 кВ — те же чертежи, что 10 кВ; шкаф реактора 1000×1300×2100
+        c6 = await page.evaluate("() => { const set = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('change', {bubbles: true})); };"
+                                 " set('voltage', 'T060'); set('power', '400'); set('capacitorType', 'PF'); set('bypass', 'A'); set('reactor', 'R'); const a = rDrawing(), na = rExtrasNote();"
+                                 " set('voltage', 'T100'); set('power', '1000'); const b = rDrawing(); set('reactor', 'X'); set('bypass', 'X');"
+                                 " return [a && a.file, b && b.file, na]; }")
+        check(c6[0] and c6[0] == c6[1] and c6[0].endswith('R_F_10_280-1000_A_R.pdf') and os.path.exists(os.path.join(ROOT, c6[0])) and '1000×1300×2100' in c6[2],
+              f'ME800-R компактный 6 кВ — чертёж как у 10 кВ, реактор 1000×1300×2100: {c6}')
         for fn in [d for d in drw if d]:
             check(os.path.exists(os.path.join(ROOT, fn)), 'файл чертежа есть: ' + fn)
         # ME800-R, плёночные вне компактного корпуса — корпус G1: файл есть для каждой мощности и комплектации
