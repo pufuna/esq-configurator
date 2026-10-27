@@ -7,8 +7,7 @@
    • «Сбросить» — забыть сохранённое и открыть страницу с настройками по умолчанию.
 
    Значения восстанавливаются в порядке полей на странице с событием change —
-   так срабатывают те же пересчёты, что и при ручном выборе (модель → напряжение → мощность → …).
-   Разбор ТЗ (?from=tz) имеет приоритет: в этом случае сохранённое не подставляется. */
+   так срабатывают те же пересчёты, что и при ручном выборе (модель → напряжение → мощность → …). */
 (function () {
   'use strict';
   const PRIVATE = ['tkpAuthor', 'tkpPrice', 'tkpQty'];             // не передаются по ссылке
@@ -57,7 +56,7 @@
     let restoring = false, t = null;
     const save = () => { if (restoring) return; clearTimeout(t); t = setTimeout(() => store.set(collect()), 150); };
 
-    // восстановление: ссылка (?cfg=1) → сохранённое в браузере; разбор ТЗ (?from=tz) — без подстановки
+    // восстановление: ссылка (?cfg=1) → сохранённое в браузере
     const q = new URLSearchParams(location.search);
     restoring = true;
     try {
@@ -66,7 +65,7 @@
         const saved = store.get();                                    // составителя оставляем своего
         if (saved && saved.v) PRIVATE.forEach(id => { if (id in saved.v) v[id] = saved.v[id]; });
         apply({ v });
-      } else if (q.get('from') !== 'tz') apply(store.get());
+      } else apply(store.get());
     } finally { restoring = false; }
 
     scope.addEventListener('change', save);

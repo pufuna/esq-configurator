@@ -124,8 +124,6 @@
     .drawing-link{margin-top:8px}
     .drawing-link a{color:var(--teal);font-weight:500;text-decoration:none}
     .drawing-link a:hover{text-decoration:underline}
-    .tz-banner{padding:12px 16px;background:var(--orange-l);border:1.5px solid var(--orange);border-radius:var(--r);color:var(--ink);font-size:14px}
-    .tz-banner span{color:var(--muted);font-size:13px}
 
     /* ---------- подвал: как низ страниц ТКП ---------- */
     .footer{background:#fff;border-top:1px solid var(--line)}
@@ -133,7 +131,6 @@
     .footer .icons{height:38px;width:auto;flex:0 1 auto;min-width:0;object-fit:contain;object-position:left}
     .footer .esq-s{height:30px;width:auto;margin-left:auto}
     .footer p{margin:0;color:var(--muted);font-size:12.5px;white-space:nowrap}
-    .ft-link{color:inherit;text-decoration:none;cursor:default}
 
     /* ---------- адаптив ---------- */
     @media (max-width:1100px){
@@ -498,7 +495,7 @@
     <div class="footer-in">
       <img class="icons" src="assets/ui/icons.png" alt="">
       <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
-      <p><a href="tz.html" class="ft-link" tabindex="-1" aria-hidden="true">©</a> <span id="year">2026</span> ESQ · ООО «Элком»</p>
+      <p>© <span id="year">2026</span> ESQ · ООО «Элком»</p>
       <script>document.getElementById('year').textContent = new Date().getFullYear();   // год в подвале — текущий</script>
     </div>
   </footer>
@@ -1493,41 +1490,6 @@
       if (textSource !== box) document.body.removeChild(textSource);
     }
 
-    /* ===== Конфигурация из разбора ТЗ (параметры в адресе страницы) =====
-       ?from=tz&v=T060&kw=1000&a=130&cap=auto&mat=CU&puls=30&byp=A&react=X&ip=42&exp=X&ups=U&cab=T&pr=MR&cb=B&mot=A&sync=B&qty=4&tz=...
-       Мощность подбирается наименьшая, у которой P ≥ kw и I ≥ a. */
-    function applyUrlParams(){
-      let q; try { q = new URLSearchParams(location.search); } catch(e){ return; }
-      if (q.get('from') !== 'tz') return;
-      const set = (id, val) => { const el = document.getElementById(id); if (!el || val == null || val === '') return false;
-        if (el.tagName === 'SELECT' && !Array.from(el.options).some(o => o.value === val && !o.disabled)) return false; el.value = val; return true; };
-      const notes = [];
-      if (q.get('model') === 'R' || q.get('model') === 'ME800R') { document.getElementById('model').value = 'ME800R'; onModelChange(); }
-      if (set('voltage', q.get('v'))) updatePowerOptions();
-      const v = document.getElementById('voltage').value;
-      const kw = Number(q.get('kw')) || 0, a = Number(q.get('a')) || 0;
-      const fit = Object.keys(md(v)).map(Number).sort((x, y) => x - y)
-        .find(p => p >= kw && Number(md(v)[String(p)].current) >= a);
-      if (fit) { set('power', String(fit)); updateDependencies(); }
-      else if (kw || a) notes.push('нет модели под ' + (kw ? kw + ' кВт' : '') + (a ? ' / ' + a + ' А' : '') + ' — выбрана вручную');
-      const cap = document.getElementById('capacitorType'), p = document.getElementById('power').value;
-      const want = q.get('cap') || 'auto';
-      cap.value = want === 'EL' ? 'EL' : 'PF';
-      onCapacitorTypeChange();
-      if (q.get('puls') && !set('pulsation', q.get('puls'))) notes.push('пульсность ' + q.get('puls') + ' недоступна');
-      [['mat','material'],['byp','bypass'],['react','reactor'],['ip','ip'],['exp','expansion'],['ups','ups'],['cab','cable'],
-       ['pr','protocol'],['cb','cellBypass'],['mot','motor'],['sync','sync']].forEach(([k, id]) => set(id, q.get(k)));
-      if (!document.getElementById('starter').disabled && q.get('st')) set('starter', q.get('st'));
-      if (q.get('qty')) document.getElementById('tkpQty').value = q.get('qty');
-      updateNomenclature();
-      const box = document.createElement('div');
-      box.className = 'tz-banner';
-      box.innerHTML = '<b>Конфигурация из разбора ТЗ</b>' + (q.get('tz') ? ': ' + esc(q.get('tz')) : '') +
-        '<br><span>Проверьте параметры перед скачиванием ТКП.' + (notes.length ? ' Внимание: ' + esc(notes.join('; ')) + '.' : '') + '</span>';
-      const host = document.querySelector('.form-col');
-      host.insertBefore(box, host.firstChild);
-    }
-
     /* ===== Подбор мощности по двигателю (раздел 6 техописания) =====
        Наименьшая модель с P ≥ Pдв и I ≥ Iдв при выбранных модели и напряжении; для винтового компрессора — на ступень больше,
        для поршневого — на две. Плёночные — если доступны на этой мощности, иначе тип конденсаторов переключается на электролитические. */
@@ -1621,7 +1583,6 @@
       document.getElementById('capacitorType').value='EL';
       document.getElementById('model').value='ME800';
       onModelChange();
-      applyUrlParams();
       document.querySelectorAll('select').forEach(el=>{
         if (el.id==='voltage' || el.id==='model') return;                 // у них свой onchange
         if (el.id==='power') el.addEventListener('change', updateDependencies);
@@ -1692,7 +1653,7 @@
     /* ===== Скачивание ТКП: обязательны фамилия и инициалы; для фамилии сотрудника — ещё и пароль ===== */
     (function () {
       const PRODUCT = 'pch';
-      const FUNCTION_URL = window.TZ_FUNCTION_URL || 'https://functions.yandexcloud.net/d4eplvhu1pvut5be24vd';
+      const FUNCTION_URL = window.TKP_FUNCTION_URL || 'https://functions.yandexcloud.net/d4eplvhu1pvut5be24vd';
       const CAP = '[A-ZА-ЯЁ]', LET = '[A-Za-zА-Яа-яЁё]';
       const SUR = CAP + LET + '+(?:-' + CAP + LET + '+)?', INI = CAP + '\\.(?:\\s?' + CAP + '\\.)?';
       const RE_A = new RegExp('^' + SUR + '\\s+' + INI + '$'), RE_B = new RegExp('^' + INI + '\\s*' + SUR + '$');

@@ -123,8 +123,6 @@
     .drawing-link{margin-top:8px}
     .drawing-link a{color:var(--teal);font-weight:500;text-decoration:none}
     .drawing-link a:hover{text-decoration:underline}
-    .tz-banner{padding:12px 16px;background:var(--orange-l);border:1.5px solid var(--orange);border-radius:var(--r);color:var(--ink);font-size:14px}
-    .tz-banner span{color:var(--muted);font-size:13px}
 
     /* ---------- подвал: как низ страниц ТКП ---------- */
     .footer{background:#fff;border-top:1px solid var(--line)}
@@ -132,7 +130,6 @@
     .footer .icons{height:38px;width:auto;flex:0 1 auto;min-width:0;object-fit:contain;object-position:left}
     .footer .esq-s{height:30px;width:auto;margin-left:auto}
     .footer p{margin:0;color:var(--muted);font-size:12.5px;white-space:nowrap}
-    .ft-link{color:inherit;text-decoration:none;cursor:default}
 
     /* ---------- адаптив ---------- */
     @media (max-width:1100px){
@@ -418,7 +415,7 @@
     <div class="footer-in">
       <img class="icons" src="assets/ui/icons.png" alt="">
       <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
-      <p><a href="tz.html?p=upp" class="ft-link" tabindex="-1" aria-hidden="true">©</a> <span id="year">2026</span> ESQ · ООО «Элком»</p>
+      <p>© <span id="year">2026</span> ESQ · ООО «Элком»</p>
       <script>document.getElementById('year').textContent = new Date().getFullYear();   // год в подвале — текущий</script>
     </div>
   </footer>
@@ -537,7 +534,6 @@
     });
     function dcHighlight(i){ document.querySelectorAll('.dc-seg, #dc-body tr').forEach(el => el.classList.toggle('hl', el.dataset.i === i)); }
 
-    window.isDrawingMissing = noDrawing;   // для страницы разбора ТЗ
     window.UPP_MODELS = MODELS;            // модельный ряд — для таблицы в ТКП
 
     /* ===== Состояние для ТКП (tkp_upp.js) ===== */
@@ -644,33 +640,6 @@
       if (src !== box) document.body.removeChild(src);
     }
 
-    /* ===== Конфигурация из разбора ТЗ (параметры в адресе страницы) =====
-       ?from=tz&v=06&kw=630&a=75&pkg=STD&mot=A&ip=IP41&ctl=AC220&cab=D&srv=2&pr=MR&qty=2&tz=...
-       Подбирается наименьшая модель, у которой мощность ≥ kw и ток ≥ a. */
-    function applyUrlParams(){
-      let q; try { q = new URLSearchParams(location.search); } catch(e){ return; }
-      if (q.get('from') !== 'tz') return;
-      const set = (id, v) => { const el = $(id); if (!el || v == null || v === '') return false;
-        if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === v)) return false; el.value = v; return true; };
-      const notes = [];
-      if (set('voltage', q.get('v'))) updatePowerOptions();
-      const kw = Number(q.get('kw')) || 0, a = Number(q.get('a')) || 0;
-      const fit = MODELS[val('voltage')].find(([I, P]) => P >= kw && I >= a);
-      if (fit) set('power', String(fit[0]));
-      else if (kw || a) notes.push('нет модели под ' + (kw ? kw + ' кВт' : '') + (a ? ' / ' + a + ' А' : '') + ' — выбрана вручную');
-      [['pkg','package'],['mot','motor'],['ip','ip'],['ctl','ctl'],['cab','cable'],['srv','service'],['pr','protocol']].forEach(([k, id]) => {
-        if (q.get(k) && !set(id, q.get(k))) notes.push(k + '=' + q.get(k) + ' недоступно');
-      });
-      if (q.get('qty')) $('tkpQty').value = q.get('qty');
-      update();
-      const box = document.createElement('div');
-      box.className = 'tz-banner';
-      box.innerHTML = '<b>Конфигурация из разбора ТЗ</b>' + (q.get('tz') ? ': ' + esc(q.get('tz')) : '') +
-        '<br><span>Проверьте параметры перед скачиванием ТКП.' + (notes.length ? ' Внимание: ' + esc(notes.join('; ')) + '.' : '') + '</span>';
-      const host = document.querySelector('.form-col');
-      host.insertBefore(box, host.firstChild);
-    }
-
     /* ===== Подбор по двигателю: наименьшая модель с P ≥ Pдв и I ≥ Iдв при выбранном напряжении ===== */
     function pickByMotor(){
       const kw = Number(val('mpKw')) || 0, a = Number(val('mpA')) || 0;
@@ -688,7 +657,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       updatePowerOptions();
       $('power').value = '75'; update();          // по умолчанию — модель образца ТКП
-      applyUrlParams();
       document.querySelectorAll('select').forEach(el => el.addEventListener('change', el.id === 'voltage' ? updatePowerOptions : update));
     });
   </script>
@@ -749,7 +717,7 @@
     /* ===== Скачивание ТКП: обязательны фамилия и инициалы; для фамилии сотрудника — ещё и пароль ===== */
     (function () {
       const PRODUCT = 'upp';
-      const FUNCTION_URL = window.TZ_FUNCTION_URL || 'https://functions.yandexcloud.net/d4eplvhu1pvut5be24vd';
+      const FUNCTION_URL = window.TKP_FUNCTION_URL || 'https://functions.yandexcloud.net/d4eplvhu1pvut5be24vd';
       const CAP = '[A-ZА-ЯЁ]', LET = '[A-Za-zА-Яа-яЁё]';
       const SUR = CAP + LET + '+(?:-' + CAP + LET + '+)?', INI = CAP + '\\.(?:\\s?' + CAP + '\\.)?';
       const RE_A = new RegExp('^' + SUR + '\\s+' + INI + '$'), RE_B = new RegExp('^' + INI + '\\s*' + SUR + '$');
