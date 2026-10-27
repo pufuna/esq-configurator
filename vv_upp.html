@@ -714,29 +714,12 @@
   </script>
 
   <script>
-    /* ===== Скачивание ТКП: обязательны фамилия и инициалы; для фамилии сотрудника — ещё и пароль ===== */
+    /* ===== Скачивание ТКП: обязательны фамилия и инициалы составителя ===== */
     (function () {
-      const PRODUCT = 'upp';
-      const FUNCTION_URL = window.TKP_FUNCTION_URL || 'https://functions.yandexcloud.net/d4eplvhu1pvut5be24vd';
       const CAP = '[A-ZА-ЯЁ]', LET = '[A-Za-zА-Яа-яЁё]';
       const SUR = CAP + LET + '+(?:-' + CAP + LET + '+)?', INI = CAP + '\\.(?:\\s?' + CAP + '\\.)?';
       const RE_A = new RegExp('^' + SUR + '\\s+' + INI + '$'), RE_B = new RegExp('^' + INI + '\\s*' + SUR + '$');
       const HINT = 'Укажите фамилию и инициалы, например: Иванов И.И.';
-      const LOOK = { a: 'а', b: 'в', c: 'с', e: 'е', h: 'н', k: 'к', m: 'м', o: 'о', p: 'р', t: 'т', x: 'х', y: 'у' };
-      // фамилия сотрудника хранится только в виде SHA-256 (кириллица и латиница), сравнивается каждое слово ввода
-      const STAFF = ['4040bc86da4996bde2026601f197160ad02d9674a65f29558713390560c44d92', '22d3ead26bcb1df296c64bfe48feaf89d08d16d580b7017b73e3b7d102131fe1'];
-      async function isStaff(s) {
-        const low = s.toLowerCase().replace(/ё/g, 'е');
-        for (const w of low.split(/[\s.,\-]+/)) {
-          const lat = w.replace(/[^a-z]/g, ''), cyr = w.replace(/[a-z]/g, ch => LOOK[ch] || ch).replace(/[^а-я]/g, '');
-          for (const t of [cyr, lat]) {
-            if (t.length < 4 || !(window.crypto && crypto.subtle)) continue;
-            const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
-            if (STAFF.includes(Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join(''))) return true;
-          }
-        }
-        return false;
-      }
       const input = document.getElementById('tkpAuthor');
       const note = document.getElementById('authorNote');
       function norm() { return (input.value || '').replace(/\s+/g, ' ').trim(); }
@@ -749,69 +732,19 @@
       input.addEventListener('blur', () => { const s = norm(); if (s && !valid(s)) show(HINT); else if (s) show(''); });
 
       const st = document.createElement('style');
-      st.textContent = 'input.invalid{border-color:#b42318!important;box-shadow:0 0 0 3px rgba(180,35,24,.12)!important}' +
-        '.pw-ov{position:fixed;inset:0;background:rgba(7,83,90,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}' +
-        '.pw-card{background:#fff;border:1.5px solid #0a6972;border-radius:18px;padding:22px 24px;width:100%;max-width:400px;box-shadow:0 20px 50px rgba(0,0,0,.25)}' +
-        '.pw-card h3{margin:0 0 6px;color:#f26928;font-size:19px;font-weight:600}' +
-        '.pw-card p{margin:0 0 14px;color:#6b787c;font-size:14px}' +
-        '.pw-card input{width:100%;font:inherit;font-size:15px;border:1px solid #cfdfe1;border-radius:10px;padding:10px 12px;min-height:42px;outline:none}' +
-        '.pw-card input:focus{border-color:#0a6972;box-shadow:0 0 0 3px rgba(10,105,114,.15)}' +
-        '.pw-err{min-height:18px;margin:8px 0 0;color:#b42318;font-size:13px}' +
-        '.pw-row{display:flex;gap:10px;margin-top:10px}' +
-        '.pw-row button{flex:1;font:inherit;font-weight:600;font-size:15px;border-radius:999px;padding:11px 16px;cursor:pointer;border:1.5px solid #f26928;background:#f26928;color:#fff}' +
-        '.pw-row button.ghost{background:#fff;color:#0a6972;border-color:#0a6972}.pw-row button:disabled{opacity:.5;cursor:default}';
+      st.textContent = 'input.invalid{border-color:#b42318!important;box-shadow:0 0 0 3px rgba(180,35,24,.12)!important}';
       document.head.appendChild(st);
-
-      let okSession = false; try { okSession = sessionStorage.getItem('tkpPwOk') === '1'; } catch (e) {}
-      let pwFails = 0;                                                    // неверные пароли в этой вкладке: после каждого — пауза 2, 4, 8 … 60 с
-      function hold(btn, sec, done) {
-        btn.disabled = true;
-        const tick = () => { if (sec <= 0) { btn.textContent = 'Скачать'; btn.disabled = false; return done(); } btn.textContent = 'Подождите ' + sec-- + ' с'; setTimeout(tick, 1000); };
-        tick();
-      }
-      function askPassword() {
-        return new Promise(resolve => {
-          const ov = document.createElement('div'); ov.className = 'pw-ov';
-          ov.innerHTML = '<div class="pw-card" role="dialog" aria-modal="true"><h3>Нужен пароль</h3><p>Для этого составителя скачивание ТКП доступно после ввода пароля сотрудника.</p>' +
-            '<input type="password" autocomplete="current-password" placeholder="Пароль"><div class="pw-err"></div>' +
-            '<div class="pw-row"><button type="button" class="ghost">Отмена</button><button type="button" class="go">Скачать</button></div></div>';
-          document.body.appendChild(ov);
-          const pw = ov.querySelector('input'), err = ov.querySelector('.pw-err'), go = ov.querySelector('.go'), cancel = ov.querySelector('.ghost');
-          const close = r => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(r); };
-          const onKey = e => { if (e.key === 'Escape') close(false); };
-          document.addEventListener('keydown', onKey);
-          async function submit() {
-            if (go.disabled) return;                                       // идёт проверка или пауза после неверного пароля (Enter)
-            if (!pw.value) { err.textContent = 'Введите пароль'; return; }
-            go.disabled = true; err.style.color = '#6b787c'; err.textContent = 'Проверяю…';
-            try {
-              const r = await fetch(FUNCTION_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({ password: pw.value, action: 'ping', product: PRODUCT }) });
-              let j = null; try { j = await r.json(); } catch (e) {}
-              if (r.ok && j && j.ok) { try { sessionStorage.setItem('tkpPwOk', '1'); } catch (e) {} okSession = true; close(true); return; }
-              err.style.color = '#b42318'; err.textContent = (j && j.error) ? j.error : 'Не удалось проверить пароль (код ' + r.status + ')';
-              if (r.status === 403 || r.status === 429) { pwFails++; return hold(go, Math.min(60, 2 ** pwFails), () => pw.select()); }
-            } catch (e) { err.style.color = '#b42318'; err.textContent = 'Нет связи с сервером проверки — попробуйте позже'; }
-            go.disabled = false; pw.select();
-          }
-          go.onclick = submit; cancel.onclick = () => close(false);
-          pw.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
-          ov.addEventListener('mousedown', e => { if (e.target === ov) close(false); });
-          setTimeout(() => pw.focus(), 30);
-        });
-      }
 
       const orig = window.downloadTKP;
       window.downloadTKP = async function (e, fmt) {                     // fmt: 'docx' — ТКП в Word
         if (e && e.preventDefault) e.preventDefault();
         const btn = e && e.currentTarget;                                // после await у события его уже нет — передаём кнопку дальше
         if (e) e = { preventDefault() {}, currentTarget: btn };
-        const s = norm();
-        if (!valid(s)) {
+        if (!valid(norm())) {
           show(HINT); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => input.focus(), 250);
           return;
         }
         show('');
-        if ((await isStaff(s)) && !okSession && !(await askPassword())) return;
         return orig.call(this, e, fmt);
       };
     })();
