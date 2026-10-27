@@ -21,6 +21,7 @@ DRAW = os.path.join(ROOT, 'assets', 'drawings_r')
 FONT = os.path.join(ROOT, 'assets', 'fonts', 'LiberationSans-Regular.ttf')   # тем же шрифтом набраны листы
 TPL = os.path.join(DRAW, 'R_F_10_280-1000_M.pdf')                             # шкаф байпаса 650 × 1999 слева от ПЧ
 TPL_W, TPL_H = 650, 1999
+TPL_ROOF, TPL_PLINTH, TPL_SIDE = 75, 110, 90                                  # крыша (1924–1999), цоколь (0–105), боковые рамки — в натуральную величину
 REACTOR = (1000, 1300, 2100)
 SHEET_W = 1191.12                                                             # 420 мм в pt
 NAMES = {'R': ('Шкаф реактора', 'ШР', 'шкаф реактора'), 'S': ('Пусковой шкаф', 'ПШ', 'пусковой шкаф'), 'B': ('Шкаф байпаса', 'ШБ', 'шкаф байпаса')}
@@ -276,10 +277,19 @@ class Pen:
             self.text(xl - f * 0.35, yb - f * 1.6 - FNT.text_length(txt, fontsize=f) / 2, txt, size=f, rot=90)
         self.fs = save
 
-    def place(self, paths, src, dst):
-        """Пути из прямоугольника src (лист шаблона) в dst (масштаб по ширине и высоте)."""
-        kx, ky = dst.width / src.width, dst.height / src.height
-        tr = lambda p: self.P(dst.x0 + (p.x - src.x0) * kx, dst.y0 + (p.y - src.y0) * ky)
+    def place(self, paths, src, dst, ks, kd):
+        """Пути шкафа из прямоугольника src (лист шаблона, ks pt/мм) в dst (этот лист, kd pt/мм).
+           Крыша, цоколь и боковые рамки переносятся в натуральную величину — как у шкафа байпаса;
+           растягивается только середина (под другую ширину и высоту шкафа)."""
+        Ws, Hs, Wd, Hd = src.width / ks, src.height / ks, dst.width / kd, dst.height / kd
+        def part(u, S, D, lo, hi):                                                  # кусочно-линейно: края lo и hi — как есть
+            if u <= lo: return u
+            if u >= S - hi: return D - (S - u)
+            return lo + (u - lo) * (D - lo - hi) / (S - lo - hi)
+        side = min(TPL_SIDE, Ws / 3, Wd / 3)
+        tr = lambda p: self.P(dst.x0 + part((p.x - src.x0) / ks, Ws, Wd, side, side) * kd,
+                              dst.y1 - part((src.y1 - p.y) / ks, Hs, Hd, TPL_PLINTH, TPL_ROOF) * kd)
+        kx = ky = kd / ks
         sh = self.sh
         for d in paths:
             for it in d['items']:
@@ -288,7 +298,8 @@ class Pen:
                 elif it[0] == 'c':
                     sh.draw_bezier(tr(it[1]), tr(it[2]), tr(it[3]), tr(it[4]))
                 elif it[0] == 're':
-                    sh.draw_rect(pymupdf.Rect(tr(it[1].tl), tr(it[1].br)))
+                    a, b = tr(it[1].tl), tr(it[1].br)
+                    sh.draw_rect(pymupdf.Rect(min(a.x, b.x), min(a.y, b.y), max(a.x, b.x), max(a.y, b.y)))
                 elif it[0] == 'qu':
                     q = it[1]
                     sh.draw_quad(pymupdf.Quad(tr(q.ul), tr(q.ur), tr(q.ll), tr(q.lr)))
@@ -436,14 +447,14 @@ def compose(base_pdf, code, out_pdf):
         cp.draw_rect(r + (ox - 0.5, oy - 0.5, ox + 0.5, oy + 0.5), color=None, fill=(1, 1, 1))
         pen.text((r.x0 + r.x1) / 2, r.y1 - wt['size'] * 0.2, str(g['W']), size=wt['size'])
 
-    (TF, TFB), (TR, TRB), _ = template()
+    (TF, TFB), (TR, TRB), kt = template()
     plan_drawn = False
     x = new_left
     for c in order:
         w, dpt, h = spec[c]
         name, short, _ = NAMES[c]
         a, b = x, x + w * k
-        pen.place(TF, TFB, pymupdf.Rect(a, base_y - h * k, b, base_y))
+        pen.place(TF, TFB, pymupdf.Rect(a, base_y - h * k, b, base_y), kt, k)
         pen.text((a + b) / 2, base_y - h * k - fs * 0.5, name, fs * 0.8)
         pen.hdim(a, b, base_y, g['ydim'], str(w))
         for kind, lo, hi in bands:
@@ -457,7 +468,7 @@ def compose(base_pdf, code, out_pdf):
         xr = rv['rr']
         for c in reversed(order):
             w, dpt, h = spec[c]
-            pen.place(TR, TRB, pymupdf.Rect(xr, rv['rbase'] - h * k, xr + w * k, rv['rbase']))
+            pen.place(TR, TRB, pymupdf.Rect(xr, rv['rbase'] - h * k, xr + w * k, rv['rbase']), kt, k)
             pen.text(xr + w * k / 2, rv['rbase'] - h * k - fs * 0.5, NAMES[c][0], fs * 0.8)
             xr += w * k
     hmax = max(spec[c][2] for c in order)
