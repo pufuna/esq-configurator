@@ -316,7 +316,8 @@
     const SCH = new URL(window.SCHEMES_BASE || 'assets/schemes/', document.baseURI).href;
     // топология ячейки: сдвоенная «два в одном» — только в компактном корпусе (ME800 — G4; ME800-R — ячейки F до 630 кВт (6 кВ) / 1000 кВт (10 кВ));
     // иначе — одиночная ячейка (cell_el: выпрямитель — звено постоянного тока — H-мост, одинакова для обоих типов конденсаторов)
-    const schFiles = { 7: 'struct_' + s.n + '.pdf', 8: (s.dbl ? 'cell_pf' : 'cell_el') + '.pdf', 9: 'ext.pdf', 12: 'sine.pdf' };
+    // ME800-R: байпас силовой ячейки — в стандартной комплектации: схема ячейки без пометки «(опция)» (*_r.pdf)
+    const schFiles = { 7: 'struct_' + s.n + '.pdf', 8: (s.dbl ? 'cell_pf' : 'cell_el') + (s.isR ? '_r' : '') + '.pdf', 9: 'ext.pdf', 12: 'sine.pdf' };
     const ZONE = { 7: [82, 150, 522, 692], 8: [112, 103, 719, 487], 9: [82, 146.5, 522, 692], 12: [70, 234, 525, 416] };
     for (const [i, f] of Object.entries(schFiles)) {
       try { const r = await fetch(SCH + f); if (r.ok) await drawScheme(doc, pg[+i], await r.arrayBuffer(), ZONE[i]); }
