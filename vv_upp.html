@@ -173,7 +173,6 @@
     /* ---------- УПП ---------- */
     .hero .photo.upp{height:290px;margin-bottom:-1px}
     .param .note.warn{color:#b4471a;background:var(--orange-l);border-radius:8px;padding:6px 10px}
-    #summary{font-size:14px;color:var(--ink);overflow-wrap:anywhere;margin:0 0 4px}
     @media (max-width:1100px){.hero .photo.upp{height:230px}}
     @media (max-width:720px){.hero .photo.upp{height:200px}}
     /* ---------- подбор по двигателю ---------- */
@@ -350,7 +349,7 @@
         <div class="note" id="dimsNote"></div>
       </div>
       <div class="param">
-        <label for="tkpMass">Масса, кг</label>
+        <label for="tkpMass">Масса УПП, кг</label>
         <input type="text" id="tkpMass" placeholder="Стандартная" inputmode="decimal" oninput="updateDimsHint()">
         <div class="note" id="massNote"></div>
       </div>
@@ -377,8 +376,8 @@
         <div class="rc-body">
           <div class="result-title">Маркировка</div>
           <div id="result">ESQ F HVS</div>
-          <div class="result-title">Конфигурация</div>
-          <div id="summary"></div>
+          <div class="result-title">Комплектация</div>
+          <div id="old-result"></div>
           <div class="btns">
             <div class="tkp-row"><a href="#" class="btn btn-primary" onclick="downloadTKP(event)">Скачать ТКП (PDF)</a><a href="#" class="btn btn-word" onclick="downloadTKP(event, 'docx')" title="ТКП в Word: таблица предложения, описание и характеристики — редактируемым текстом">Word</a></div>
             <a href="#" class="btn btn-teal techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
@@ -491,17 +490,19 @@
 
     function summaryText(){
       const m = model(), kv = val('voltage') === '06' ? 6 : 10;
-      return [kv + ' кВ', m[1] + ' кВт', m[0] + ' А', 'комплектация ' + PKG[val('package')],
-        ($('motor').value === 'S' ? 'синхронный' : 'асинхронный') + ' двигатель', val('ip'),
-        'питание цепей управления ' + CTL[val('ctl')], 'вводы ' + (val('cable') === 'T' ? 'сверху' : 'снизу'),
-        (val('service') === '1' ? 'одностороннее' : 'двухстороннее') + ' обслуживание', PROTO[val('protocol')]].join(', ');
+      // тот же порядок, что в комплектации ПЧ: напряжение, мощность, ток, IP, исполнение, протокол, вводы, двигатель
+      return [kv + ' кВ', m[1] + ' кВт', m[0] + ' А', val('ip'),
+        val('package') === 'STD' ? 'стандартная комплектация' : PKG[val('package')],
+        'питание цепей управления ' + CTL[val('ctl')], (val('service') === '1' ? 'одностороннее' : 'двухстороннее') + ' обслуживание',
+        PROTO[val('protocol')], 'вводы ' + (val('cable') === 'T' ? 'сверху' : 'снизу'),
+        ($('motor').value === 'S' ? 'синхронный' : 'асинхронный') + ' двигатель'].join(', ');
     }
 
     function update(){
       const m = model();
       $('current').value = m[0];
       $('result').textContent = buildMark();
-      $('summary').textContent = summaryText();
+      $('old-result').textContent = summaryText();
       const n = $('sizeNote');
       if (noDrawing()) { n.textContent = noDrawingMsg(); n.className = 'note warn'; }
       else { n.textContent = 'Габариты ' + dims() + ' мм (Ш×Г×В), масса ' + MASS_KG + ' кг.'; n.className = 'note'; }

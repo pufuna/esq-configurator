@@ -250,7 +250,7 @@
         <div class="note" id="modelNote"></div>
       </div>
       <details class="motor-pick" id="motorPick">
-        <summary>Подобрать мощность по данным двигателя</summary>
+        <summary>Подобрать ПЧ по данным двигателя</summary>
         <div class="mp-grid">
           <div><small>Мощность двигателя, кВт</small><input type="number" id="mpKw" min="0" step="any" placeholder="1000"></div>
           <div><small>Номинальный ток, А</small><input type="number" id="mpA" min="0" step="any" placeholder="необязательно"></div>
@@ -361,7 +361,7 @@
     <section class="card">
       <h2>3. Подключение и управление</h2>
       <div class="param">
-        <label for="cable">14. Вводы/выводы</label>
+        <label for="cable">14. Вводы/выводы кабелей</label>
         <select id="cable" onchange="updateNomenclature()">
           <option value="D">Снизу</option>
           <option value="T">Сверху</option>
@@ -1015,7 +1015,7 @@
         `${material==='AL'?'алюминиевый':'медный'} трансформатор`, getCellCount()
       ];
       const adds = [];
-      adds.push(cellBypass==='B' ? 'с байпас силовой ячейки' : 'без байпас силовой ячейки');
+      adds.push(cellBypass==='B' ? 'с байпасом силовой ячейки' : 'без байпаса силовой ячейки');
       if (starter==='S') adds.push('пусковой шкаф');
       if (reactor==='R') adds.push('шкаф реактора');
       if (bypassSel.value!=='X') adds.push(`${bypassText} шкаф байпаса`);
