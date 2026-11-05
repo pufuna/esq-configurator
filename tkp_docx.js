@@ -6,7 +6,7 @@
    • картинками во всю страницу в исходном оформлении — постоянные и графические листы (обложка, письмо, схемы,
      чертёж, такелаж, обслуживание, клиенты). Картинки рендерит pdf.js из того же PDF.
 
-   Библиотека docx — assets/vendor/docx.iife.js (запасной вариант — CDN), pdf.js — assets/vendor/pdfjs. */
+   Библиотека docx — assets/vendor/docx.min.js (запасной вариант — CDN), pdf.js — assets/vendor/pdfjs. */
 (function () {
   'use strict';
   const TEAL = '0A6972', ORANGE = 'F26928', INK = '231F20', MUTED = '6B787C', LINE = 'CFDFE1', HEADBG = 'E7F1F2', GRAY = 'D4D4D4';
@@ -20,7 +20,7 @@
   }
   async function docxLib() {
     if (window.docx) return window.docx;
-    try { await loadScript('assets/vendor/docx.iife.js'); } catch (e) { await loadScript('https://cdn.jsdelivr.net/npm/docx@9.6.1/dist/index.iife.js'); }
+    try { await loadScript('assets/vendor/docx.min.js'); } catch (e) { await loadScript('https://cdn.jsdelivr.net/npm/docx@9.8.1/dist/index.iife.js'); }
     if (!window.docx) throw new Error('библиотека docx не загрузилась');
     return window.docx;
   }

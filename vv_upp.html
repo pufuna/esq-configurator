@@ -7,11 +7,11 @@
   <meta name="robots" content="noindex, nofollow">
   <style>
     /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
-    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2'),url('assets/fonts/Inter-Light.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff2') format('woff2'),url('assets/fonts/Inter-Regular.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff2') format('woff2'),url('assets/fonts/Inter-Medium.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff2') format('woff2'),url('assets/fonts/Inter-SemiBold.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff2') format('woff2'),url('assets/fonts/Inter-Bold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff2') format('woff2')}
     :root{
       --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
       --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
@@ -208,20 +208,20 @@
 <body>
   <header class="topbar">
     <div class="topbar-in">
-      <img class="elkom" src="assets/ui/elkom.png" alt="ЭЛКОМ — стандарт качества">
+      <img class="elkom" src="assets/ui/elkom.webp" alt="ЭЛКОМ — стандарт качества">
       <div class="caption">Конфигуратор устройства плавного пуска</div>
       <a href="index.html" class="home-button">На главную</a>
     </div>
   </header>
 
   <section class="hero">
-    <img class="arcs" src="assets/ui/arcs.jpg" alt="">
+    <img class="arcs" src="assets/ui/arcs.webp" alt="">
     <div class="hero-in">
       <div>
-        <img class="esq" src="assets/ui/esq.png" alt="ESQ — Elcom Standard of Quality">
+        <img class="esq" src="assets/ui/esq.webp" alt="ESQ — Elcom Standard of Quality">
         <h1>Конфигуратор<br>устройства плавного пуска</h1>
       </div>
-      <img class="photo upp" src="assets/upp/cover_upp.png" alt="Устройство плавного пуска ESQ F HVS">
+      <img class="photo upp" src="assets/upp/cover_upp.webp" alt="Устройство плавного пуска ESQ F HVS">
     </div>
     <div class="band"><div class="band-in">
       <b>Устройство плавного пуска</b><span>ESQ F HVS · 6 и 10 кВ · 420–7000 кВт</span>
@@ -410,8 +410,8 @@
 
   <footer class="footer">
     <div class="footer-in">
-      <img class="icons" src="assets/ui/icons.png" alt="">
-      <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
+      <img class="icons" src="assets/ui/icons.webp" alt="" loading="lazy" decoding="async">
+      <img class="esq-s" src="assets/ui/esq.webp" alt="ESQ" loading="lazy" decoding="async">
       <p>© <span id="year">2026</span> ESQ · ООО «Элком»</p>
       <script>document.getElementById('year').textContent = new Date().getFullYear();   // год в подвале — текущий</script>
     </div>
@@ -696,9 +696,28 @@
           .catch(e => { window.__pdfLib = null; throw e; }));
     };
   </script>
-  <script src="pdfscrub.js"></script>
-  <script src="tkp_upp.js"></script>
-  <script src="tkp_docx.js"></script>
+  <script>
+    /* Сборка ТКП (pdfscrub.js, tkp_upp.js, tkp_docx.js) нужна только при скачивании: скрипты грузятся в фоне после открытия
+       страницы, а если кнопку нажали раньше — по нажатию. Обёртки downloadTKP на странице (проверка «Составил») сохраняются. */
+    (function () {
+      const SRC = ['pdfscrub.js', 'tkp_upp.js', 'tkp_docx.js'];
+      let real = null, loading = null;
+      const add = src => new Promise((ok, fail) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => fail(new Error('не загрузился ' + src)); document.head.appendChild(el); });
+      const load = () => loading || (loading = (async () => {
+        const keep = window.downloadTKP;                                 // обёртка страницы — остаётся на месте
+        for (const s of SRC) await add(s);
+        real = window.downloadTKP; window.downloadTKP = keep;
+      })().catch(e => { loading = null; throw e; }));
+      window.downloadTKP = async function (e, fmt) {
+        if (e && e.preventDefault) e.preventDefault();
+        const btn = e && e.currentTarget;
+        if (!real) { if (btn) btn.style.opacity = .6; try { await load(); } catch (err) { if (btn) btn.style.opacity = 1; alert('Не удалось загрузить модуль ТКП: ' + err.message); return; } }
+        return real.call(this, { preventDefault() {}, currentTarget: btn }, fmt);
+      };
+      const idle = window.requestIdleCallback || (f => setTimeout(f, 1500));
+      window.addEventListener('load', () => idle(() => load().catch(() => {})));
+    })();
+  </script>
 
   <script>
     /* Кнопки скачивания документации: если файл ещё не выложен в assets/docs/, показываем понятное сообщение вместо страницы 404 */
