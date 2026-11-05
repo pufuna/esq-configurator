@@ -6,7 +6,7 @@
 
 В архив попадает только то, что нужно сайту: страницы, скрипты, assets/ (чертежи, документация, шаблоны ТКП,
 шрифты, библиотеки), конфиги веб-сервера (web.config — IIS, .htaccess — Apache, nginx.conf — пример)
-и инструкция по внедрению. Не попадают: тесты, служебные скрипты, код облачных функций, шрифты для служебных
+и инструкция по внедрению. Не попадают: тесты, служебные скрипты, шрифты для служебных
 скриптов, образцы и пустые файлы-заглушки «x».
 """
 import datetime, os, subprocess, sys, zipfile
@@ -40,7 +40,7 @@ def main():
     dst = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'dist', 'esq-configurator-' + datetime.date.today().isoformat() + '.zip')
     os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)
     files = sorted(site_files())
-    for need in ['index.html', 'configurator_vv_pch.html', 'vv_upp.html', 'registry.html', 'assets/template.pdf']:
+    for need in ['index.html', 'configurator_vv_pch.html', 'vv_upp.html', 'assets/template.pdf']:
         if need not in files:
             sys.exit('нет обязательного файла: ' + need)
     total = 0

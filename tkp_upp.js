@@ -149,14 +149,6 @@
     layout(size, false);
   }
 
-  /* запись в реестр выданных ТКП (registry.js) */
-  function registry(s, offer, fmt, product) {
-    if (!window.TkpRegistry) return;
-    const priced = offer.rows.every(r => r.price > 0);
-    window.TkpRegistry.add({ product, model: s.model || 'ESQ F HVS', mark: s.mark.replace(/А/g, 'A'), kv: s.kv, P: +s.P, I: +s.I, who: s.who, qty: s.qty, price: s.price || 0,
-      total: priced ? offer.rows.reduce((a, r) => a + r.price * r.qty, 0) : 0,
-      extra: (s.extra || []).map(r => ({ name: r.name, qty: r.qty, unit: r.unit, price: r.price })), fmt, link: window.TkpRegistry.link() });
-  }
 
   const WARRANTY = 'Гарантийный срок на устройство плавного пуска составляет 24 месяца со дня начала эксплуатации при условии гарантийной наработки 10 000 ч., но не более 36 месяцев с даты продажи при условии соблюдения Покупателем правил эксплуатации изделия, изложенных в инструкции по эксплуатации. Информация о ценах, содержащихся в данном документе, является конфиденциальной и действительна только при заказе оборудования и услуг. Данное предложение носит информационный характер и не является публичной офертой (согласно ст. 435 ГК РФ).';
 
@@ -450,14 +442,12 @@
             ...(extrasList(s).length ? [{ head: 'Дополнительная комплектация в данном предложении:', teal: true, bullets: extrasList(s) }] : [])] },
           tech: { title: '3. Основные технические характеристики предлагаемого оборудования',
             rows: techRows(s).map(([k, v]) => k === '§' ? { section: v } : { label: k, value: v }) } });
-        registry(s, { rows }, 'Word', 'ВВ УПП');
         return;
       }
       const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
       const link = document.createElement('a'); link.href = url;
       link.download = 'TKP_' + s.mark.replace(/ /g, '_') + '.pdf';
       document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
-      registry(s, { rows: [{ name: s.name, qty: s.qty, price: s.price }].concat(s.extra) }, 'PDF', 'ВВ УПП');
     } catch (e) { console.error(e); alert('Не удалось сформировать ТКП: ' + e.message); }
     finally { if (btn) btn.style.opacity = 1; }
   }

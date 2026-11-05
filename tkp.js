@@ -392,11 +392,9 @@
         if (!window.TkpDocx) throw new Error('не загружен модуль Word (tkp_docx.js)');
         await window.TkpDocx.pch({ pdf: out, s, vals: VALS, cell: CELL, offer: offerContent(s), desc: descContent(s),
           decode: { segments: decodeSegments(s), rows: decodeRows(s) } });
-        registry(s, offerContent(s), 'Word', 'ВВ ПЧ');
         return;
       }
       download(out, 'TKP_' + fileMark(s.mark) + '.pdf');
-      registry(s, offerContent(s), 'PDF', 'ВВ ПЧ');
     } catch (e) { console.error(e); alert('Не удалось сформировать ТКП: ' + e.message); }
     finally { if (btn) btn.style.opacity = 1; }
   }
@@ -495,19 +493,10 @@
       await window.TkpDocx.pch({ pdf: bytes, s: S[0], cell: CELL, offer, desc: descContent(descS), plan, fileName: name,
         models: S.map((s, k) => ({ s, vals: built[k].VALS, decode: { segments: decodeSegments(s), rows: decodeRows(s) } })) });
     } else download(bytes, name + '.pdf');
-    S.forEach((s, k) => registry(Object.assign({}, s, { extra: k ? [] : extra }), { rows: [{ name: s.name, qty: s.qty, price: s.price }].concat(k ? [] : extra) }, fmt === 'docx' ? 'Word' : 'PDF', 'ВВ ПЧ'));
   }
 
 
 
-  /* запись в реестр выданных ТКП (registry.js) */
-  function registry(s, offer, fmt, product) {
-    if (!window.TkpRegistry) return;
-    const priced = offer.rows.every(r => r.price > 0);
-    window.TkpRegistry.add({ product, model: s.model ? (s.isR ? 'ESQ F ME800-R' : s.model) : 'ESQ F HVS', mark: s.mark.replace(/А/g, 'A'), kv: s.kv, P: +s.P, I: +s.I, who: s.who, qty: s.qty, price: s.price || 0,
-      total: priced ? offer.rows.reduce((a, r) => a + r.price * r.qty, 0) : 0,
-      extra: (s.extra || []).map(r => ({ name: r.name, qty: r.qty, unit: r.unit, price: r.price })), fmt, link: window.TkpRegistry.link() });
-  }
 
   /* ================= Стр. 3: таблица предложения с дополнительными позициями =================
      Шапка таблицы — из шаблона; ниже — строки (ПЧ + доп. оборудование), итог и абзац о гарантии.
