@@ -6,6 +6,11 @@ AddType font/woff2 .woff2
 AddType application/json .json
 DirectoryIndex index.html
 
+<IfModule mod_deflate.c>
+  # сжатие страниц, скриптов и данных (gzip): в 3–5 раз меньше трафика; PDF, картинки и шрифты уже сжаты
+  AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
 <IfModule mod_headers.c>
   # страницы, скрипты и данные — всегда сверять с сервером, чтобы после обновления никто не работал со старой версией
   <FilesMatch "\.(html|js|mjs|json)$">

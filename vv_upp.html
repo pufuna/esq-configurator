@@ -7,11 +7,11 @@
   <meta name="robots" content="noindex, nofollow">
   <style>
     /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
-    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2'),url('assets/fonts/Inter-Light.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff2') format('woff2'),url('assets/fonts/Inter-Regular.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff2') format('woff2'),url('assets/fonts/Inter-Medium.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff2') format('woff2'),url('assets/fonts/Inter-SemiBold.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff2') format('woff2'),url('assets/fonts/Inter-Bold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff2') format('woff2')}
     :root{
       --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
       --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
@@ -173,7 +173,6 @@
     /* ---------- УПП ---------- */
     .hero .photo.upp{height:290px;margin-bottom:-1px}
     .param .note.warn{color:#b4471a;background:var(--orange-l);border-radius:8px;padding:6px 10px}
-    #summary{font-size:14px;color:var(--ink);overflow-wrap:anywhere;margin:0 0 4px}
     @media (max-width:1100px){.hero .photo.upp{height:230px}}
     @media (max-width:720px){.hero .photo.upp{height:200px}}
     /* ---------- подбор по двигателю ---------- */
@@ -204,26 +203,25 @@
     .doc-btn{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;padding:10.5px 12px;white-space:nowrap}
     @media (max-width:360px){.doc-btn{white-space:normal}}
     .doc-btn svg{flex:0 0 auto}
-    .reg-link[hidden]{display:none!important}      /* реестр ТКП — только для допущенных (registry.js) */
   </style>
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-in">
-      <img class="elkom" src="assets/ui/elkom.png" alt="ЭЛКОМ — стандарт качества">
+      <img class="elkom" src="assets/ui/elkom.webp" alt="ЭЛКОМ — стандарт качества">
       <div class="caption">Конфигуратор устройства плавного пуска</div>
       <a href="index.html" class="home-button">На главную</a>
     </div>
   </header>
 
   <section class="hero">
-    <img class="arcs" src="assets/ui/arcs.jpg" alt="">
+    <img class="arcs" src="assets/ui/arcs.webp" alt="">
     <div class="hero-in">
       <div>
-        <img class="esq" src="assets/ui/esq.png" alt="ESQ — Elcom Standard of Quality">
+        <img class="esq" src="assets/ui/esq.webp" alt="ESQ — Elcom Standard of Quality">
         <h1>Конфигуратор<br>устройства плавного пуска</h1>
       </div>
-      <img class="photo upp" src="assets/upp/cover_upp.png" alt="Устройство плавного пуска ESQ F HVS">
+      <img class="photo upp" src="assets/upp/cover_upp.webp" alt="Устройство плавного пуска ESQ F HVS">
     </div>
     <div class="band"><div class="band-in">
       <b>Устройство плавного пуска</b><span>ESQ F HVS · 6 и 10 кВ · 420–7000 кВт</span>
@@ -351,7 +349,7 @@
         <div class="note" id="dimsNote"></div>
       </div>
       <div class="param">
-        <label for="tkpMass">Масса, кг</label>
+        <label for="tkpMass">Масса УПП, кг</label>
         <input type="text" id="tkpMass" placeholder="Стандартная" inputmode="decimal" oninput="updateDimsHint()">
         <div class="note" id="massNote"></div>
       </div>
@@ -378,8 +376,8 @@
         <div class="rc-body">
           <div class="result-title">Маркировка</div>
           <div id="result">ESQ F HVS</div>
-          <div class="result-title">Конфигурация</div>
-          <div id="summary"></div>
+          <div class="result-title">Комплектация</div>
+          <div id="old-result"></div>
           <div class="btns">
             <div class="tkp-row"><a href="#" class="btn btn-primary" onclick="downloadTKP(event)">Скачать ТКП (PDF)</a><a href="#" class="btn btn-word" onclick="downloadTKP(event, 'docx')" title="ТКП в Word: таблица предложения, описание и характеристики — редактируемым текстом">Word</a></div>
             <a href="#" class="btn btn-teal techdesc-btn" onclick="toggleTechDesc(event)">Техническое описание</a>
@@ -392,7 +390,6 @@
         <div class="btns">
           <a class="btn btn-line doc-btn" href="assets/docs/TO_ESQ_F_HVS.pdf" download><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Скачать техническое описание</a>
           <a class="btn btn-line doc-btn" href="assets/docs/RE_ESQ_F_HVS.pdf" download><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Скачать руководство по эксплуатации</a>
-          <a class="btn btn-line doc-btn reg-link" href="registry.html" hidden><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>Реестр выданных ТКП</a>
         </div>
       </div>
     </aside>
@@ -413,8 +410,8 @@
 
   <footer class="footer">
     <div class="footer-in">
-      <img class="icons" src="assets/ui/icons.png" alt="">
-      <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
+      <img class="icons" src="assets/ui/icons.webp" alt="" loading="lazy" decoding="async">
+      <img class="esq-s" src="assets/ui/esq.webp" alt="ESQ" loading="lazy" decoding="async">
       <p>© <span id="year">2026</span> ESQ · ООО «Элком»</p>
       <script>document.getElementById('year').textContent = new Date().getFullYear();   // год в подвале — текущий</script>
     </div>
@@ -493,17 +490,19 @@
 
     function summaryText(){
       const m = model(), kv = val('voltage') === '06' ? 6 : 10;
-      return [kv + ' кВ', m[1] + ' кВт', m[0] + ' А', 'комплектация ' + PKG[val('package')],
-        ($('motor').value === 'S' ? 'синхронный' : 'асинхронный') + ' двигатель', val('ip'),
-        'питание цепей управления ' + CTL[val('ctl')], 'вводы ' + (val('cable') === 'T' ? 'сверху' : 'снизу'),
-        (val('service') === '1' ? 'одностороннее' : 'двухстороннее') + ' обслуживание', PROTO[val('protocol')]].join(', ');
+      // тот же порядок, что в комплектации ПЧ: напряжение, мощность, ток, IP, исполнение, протокол, вводы, двигатель
+      return [kv + ' кВ', m[1] + ' кВт', m[0] + ' А', val('ip'),
+        val('package') === 'STD' ? 'стандартная комплектация' : PKG[val('package')],
+        'питание цепей управления ' + CTL[val('ctl')], (val('service') === '1' ? 'одностороннее' : 'двухстороннее') + ' обслуживание',
+        PROTO[val('protocol')], 'вводы ' + (val('cable') === 'T' ? 'сверху' : 'снизу'),
+        ($('motor').value === 'S' ? 'синхронный' : 'асинхронный') + ' двигатель'].join(', ');
     }
 
     function update(){
       const m = model();
       $('current').value = m[0];
       $('result').textContent = buildMark();
-      $('summary').textContent = summaryText();
+      $('old-result').textContent = summaryText();
       const n = $('sizeNote');
       if (noDrawing()) { n.textContent = noDrawingMsg(); n.className = 'note warn'; }
       else { n.textContent = 'Габариты ' + dims() + ' мм (Ш×Г×В), масса ' + MASS_KG + ' кг.'; n.className = 'note'; }
@@ -697,9 +696,28 @@
           .catch(e => { window.__pdfLib = null; throw e; }));
     };
   </script>
-  <script src="registry.js"></script>
-  <script src="tkp_upp.js"></script>
-  <script src="tkp_docx.js"></script>
+  <script>
+    /* Сборка ТКП (pdfscrub.js, tkp_upp.js, tkp_docx.js) нужна только при скачивании: скрипты грузятся в фоне после открытия
+       страницы, а если кнопку нажали раньше — по нажатию. Обёртки downloadTKP на странице (проверка «Составил») сохраняются. */
+    (function () {
+      const SRC = ['pdfscrub.js', 'tkp_upp.js', 'tkp_docx.js'];
+      let real = null, loading = null;
+      const add = src => new Promise((ok, fail) => { const el = document.createElement('script'); el.src = src; el.onload = ok; el.onerror = () => fail(new Error('не загрузился ' + src)); document.head.appendChild(el); });
+      const load = () => loading || (loading = (async () => {
+        const keep = window.downloadTKP;                                 // обёртка страницы — остаётся на месте
+        for (const s of SRC) await add(s);
+        real = window.downloadTKP; window.downloadTKP = keep;
+      })().catch(e => { loading = null; throw e; }));
+      window.downloadTKP = async function (e, fmt) {
+        if (e && e.preventDefault) e.preventDefault();
+        const btn = e && e.currentTarget;
+        if (!real) { if (btn) btn.style.opacity = .6; try { await load(); } catch (err) { if (btn) btn.style.opacity = 1; alert('Не удалось загрузить модуль ТКП: ' + err.message); return; } }
+        return real.call(this, { preventDefault() {}, currentTarget: btn }, fmt);
+      };
+      const idle = window.requestIdleCallback || (f => setTimeout(f, 1500));
+      window.addEventListener('load', () => idle(() => load().catch(() => {})));
+    })();
+  </script>
 
   <script>
     /* Кнопки скачивания документации: если файл ещё не выложен в assets/docs/, показываем понятное сообщение вместо страницы 404 */

@@ -7,11 +7,11 @@
   <meta name="robots" content="noindex, nofollow">
   <style>
     /* Оформление — как в ТКП и техописании ESQ: шрифт Inter, бирюзовый и оранжевый, рамки со скруглением */
-    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2'),url('assets/fonts/Inter-Light.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff2') format('woff2'),url('assets/fonts/Inter-Regular.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff2') format('woff2'),url('assets/fonts/Inter-Medium.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff2') format('woff2'),url('assets/fonts/Inter-SemiBold.woff') format('woff')}
-    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff2') format('woff2'),url('assets/fonts/Inter-Bold.woff') format('woff')}
+    @font-face{font-family:'Inter';font-weight:300;font-display:swap;src:url('assets/fonts/Inter-Light.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url('assets/fonts/Inter-Regular.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url('assets/fonts/Inter-Medium.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url('assets/fonts/Inter-SemiBold.woff2') format('woff2')}
+    @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url('assets/fonts/Inter-Bold.woff2') format('woff2')}
     :root{
       --teal:#0a6972; --teal-d:#07535a; --teal-l:#e7f1f2; --teal-ll:#f3f8f8;
       --orange:#f26928; --orange-d:#d9551a; --orange-l:#fff1ea;
@@ -57,7 +57,6 @@
     .hero-in{min-height:250px;grid-template-columns:minmax(0,1fr)}
     .wrap{width:100%;max-width:1240px;margin:32px auto 44px;padding:0 24px;flex:1}
     .tool{display:flex;align-items:center;gap:18px;margin-top:16px;padding:18px 22px;background:#fff;border:1.5px solid var(--teal);border-radius:var(--r);text-decoration:none;color:var(--ink);transition:box-shadow .2s,transform .2s}
-    .reg-link[hidden]{display:none!important}      /* реестр ТКП — только для допущенных (registry.js) */
     .tool:hover{box-shadow:0 14px 34px rgba(10,105,114,.14);transform:translateY(-2px)}
     .tool-ico{flex:0 0 auto;width:54px;height:54px;border-radius:14px;background:var(--orange);color:#fff;display:flex;align-items:center;justify-content:center}
     .tool-txt{flex:1;font-size:14.5px}.tool-txt b{display:block;color:var(--orange);font-weight:600;font-size:19px;margin-bottom:2px}
@@ -113,16 +112,16 @@
 <body>
   <header class="topbar">
     <div class="topbar-in">
-      <img class="elkom" src="assets/ui/elkom.png" alt="ЭЛКОМ — стандарт качества">
+      <img class="elkom" src="assets/ui/elkom.webp" alt="ЭЛКОМ — стандарт качества">
       <div class="caption">Высоковольтное оборудование ESQ</div>
     </div>
   </header>
 
   <section class="hero">
-    <img class="arcs" src="assets/ui/arcs.jpg" alt="">
+    <img class="arcs" src="assets/ui/arcs.webp" alt="">
     <div class="hero-in">
       <div>
-        <img class="esq" src="assets/ui/esq.png" alt="ESQ — Elcom Standard of Quality">
+        <img class="esq" src="assets/ui/esq.webp" alt="ESQ — Elcom Standard of Quality">
         <h1>Конфигураторы<br>оборудования</h1>
         <p class="lead">Подберите исполнение, получите маркировку, техническое описание и готовое ТКП в PDF или Word за пару минут.</p>
       </div>
@@ -151,7 +150,7 @@
       </article>
 
       <article class="prod">
-        <a class="pic" href="vv_upp.html"><span class="tag">ВВ УПП</span><img src="assets/upp/cover_upp.png" alt="Устройство плавного пуска ESQ F HVS"></a>
+        <a class="pic" href="vv_upp.html"><span class="tag">ВВ УПП</span><img src="assets/upp/cover_upp.webp" alt="Устройство плавного пуска ESQ F HVS"></a>
         <div class="body">
           <h2>Высоковольтное устройство плавного пуска</h2>
           <div class="model">ESQ F HVS</div>
@@ -167,27 +166,21 @@
       </article>
     </div>
 
-    <a class="tool reg-link" href="registry.html" hidden>
-      <span class="tool-ico" aria-hidden="true" style="background:var(--teal)"><svg viewBox="0 0 24 24" width="28" height="28"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg></span>
-      <span class="tool-txt"><b style="color:var(--teal)">Реестр выданных ТКП</b>Все ТКП, скачанные в конфигураторах: кто, когда, на какую конфигурацию и сумму. Поиск, выгрузка в Excel, открытие конфигурации в один клик.</span>
-      <span class="tool-go">Открыть →</span>
-    </a>
 
     <section class="about">
       <div><b>1. Параметры</b>Выберите напряжение, мощность и опции — маркировка собирается автоматически.</div>
       <div><b>2. Описание</b>Техническое описание конфигурации и габаритный чертёж — прямо на странице.</div>
-      <div><b>3. ТКП</b>Скачайте технико-коммерческое предложение в PDF или Word с вашей конфигурацией — оно попадёт в реестр.</div>
+      <div><b>3. ТКП</b>Скачайте технико-коммерческое предложение в PDF или Word с вашей конфигурацией.</div>
     </section>
   </main>
 
   <footer class="footer">
     <div class="footer-in">
-      <img class="icons" src="assets/ui/icons.png" alt="">
-      <img class="esq-s" src="assets/ui/esq.png" alt="ESQ">
+      <img class="icons" src="assets/ui/icons.webp" alt="" loading="lazy" decoding="async">
+      <img class="esq-s" src="assets/ui/esq.webp" alt="ESQ" loading="lazy" decoding="async">
       <p>© <span id="year">2026</span> ESQ · ООО «Элком»</p>
       <script>document.getElementById('year').textContent = new Date().getFullYear();   // год в подвале — текущий</script>
     </div>
   </footer>
-  <script src="registry.js"></script>
 </body>
 </html>

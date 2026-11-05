@@ -7,4 +7,4 @@
 |---|---|---|---|
 | pdf-lib.min.js | pdf-lib | 1.17.1 | MIT |
 | pdfjs/pdf.min.mjs, pdfjs/pdf.worker.min.mjs | pdfjs-dist (legacy build) | 6.2.108 | Apache-2.0 |
-| docx.iife.js | docx | 9.8.1 | MIT |
+| docx.min.js | docx (минифицирован esbuild из dist/index.iife.js) | 9.8.1 | MIT |

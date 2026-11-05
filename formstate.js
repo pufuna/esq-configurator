@@ -86,7 +86,7 @@
     scope.addEventListener('click', e => { if (e.target.closest('.ex-del, .add-row, .md-del, .md-add')) setTimeout(save, 0); });
     save();
 
-    // ссылка на текущую конфигурацию (её же сохраняет реестр ТКП)
+    // ссылка на текущую конфигурацию
     window.FormStateLink = () => {
       const p = new URLSearchParams({ cfg: '1' });
       fields().forEach(el => { if (!PRIVATE.includes(el.id) && el.tagName === 'SELECT') p.set(el.id, el.value); });
