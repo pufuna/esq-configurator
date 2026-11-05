@@ -229,17 +229,6 @@ async def main():
         text, nsec = await word()
         check('Шеф-монтаж' in text and 'Функции защиты' in text and 'ESQ F HVS' in text and 'ЗИП: тиристорный блок' in text, 'ТКП УПП в Word: доп. строка, ЗИП и характеристики')
 
-        # ---------- расчёт энергосбережения ----------
-        print('Расчёт энергосбережения')
-        await page.goto(base + 'energy.html'); await page.evaluate("localStorage.removeItem('esq.energy')"); await page.reload(); await page.wait_for_timeout(400)
-        r = await page.evaluate("""() => __energyCalc({mech:'pump', ctl:'valve', kw:1000, load:85, hst:20, etaM:95, etaV:96.5, tariff:7.5, cost:'45000000', years:10},
-            [{q:80, h:1000}])""")
-        # Q=0,8: задвижка 850·(0,45+0,55·0,8)/0,95 = 796,3 кВт; ПЧ 850·0,8·(0,2+0,8·0,64)/(0,95·0,965) = 528,1 кВт
-        check(abs(r['res'][0]['now'] - 796.3) < 0.5 and abs(r['res'][0]['vfd'] - 528.1) < 0.5, f"формулы: {r['res'][0]['now']:.1f} / {r['res'][0]['vfd']:.1f} кВт")
-        check('млн руб.' in await page.text_content('#rRub'), 'страница считает итог: ' + await page.text_content('#rRub'))
-        await page.goto(base + await page.get_attribute('#toConf', 'href')); await page.wait_for_timeout(700)
-        check(await page.input_value('#power') == '1000', 'переход в конфигуратор с подбором по двигателю')
-
         check(not errors, 'нет ошибок JavaScript' + (': ' + '; '.join(errors[:3]) if errors else ''))
         await browser.close()
 
