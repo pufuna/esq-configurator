@@ -982,15 +982,6 @@
       return ({'18':'3 ячейки на фазу','30':'5 ячеек на фазу','36':'6 ячеек на фазу','48':'8 ячеек на фазу','54':'9 ячеек на фазу'})[p] || '';
     }
 
-    function getOldNomenclatureCode(){
-      const newCode = document.getElementById('result').textContent;
-      const lastPart = newCode.split('-').pop();
-      const lastThree = lastPart.slice(-3);
-      const v = document.getElementById('voltage').value;
-      const p = document.getElementById('power').value;
-      return `ESQ-ME800-${p}-${v}-${lastThree}`;
-    }
-
     function buildOldNomenclatureText(){
       const vSel = document.getElementById('voltage');
       const vText = vSel.options[vSel.selectedIndex].text;
@@ -1010,7 +1001,7 @@
       const cellBypass = document.getElementById('cellBypass').value;
 
       const parts = [
-        getOldNomenclatureCode(), vText, `${p} кВт`, `${i} А`, `IP${ip}`,
+        vText, `${p} кВт`, `${i} А`, `IP${ip}`,
         `${material==='AL'?'алюминиевый':'медный'} трансформатор`, getCellCount()
       ];
       const adds = [];
