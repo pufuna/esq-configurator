@@ -13,6 +13,7 @@
   • габариты и масса, вписанные вручную (ПЧ и УПП), — в техописании и ТКП;
   • ТКП ПЧ на несколько моделей (PDF и Word);
   • форма восстанавливается после перезагрузки страницы;
+  • из ТКП удалено скрытое содержимое шаблонов и чертежей (pdfscrub.js);
   • сайт работает без CDN (cdn.jsdelivr.net заблокирован — библиотеки берутся из assets/vendor);
   • в консоли нет ошибок JavaScript.
 """
@@ -228,6 +229,9 @@ async def main():
         check('1100×1600×2400' in tu and '950 кг' in tu and 'по согласованию' in tu, 'ТКП УПП: ручные габариты и масса')
         text, nsec = await word()
         check('Шеф-монтаж' in text and 'Функции защиты' in text and 'ESQ F HVS' in text and 'ЗИП: тиристорный блок' in text, 'ТКП УПП в Word: доп. строка, ЗИП и характеристики')
+
+        st = await page.evaluate('window.__scrubStat')
+        check(bool(st) and st['removed'] > 0 and st['orphans'] > 0, f'скрытое содержимое шаблонов и чертежей удалено из ТКП (pdfscrub.js): {st}')
 
         check(not errors, 'нет ошибок JavaScript' + (': ' + '; '.join(errors[:3]) if errors else ''))
         await browser.close()

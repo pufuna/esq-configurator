@@ -429,6 +429,7 @@
       M.apply();
       if (s.noDrawing) alert('Напоминание: для ' + s.mark + ' габаритный эскиз в ТКП не вставляется — лист эскиза останется пустым' +
         (s.dims ? '' : ', строка «Габариты» тоже') + '. Приложите эскиз к ТКП отдельно.');
+      if (window.PdfScrub) await window.PdfScrub.scrub(doc);            // скрытое содержимое шаблона и чертежей — из файла (pdfscrub.js)
       const out = await doc.save({ useObjectStreams: true });
       if (fmt === 'docx') {
         if (!window.TkpDocx) throw new Error('не загружен модуль Word (tkp_docx.js)');

@@ -387,6 +387,7 @@
       const s = readState();
       if (!s.m) throw new Error('не удалось разобрать маркировку: ' + s.mark);
       const { doc, VALS } = await build(s);
+      if (window.PdfScrub) await window.PdfScrub.scrub(doc);            // скрытое содержимое шаблона и чертежей — из файла (pdfscrub.js)
       const out = await doc.save();
       if (fmt === 'docx') {
         if (!window.TkpDocx) throw new Error('не загружен модуль Word (tkp_docx.js)');
@@ -484,6 +485,7 @@
     }
     const out = await PDFDocument.create();
     for (const [k, p] of plan) { const [cp] = await out.copyPages(built[k].doc, [p]); out.addPage(cp); }
+    if (window.PdfScrub) await window.PdfScrub.scrub(out);            // скрытое содержимое — из файла (pdfscrub.js)
     const bytes = await out.save();
     if (notes.length) alert('Напоминание:\n' + [...new Set(notes)].join('\n'));
     const name = 'TKP_ESQ_F_ME800_' + S.map(s => s.P).join('-') + 'kW';
