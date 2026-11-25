@@ -41,9 +41,22 @@ def serve():
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv.server_address[1]
 
+LAST_PDF = {}
 def pdf_pages(data):
+    LAST_PDF['data'] = data
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         return len(pdf.pages)
+
+def shared_streams(data):
+    """Листы с одинаковым списком потоков содержимого. Тело листа-заготовки у копий общее — это нормально,
+    но если копии делят сам массив Contents, всё нарисованное на одном листе проступает на всех."""
+    seen = {}
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        for i, pg in enumerate(pdf.pages):
+            c = pg.page_obj.attrs.get('Contents')
+            key = tuple(getattr(r, 'objid', None) for r in (c if isinstance(c, list) else [c]))
+            seen.setdefault(key, []).append(i + 1)
+    return [v for v in seen.values() if len(v) > 1]
 
 PCH_CASES = []
 for model, volts in [('ME800', {'T060': ['280', '1250', '1600', '1800', '4500', '8000'], 'T100': ['280', '2650', '2800', '12500']}),
@@ -225,6 +238,8 @@ async def main():
         n, t = await tkp()
         check(n > 8 and 'ESQ F HVS' in t(3) and 'Шеф-монтаж' in t(3), f'ТКП УПП: {n} стр., доп. строка на листе 3')
         check('ЗИП: тиристорный блок' in t(3), 'ТКП УПП: ЗИП в строке УПП на листе 3')
+        sh = shared_streams(LAST_PDF['data'])
+        check(not sh, 'ТКП УПП: листы не накладываются друг на друга (у каждого листа свой набор потоков)' + (f': листы {sh}' if sh else ''))
         tu = ' '.join(t(i) for i in range(n))
         check('1100×1600×2400' in tu and '950 кг' in tu and 'по согласованию' in tu, 'ТКП УПП: ручные габариты и масса')
         text, nsec = await word()

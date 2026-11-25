@@ -22,7 +22,7 @@
   };
 
   function init() {
-  const { PDFDocument, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, rectangle, clipEvenOdd, endPath } = window.PDFLib;
+  const { PDFDocument, PDFName, PDFArray, rgb, pushGraphicsState, popGraphicsState, concatTransformationMatrix, rectangle, clipEvenOdd, endPath } = window.PDFLib;
   const WHITE = rgb(1, 1, 1), DARK = rgb(35 / 255, 31 / 255, 33 / 255), TEAL = rgb(10 / 255, 105 / 255, 114 / 255),
     ORANGE = rgb(242 / 255, 105 / 255, 40 / 255), LINE = rgb(12 / 255, 106 / 255, 115 / 255), BAND = rgb(.0392, .412, .447),
     HEAD = rgb(212 / 255, 212 / 255, 212 / 255), TEAL5 = rgb(3 / 255, 91 / 255, 110 / 255), OR5 = rgb(243 / 255, 95 / 255, 39 / 255),
@@ -296,6 +296,12 @@
 
       const doc = await PDFDocument.create();
       const copied = await doc.copyPages(shell, plan.map(x => SH[x[0]]));
+      // Копии одного листа-заготовки (лист с заголовком, пустой, чертёж) из одного copyPages получают ОДИН и тот же массив
+      // Contents (pdf-lib копирует объект один раз), и всё, что рисуется на одном листе, оказывается на всех. Каждому — свой массив.
+      copied.forEach(p => {
+        const c = p.node.get(PDFName.of('Contents'));
+        if (c instanceof PDFArray) p.node.set(PDFName.of('Contents'), doc.context.obj(c.asArray().slice()));
+      });
       copied.forEach(p => doc.addPage(p));
       const pg = doc.getPages();
       LOG.pages = pg;
